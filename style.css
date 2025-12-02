@@ -1,0 +1,63 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap');
+
+/* SECTIONS */
+header {
+    nav {
+        display: flex;
+        justify-content: space-around;
+        max-width: 600px;
+    }
+    padding-top: 20px;
+
+    .navbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        max-width: 1500px;
+        margin: auto;
+      }
+      
+    .navbar .navs {
+        color: rgb(0, 0, 0);
+        text-decoration: none;
+        margin-left: 16px;
+        font-weight: 500;
+        transition: color 0.3s;
+        font-family: Inter;
+    }
+      
+    .navbar .navs:hover {
+        color: #2B792C;
+    }
+
+    #logo {
+        display: flex;
+    }
+}
+
+h1 {
+    font-family: Poppins;
+
+}
+
+#imgLogo {
+    width: 50px;
+    height: 50px;
+}
+
+#logo {
+    align-items: center;
+}
+
+/* TEXT */
+
+span {
+    color: #2B792C;
+}
+
+/* IMAGES */
+.logo {
+    width: 50px;
+    height: 50px;
+    border-radius: 5px;
+}
