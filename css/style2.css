@@ -1,0 +1,179 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap');
+
+body {
+    background-color: black;
+    color: white;
+}
+/* SECTIONS */
+
+.logoaa {
+    max-width: 100%;
+    justify-content: center;
+    align-items: center;
+    display: flex;
+}
+
+.rankingContent {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 40px;
+    padding: 60px 20px;
+}
+
+.rankingDiv {
+    display: flex;
+    flex-direction: column;
+    max-width: 700px;
+}
+
+.premiumContent {
+    display: block;
+    text-align: center;
+    padding: 50px 20px;
+}
+
+.fullLogo {
+    display: flex;
+    align-items: center;
+}
+
+/* ITEMS */
+nav {
+    display: flex;
+    justify-content: space-around;
+    max-width: 600px;
+}
+
+.navbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    max-width: 1500px;
+    margin: auto;
+}
+
+.navItem {
+    color: rgb(0, 0, 0);
+    text-decoration: none;
+    font-weight: 500;
+    transition: color 0.3s;
+    font-family: Inter;
+
+    padding: 49px 20px 49px 20px;
+    
+    &:hover {
+        color: #2B792C;
+        text-decoration: underline;
+    }
+}
+    
+/* TEXT */
+
+h1 {
+    font-family: Poppins;
+    font-size: 35px;
+}
+
+p {
+    font-family: Inter;
+    font-size: 20px;
+}
+
+#premiumEnfase {
+    color: #2B792C;
+}
+
+.rankingSlogan {
+    font-family: Inter;
+    font-size: 60px;
+    margin-top: 10px;
+    margin-bottom: 10px;
+}
+
+.description {
+    font-family: Inter;
+    font-size: 20px;
+}
+
+.rankingDescription {
+    font-family: Inter;
+    font-size: 50px;
+    margin-top: 10px;
+    margin-bottom: 10px;
+    margin: 0;
+    font-size: 20px;
+    line-height: 1.4;
+}
+
+.premiumSlogan {
+    font-family: Inter;
+    font-size: 70px;
+    margin-bottom: 10px;
+}
+
+.alreadyRegistered {
+    margin-top: 15px;
+    font-family: Inter;
+    font-size: 16px;
+}
+
+.logIn {
+    color: #2B792C;
+    text-decoration: none;
+    font-weight: 500;
+    transition: color 0.3s;
+    font-family: Inter;
+
+    &:hover {
+        color: #1F5E1F;
+        text-decoration: underline;
+    }
+}
+
+#premium {
+    font-weight: bold;
+    color: #266701;
+}
+
+span {
+    color: #2B792C;
+}
+
+/* IMAGES */
+.logo {
+    width: 65px;
+    height: 65px;
+    border-radius: 5px;
+}
+
+.rankingImage {
+  width: 420px;
+  height: auto;
+  border-radius: 12px;
+  transition: 0.75s all;
+    &:hover {
+        transform: scale(1.20);
+    }
+}
+
+/* BUTTONS */
+.getStartedBtn {
+    background-color: #2b792c00;
+        color:#2B792C;
+
+    font-family: Inter;
+    font-size: 20px;
+    font-weight: 600;
+    padding: 15px 30px;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    margin-top: 20px;
+    transition: 0.2s all;
+
+    &:hover {
+        background-color:rgba(1, 92, 4, 0.264);
+        color:#2B792C;
+    }
+}
