@@ -2,14 +2,22 @@
 
 /* SECTIONS */
 header {
-position: fixed;
-top: 0;
-left: 0;
-width: 100%;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
 
-background-color: white;
-box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-z-index: 1000;
+    background-color: white;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    z-index: 1000;
+}
+
+.activityContent {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 40px;
+    padding: 60px 20px;
 }
 
 .rankingContent {
@@ -81,12 +89,6 @@ p {
     font-size: 20px;
 }
 
-.rankingSlogan {
-    font-family: Inter;
-    font-size: 60px;
-    margin-top: 10px;
-    margin-bottom: 10px;
-}
 
 .description {
     font-family: Inter;
@@ -101,6 +103,24 @@ p {
     margin: 0;
     font-size: 20px;
     line-height: 1.4;
+}
+
+.activityDescription {
+
+}
+
+.rankingSlogan {
+    font-family: Inter;
+    font-size: 60px;
+    margin-top: 10px;
+    margin-bottom: 10px;
+}
+
+.activitySlogan {
+    font-family: Inter;
+    font-size: 60px;
+    margin-top: 10px;
+    margin-bottom: 10px;
 }
 
 .slogan {
