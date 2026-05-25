@@ -1,0 +1,648 @@
+package br.com.zenith.ui.components.profile
+
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.Icon
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import br.com.zenith.R
+import androidx.compose.foundation.pager.PageSize
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.unit.sp
+import br.com.zenith.data.SupabaseConfig
+import br.com.zenith.ui.theme.Inter
+import br.com.zenith.data.models.Badge
+import br.com.zenith.data.models.Profile
+import br.com.zenith.data.models.Titulo
+import br.com.zenith.ui.theme.ZenithTheme
+import br.com.zenith.viewmodels.profile.UserStats
+import coil.compose.AsyncImage
+import io.github.jan.supabase.storage.storage
+import androidx.core.graphics.toColorInt
+import androidx.navigation.NavController
+import br.com.zenith.data.models.Atividade
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.doubleOrNull
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+
+private data class BadgeConfig(
+    val backgroundColor: Color,
+    val iconRes: Int,
+    val textColor: Color = Color.Black,
+    val tint: Color = Color.Black,
+    val iconSize: androidx.compose.ui.unit.Dp = 24.dp,
+)
+
+private fun badgeConfig(title: String): BadgeConfig? = when (title.uppercase()) {
+    "DEV" -> BadgeConfig(
+        backgroundColor = Color(0xFF5DA8FE),
+        iconRes = R.drawable.badge_dev,
+    )
+    "TESTER" -> BadgeConfig(
+        backgroundColor = Color(0xFFD79B3B),
+        iconRes = R.drawable.badge_tester,
+        iconSize = 20.dp
+    )
+    "PREMIUM" -> BadgeConfig(
+        backgroundColor = Color(0xFF4CAF50),
+        iconRes = R.drawable.badge_premium,
+        iconSize = 20.dp
+    )
+    else -> null
+}
+
+@Composable
+fun ProfileHeader(
+    user: Profile?,
+    stats: UserStats,
+    badge: Badge?,
+    onBack: () -> Unit,
+    onEdit: (() -> Unit)? = null,
+    onTitleClick: () -> Unit = {},
+    onStatusClick: (() -> Unit)? = null
+) {
+    ZenithTheme {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Box(modifier = Modifier.fillMaxWidth()) {
+                Banner(bannerHash = user?.bannerHash)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(10.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Voltar",
+                        tint = Color(0xFF238D25),
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clickable { onBack() }
+                    )
+                    if (onEdit != null) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.badge_dev),
+                            contentDescription = "Editar",
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(Color(0x88FFFFFF))
+                                .border(1.dp, Color(0x88000000), RoundedCornerShape(6.dp))
+                                .clickable { onEdit() }
+                                .padding(6.dp)
+                        )
+                    }
+                }
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(start = 14.dp, top = 65.dp)
+                ) {
+                    ProfilePicture(pictureHash = user?.pictureHash)
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomStart)
+                            .offset(x = 100.dp, y = (-25).dp)
+                    ) {
+                        Status(status = user?.status, onClick = onStatusClick)
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            UserSection(user = user, badge = badge, onTitleClick = onTitleClick)
+            Spacer(modifier = Modifier.height(8.dp))
+            Streak(streak = user?.streak ?: 0)
+            Spacer(modifier = Modifier.height(8.dp))
+            Stats(stats = stats)
+        }
+    }
+}
+
+@Composable
+fun UserSection(user: Profile?, badge: Badge?, onTitleClick: () -> Unit) {
+    fun formatDate(isoDate: String): String {
+        return try {
+            val input = java.time.OffsetDateTime.parse(isoDate)
+            "%02d/%02d/%d".format(input.dayOfMonth, input.monthValue, input.year)
+        } catch (e: Exception) {
+            isoDate
+        }
+    }
+
+    Column(modifier = Modifier.padding(start = 32.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = user?.displayName ?: "Carregando...",
+                style = MaterialTheme.typography.headlineLarge,
+                textAlign = TextAlign.Center
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Badge(badge = badge)
+        }
+        Text(
+            text = "@${user?.name ?: "..."}",
+            style = MaterialTheme.typography.labelMedium
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+            text = if (user?.registerDate != null) {
+                "Membro desde ${formatDate(user.registerDate)}"
+            } else {
+                "Carregando..."
+            },
+            style = MaterialTheme.typography.labelSmall
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        Title(titulo = user?.titulo, onClick = onTitleClick)
+    }
+}
+
+@Composable
+fun Badge(badge: Badge?) {
+    if (badge == null) return
+
+    val config = badgeConfig(badge.title) ?: return  // ← some silenciosamente
+
+    Row(
+        modifier = Modifier
+            .background(color = config.backgroundColor, shape = RoundedCornerShape(size = 15.dp))
+            .wrapContentSize()
+            .padding(start = 10.dp, top = 3.dp, end = 10.dp, bottom = 3.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            painter = painterResource(id = config.iconRes),
+            contentDescription = badge.title,
+            tint = Color.Unspecified,
+            modifier = Modifier.size(config.iconSize)
+        )
+        Spacer(modifier = Modifier.width(5.dp))
+        Text(text = badge.title, color = config.textColor)
+    }
+}
+
+@Composable
+fun RecentHeader() {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 32.dp, top = 6.dp),
+        verticalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(end = 32.dp),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = "Atividades recentes",
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.W600
+            )
+            Text(
+                text = "Ver todas",
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.W600,
+                color = Color(0x99111111)
+            )
+        }
+    }
+}
+
+fun tempoRelativo(dataIso: String?): String {
+    return try {
+        val atividadeTime = java.time.OffsetDateTime.parse(dataIso)
+        val agora = java.time.OffsetDateTime.now()
+        val duracao = java.time.Duration.between(atividadeTime, agora)
+        val minutos = duracao.toMinutes()
+        val horas = duracao.toHours()
+        val dias = duracao.toDays()
+        when {
+            minutos < 1 -> "Agora mesmo"
+            minutos < 60 -> "Há $minutos minuto(s)"
+            horas < 24 -> "Há $horas hora(s)"
+            else -> "Há $dias dia(s)"
+        }
+    } catch (e: Exception) {
+        ""
+    }
+}
+
+fun activityType(atividade: Atividade): String {
+    return atividade.exercicio?.nome ?: "Atividade"
+}
+
+fun activityGroup(atividade: Atividade): String {
+    atividade.exercicio?.grupo?.takeIf { it.isNotBlank() }?.let { return it }
+
+    val text = "${atividade.exercicio?.slug.orEmpty()} ${atividade.exercicio?.nome.orEmpty()}".lowercase()
+    return when {
+        "caminh" in text -> "Caminhadas com meus amigos"
+        "corr" in text -> "Corridas"
+        "sono" in text || "dorm" in text -> "Sono e descanso"
+        "bike" in text || "cicl" in text -> "Pedaladas"
+        "academia" in text || "muscul" in text -> "Treinos de forca"
+        else -> "Atividades pessoais"
+    }
+}
+
+private fun formatDecimal(value: Double): String {
+    val rounded = kotlin.math.round(value * 10.0) / 10.0
+    return if (rounded % 1.0 == 0.0) rounded.toInt().toString() else rounded.toString()
+}
+
+fun formattedActivityValue(atividade: Atividade): String {
+    val text = "${atividade.exercicio?.slug.orEmpty()} ${atividade.exercicio?.nome.orEmpty()} ${atividade.exercicio?.unidade.orEmpty()}".lowercase()
+    val value = atividade.valor
+    return when {
+        "km" in text || "corr" in text || "caminh" in text || "bike" in text || "cicl" in text ->
+            "${formatDecimal(value)} km"
+        "min" in text ->
+            "${formatDecimal(value / 60.0)} h"
+        else ->
+            "${formatDecimal(value)} h"
+    }
+}
+
+fun formattedDuration(duracaoMin: Int?): String {
+    if (duracaoMin == null || duracaoMin <= 0) return "-"
+    val hours = duracaoMin / 60
+    val minutes = duracaoMin % 60
+    return when {
+        hours > 0 && minutes > 0 -> "${hours}h ${minutes}min"
+        hours > 0 -> "${hours}h"
+        else -> "${minutes}min"
+    }
+}
+
+@Composable
+fun RecentActivitySection(navController: NavController, atividades: List<Atividade>) {
+    val recent = remember(atividades) {
+        atividades.sortedByDescending { it.realizadaEm }.take(5)
+    }
+    Column {
+        recent.forEach { atividade ->
+            RecentActivityCard(
+                atividade = atividade,
+                onClick = { navController.navigate("activity_detail/${atividade.id}") }
+            )
+        }
+    }
+}
+
+@Composable
+fun RecentActivityCard(atividade: Atividade, onClick: () -> Unit) {
+    ZenithTheme {
+        Column(
+            modifier = Modifier
+                .padding(start = 32.dp, top = 10.dp, end = 32.dp)
+                .fillMaxWidth()
+                .background(color = Color(0xFFF5F5F5), shape = RoundedCornerShape(size = 5.dp))
+                .border(width = 1.dp, color = Color(0xFFE0E0E0), shape = RoundedCornerShape(size = 5.dp))
+                .clickable { onClick() }
+                .padding(start = 12.dp, top = 10.dp, end = 12.dp, bottom = 10.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = tempoRelativo(atividade.realizadaEm),
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.W500,
+                    color = Color(0xFF000000),
+                    fontStyle = FontStyle.Italic
+                )
+                Box(
+                    modifier = Modifier
+                        .padding(1.dp)
+                        .width(24.dp)
+                        .height(16.dp)
+                        .background(color = Color(0x5CC9C9C9), shape = RoundedCornerShape(size = 25.dp))
+                ) {
+                    Icon(
+                        painter = painterResource(
+                            id = if (atividade.verificada) R.drawable.act_verified else R.drawable.nav_social
+                        ),
+                        contentDescription = "Status da Atividade",
+                        tint = Color.Unspecified,
+                        modifier = Modifier
+                            .padding(start = 3.dp, top = 3.dp, bottom = 3.dp)
+                            .size(18.dp)
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(14.dp))
+            Text(
+                text = activityType(atividade),
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.W600,
+                color = Color(0xFF238D25)
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = activityGroup(atividade),
+                style = MaterialTheme.typography.labelSmall,
+                color = Color(0xFF6F6C6C)
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+            Text(
+                text = atividade.titulo ?: "Atividade registrada:",
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.W600,
+                color = Color(0xFF000000)
+            )
+            RouteSparkline(rota = atividade.rota)
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = formattedActivityValue(atividade),
+                style = MaterialTheme.typography.displayMedium.copy(
+                    fontSize = 27.sp,
+                    fontStyle = FontStyle.Italic,
+                    fontWeight = FontWeight.W700,
+                ),
+                color = Color(0xFF1B820E)
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = "Duracao: ${formattedDuration(atividade.duracaoMin)}",
+                style = MaterialTheme.typography.labelSmall,
+                fontSize = 12.sp,
+                color = Color(0xFF6F6C6C)
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "Nota do usuario: ${atividade.nota?.let { "$it/10" } ?: "-"}",
+                style = MaterialTheme.typography.labelSmall,
+                fontSize = 12.sp,
+                color = Color(0xFF6F6C6C)
+            )
+        }
+    }
+}
+
+@Composable
+private fun RouteSparkline(rota: String?) {
+    val points = remember(rota) { parseRouteSparklinePoints(rota) }
+    if (points.size < 2) return
+
+    Spacer(modifier = Modifier.height(8.dp))
+    Canvas(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(54.dp)
+            .background(Color(0xFFECECEC), RoundedCornerShape(5.dp))
+            .padding(8.dp)
+    ) {
+        val minLat = points.minOf { it.first }
+        val maxLat = points.maxOf { it.first }
+        val minLng = points.minOf { it.second }
+        val maxLng = points.maxOf { it.second }
+        val latRange = (maxLat - minLat).takeIf { it != 0.0 } ?: 1.0
+        val lngRange = (maxLng - minLng).takeIf { it != 0.0 } ?: 1.0
+
+        val path = Path()
+        points.forEachIndexed { index, point ->
+            val x = ((point.second - minLng) / lngRange).toFloat() * size.width
+            val y = size.height - ((point.first - minLat) / latRange).toFloat() * size.height
+            if (index == 0) path.moveTo(x, y) else path.lineTo(x, y)
+        }
+
+        drawPath(
+            path = path,
+            color = Color(0xFF454545),
+            style = Stroke(width = 6f, cap = StrokeCap.Round)
+        )
+    }
+}
+
+private fun parseRouteSparklinePoints(rota: String?): List<Pair<Double, Double>> {
+    if (rota.isNullOrBlank()) return emptyList()
+    return runCatching {
+        Json.parseToJsonElement(rota).jsonArray.mapNotNull { item ->
+            val obj = item.jsonObject
+            val lat = obj["lat"]?.jsonPrimitive?.doubleOrNull
+            val lng = obj["lng"]?.jsonPrimitive?.doubleOrNull
+            if (lat != null && lng != null) lat to lng else null
+        }
+    }.getOrDefault(emptyList())
+}
+
+@Composable
+fun Title(titulo: Titulo?, onClick: () -> Unit = {}) {
+    if (titulo != null) {
+        val cor = remember(titulo.cor) {
+            try { Color(titulo.cor.toColorInt()) }
+            catch (e: Exception) { Color(0xFF580C83) }
+        }
+        Text(
+            text = titulo.nome,
+            style = MaterialTheme.typography.labelLarge,
+            color = cor,
+            fontWeight = FontWeight.W600,
+            modifier = Modifier.clickable { onClick() }
+        )
+    } else {
+        Text(
+            text = "Escolher título",
+            style = MaterialTheme.typography.labelLarge,
+            color = Color(0xFF238D25).copy(alpha = 0.6f),
+            fontWeight = FontWeight.W400,
+            modifier = Modifier.clickable { onClick() }
+        )
+    }
+}
+
+@Composable
+fun Streak(streak: Int) {
+    Row(
+        modifier = Modifier
+            .padding(start = 32.dp, end = 32.dp)
+            .fillMaxWidth()
+            .background(color = Color(0x29D2D4D2), shape = RoundedCornerShape(size = 12.dp))
+            .padding(start = 14.dp, top = 14.dp, end = 14.dp, bottom = 14.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = "Sequência",
+            style = MaterialTheme.typography.labelLarge,
+            color = Color(0xFF000000),
+            fontWeight = FontWeight.W600,
+        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceAround
+        ) {
+            Icon(
+                painter = painterResource(id = R.drawable.firestreak),
+                contentDescription = "streak",
+                tint = Color(0xFFF26500)
+            )
+            Spacer(modifier = Modifier.width(9.dp))
+            Text(
+                text = streak.toString(),
+                color = Color(0xFFF26500),
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.W600
+            )
+        }
+        Icon(
+            painter = painterResource(id = R.drawable.greendot),
+            contentDescription = "arrow",
+            tint = Color(0xFFF26500)
+        )
+    }
+}
+
+@Composable
+fun Banner(bannerHash: String?) {
+    if (bannerHash != null) {
+        val url = SupabaseConfig.getClient().storage.from("profiles").publicUrl(bannerHash)
+        AsyncImage(
+            model = url,
+            contentDescription = "Banner",
+            contentScale = ContentScale.FillBounds,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(130.dp)
+                .blur(radius = 10.dp)
+        )
+    } else {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(130.dp)
+                .background(color = Color(0xFFB5B5B5))
+                .blur(radius = 10.dp)
+        )
+    }
+}
+
+@Composable
+fun ProfilePicture(pictureHash: String?) {
+    if (pictureHash != null) {
+        val url = SupabaseConfig.getClient().storage.from("profiles").publicUrl(pictureHash)
+        AsyncImage(
+            model = url,
+            contentDescription = "Foto de perfil",
+            contentScale = ContentScale.FillBounds,
+            modifier = Modifier
+                .size(135.dp)
+                .clip(CircleShape)
+                .border(5.dp, Color.White, CircleShape)
+        )
+    } else {
+        Image(
+            painter = painterResource(id = R.drawable.profile_picture),
+            contentDescription = "Foto de perfil",
+            contentScale = ContentScale.FillBounds,
+            modifier = Modifier
+                .size(135.dp)
+                .clip(CircleShape)
+                .border(5.dp, Color.White, CircleShape)
+        )
+    }
+}
+
+@Composable
+fun Stats(stats: UserStats) {
+    val statItems = remember {
+        listOf("Medalhas" to stats.medalhas, "Desafios" to stats.desafios, "Amigos" to stats.amigos, "Conquistas" to stats.conquistas)
+    }
+    val pagerState = rememberPagerState(pageCount = { statItems.size })
+    HorizontalPager(
+        state = pagerState,
+        contentPadding = PaddingValues(start = 32.dp, top = 5.dp, end = 32.dp),
+        pageSpacing = 12.dp,
+        pageSize = PageSize.Fixed(pageSize = 110.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(83.dp)
+    ) { page ->
+        val (type, number) = statItems[page]
+        StatCard(type = type, number = number)
+    }
+}
+
+@Composable
+fun StatCard(type: String, number: Int) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(83.dp)
+            .background(color = Color(0xFFEFEFEF), shape = RoundedCornerShape(size = 4.dp))
+            .border(width = 1.dp, color = Color(0xFFB0B0B0), shape = RoundedCornerShape(size = 4.dp))
+            .padding(top = 10.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(text = type, style = MaterialTheme.typography.labelSmall)
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = number.toString(),
+            style = MaterialTheme.typography.headlineSmall,
+            fontFamily = Inter,
+            fontStyle = FontStyle.Italic,
+            fontWeight = FontWeight.W700
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        Box(
+            modifier = Modifier
+                .width(82.dp)
+                .height(2.dp)
+                .background(color = Color(0x4F000000))
+        )
+    }
+}
+
+@Composable
+fun Status(status: String?, onClick: (() -> Unit)? = null) {
+    val text = status?.takeIf { it.isNotBlank() }
+        ?: if (onClick != null) "Como você está hoje?" else return
+
+    Box(
+        Modifier
+            .wrapContentWidth()
+            .height(31.dp)
+            .background(color = Color(0xFFE3E3E3), shape = RoundedCornerShape(size = 5.dp))
+            .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier)
+            .padding(start = 10.dp, end = 10.dp, top = 5.dp, bottom = 5.dp)
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelLarge,
+            fontStyle = FontStyle.Italic,
+            textAlign = TextAlign.Center
+        )
+    }
+}

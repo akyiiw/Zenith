@@ -1,0 +1,24 @@
+<!--
+  ~ Copyright (C) 2026 The Android Open Source Project
+  ~
+  ~ Licensed under the Apache License, Version 2.0 (the "License");
+  ~ you may not use this file except in compliance with the License.
+  ~ You may obtain a copy of the License at
+  ~
+  ~      http://www.apache.org/licenses/LICENSE-2.0
+  ~
+  ~ Unless required by applicable law or agreed to in writing, software
+  ~ distributed under the License is distributed on an "AS IS" BASIS,
+  ~ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  ~ See the License for the specific language governing permissions and
+  ~ limitations under the License.
+  -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="19dp"
+    android:height="19dp"
+    android:viewportWidth="19"
+    android:viewportHeight="19">
+  <path
+      android:pathData="M1.777,0.166C1.968,-0.026 2.266,-0.054 2.493,0.095L6.712,2.905C7.028,3.114 7.216,3.469 7.216,3.849V5.609L10.438,8.83C11.619,8.298 13.06,8.515 14.028,9.487L18.502,13.961C19.166,14.624 19.166,15.703 18.502,16.37L16.37,18.502C15.707,19.166 14.628,19.166 13.961,18.502L9.487,14.028C8.515,13.056 8.298,11.619 8.83,10.438L5.609,7.216H3.849C3.469,7.216 3.114,7.028 2.905,6.712L0.095,2.493C-0.054,2.27 -0.026,1.968 0.166,1.777L1.777,0.166ZM6.921,10.934C6.698,12.244 7.003,13.627 7.851,14.738L4.484,18.108C3.487,19.106 1.869,19.106 0.872,18.108C-0.125,17.111 -0.125,15.494 0.872,14.497L5.676,9.689L6.925,10.934H6.921ZM12.893,0.404C13.606,0.404 14.291,0.535 14.919,0.776C15.274,0.911 15.337,1.362 15.071,1.631L13.06,3.643C12.953,3.749 12.893,3.895 12.893,4.044V5.513C12.893,5.825 13.148,6.081 13.461,6.081H14.929C15.078,6.081 15.224,6.02 15.33,5.914L17.342,3.902C17.612,3.636 18.062,3.7 18.197,4.055C18.438,4.683 18.57,5.367 18.57,6.081C18.57,7.613 17.959,9.001 16.973,10.023L15.231,8.28C14.057,7.11 12.446,6.659 10.934,6.918L8.919,4.903V3.849L8.912,3.671C8.884,3.231 8.756,2.809 8.539,2.433C9.583,1.191 11.144,0.404 12.893,0.4V0.404Z"
+      android:fillColor="#000000"/>
+</vector>
