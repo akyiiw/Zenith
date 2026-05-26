@@ -53,7 +53,7 @@ class MainActivity : ComponentActivity() {
 
         requestPermissionsIfNeeded()
 
-
+        //teste commit
         enableEdgeToEdge()
 
         setContent {
