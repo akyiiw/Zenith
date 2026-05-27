@@ -2,18 +2,15 @@ package br.com.zenith.ui.screens.social
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -35,7 +32,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import br.com.zenith.data.models.Profile
 import br.com.zenith.ui.animations.CenteredZenithLoading
-import br.com.zenith.ui.components.app.CustomBottomNavigationBar
 import br.com.zenith.ui.components.social.SocialEmptyState
 import br.com.zenith.ui.components.social.SocialSectionTitle
 import br.com.zenith.ui.components.social.SocialUserRow
@@ -102,14 +98,7 @@ private fun SocialContent(
     }
 
     Scaffold(
-        containerColor = Color.White,
-        bottomBar = {
-            Column {
-                HorizontalDivider(thickness = 1.dp, color = Color.LightGray)
-                Spacer(modifier = Modifier.height(3.dp))
-                CustomBottomNavigationBar(navController = navController)
-            }
-        }
+        containerColor = Color.White
     ) { padding ->
         if (isLoading) {
             CenteredZenithLoading(
@@ -128,7 +117,7 @@ private fun SocialContent(
                 .padding(padding)
                 .statusBarsPadding()
                 .padding(horizontal = 20.dp),
-            contentPadding = PaddingValues(top = 20.dp, bottom = 24.dp),
+            contentPadding = PaddingValues(top = 19.dp, bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             item {
@@ -155,6 +144,7 @@ private fun SocialContent(
                     },
                     singleLine = true,
                     modifier = Modifier.fillParentMaxWidth(),
+                    shape = RoundedCornerShape(11.dp),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = Color(0xFF238D25),
                         focusedLabelColor = Color(0xFF238D25),

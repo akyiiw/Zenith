@@ -22,13 +22,18 @@ sealed class NavItem(val route: String, val iconRes: Int, val contentDescription
     object Social : NavItem("social", R.drawable.nav_social, "Social")
     object Home : NavItem("home", R.drawable.nav_home, "Home")
     object Progress : NavItem("progress", R.drawable.nav_progress, "Progress")
-
     object Settings : NavItem("settings", R.drawable.nav_settings, "settings")
 }
 
 @Composable
-fun CustomBottomNavigationBar(navController: NavController) { // <-- Recebe o navController aqui
-    val items = listOf(NavItem.Ranking, NavItem.Social, NavItem.Home, NavItem.Progress, NavItem.Settings)
+fun CustomBottomNavigationBar(navController: NavController) {
+    val items = listOf(
+        NavItem.Ranking,
+        NavItem.Social,
+        NavItem.Home,
+        NavItem.Progress,
+        NavItem.Settings
+    )
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
     val selectedRoute = items.firstOrNull { it.route == currentRoute }?.route
@@ -40,15 +45,12 @@ fun CustomBottomNavigationBar(navController: NavController) { // <-- Recebe o na
     ) {
         items.forEach { item ->
             val isSelected = selectedRoute == item.route
-
-            // Verifica se este item específico é o botão Home E se ele já está selecionado
             val isHomeAndSelected = item.route == "home" && isSelected
 
             NavigationBarItem(
                 selected = isSelected,
                 onClick = {
                     if (isHomeAndSelected) {
-                        // Se já estava na Home e clicou de novo, vai para a tela de nova atividade
                         navController.navigate("new_activity")
                     } else {
                         navController.navigate(item.route) {
@@ -59,11 +61,18 @@ fun CustomBottomNavigationBar(navController: NavController) { // <-- Recebe o na
                 },
                 icon = {
                     Icon(
-                        // Se for a Home e estiver selecionada, renderiza o ícone de + (adicione um vetor de mais no seu projeto)
                         painter = painterResource(
-                            id = if (isHomeAndSelected) R.drawable.zenith else item.iconRes // <-- Substitua pelo seu ícone de "+"
+                            id = if (isHomeAndSelected) {
+                                R.drawable.nav_add_activity
+                            } else {
+                                item.iconRes
+                            }
                         ),
-                        contentDescription = if (isHomeAndSelected) "Nova Atividade" else item.contentDescription,
+                        contentDescription = if (isHomeAndSelected) {
+                            "Nova Atividade"
+                        } else {
+                            item.contentDescription
+                        },
                         modifier = Modifier.size(if (isSelected) 26.dp else 22.dp)
                     )
                 },

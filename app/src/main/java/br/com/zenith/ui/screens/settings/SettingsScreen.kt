@@ -3,16 +3,13 @@ package br.com.zenith.ui.screens.settings
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -32,7 +29,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import br.com.zenith.data.SupabaseConfig
-import br.com.zenith.ui.components.app.CustomBottomNavigationBar
 import br.com.zenith.ui.components.settings.AccountSettingsGroup
 import br.com.zenith.ui.components.settings.LogoutButton
 import br.com.zenith.ui.components.settings.SettingsSectionTitle
@@ -56,17 +52,7 @@ fun SettingsScreen(navController: NavController) {
         }
 
         Scaffold(
-            containerColor = Color.White,
-            bottomBar = {
-                Column {
-                    HorizontalDivider(
-                        thickness = 1.dp,
-                        color = Color.LightGray
-                    )
-                    Spacer(modifier = Modifier.height(3.dp))
-                    CustomBottomNavigationBar(navController = navController)
-                }
-            }
+            containerColor = Color.White
         ) { padding ->
             LazyColumn(
                 modifier = Modifier
@@ -75,7 +61,7 @@ fun SettingsScreen(navController: NavController) {
                     .statusBarsPadding()
                     .padding(horizontal = 20.dp),
                 verticalArrangement = Arrangement.spacedBy(24.dp),
-                contentPadding = PaddingValues(top = 20.dp, bottom = 24.dp)
+                contentPadding = PaddingValues(top = 19.dp, bottom = 24.dp)
             ) {
                 item {
                     Text(

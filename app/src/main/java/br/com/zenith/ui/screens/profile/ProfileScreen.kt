@@ -2,7 +2,6 @@ package br.com.zenith.ui.screens.profile
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInVertically
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -11,7 +10,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -28,7 +27,6 @@ import androidx.navigation.NavController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import br.com.zenith.ui.animations.CenteredZenithLoading
 import br.com.zenith.ui.theme.ZenithTheme
-import br.com.zenith.ui.components.app.CustomBottomNavigationBar
 import br.com.zenith.ui.components.profile.ProfileHeader
 import br.com.zenith.ui.components.profile.RecentActivitySection
 import br.com.zenith.ui.components.profile.RecentHeader
@@ -59,17 +57,7 @@ fun ProfileScreen(
     }
     ZenithTheme {
         Scaffold(
-            containerColor = Color.White,
-            bottomBar = {
-                Column {
-                    HorizontalDivider(
-                        thickness = 1.dp,
-                        color = Color.LightGray
-                    )
-                    Spacer(modifier = Modifier.height(3.dp))
-                    CustomBottomNavigationBar(navController = navController)
-                }
-            }
+            containerColor = Color.White
         ) { padding ->
             if (isLoading) {
                 CenteredZenithLoading(modifier = Modifier.padding(padding))
@@ -83,11 +71,10 @@ fun ProfileScreen(
 
             AnimatedVisibility(
                 visible = contentVisible,
-                enter = fadeIn(animationSpec = tween(220)) +
-                    slideInVertically(
-                        animationSpec = tween(260),
-                        initialOffsetY = { it / 12 }
-                    )
+                enter = slideInVertically(
+                    animationSpec = tween(280),
+                    initialOffsetY = { it / 8 }
+                )
             ) {
                 LazyColumn(
                     modifier = Modifier
@@ -127,6 +114,7 @@ fun ProfileScreen(
                         value = statusText,
                         onValueChange = { statusText = it.take(80) },
                         label = { Text("Qual é o seu humor?") },
+                        shape = RoundedCornerShape(11.dp),
                         singleLine = true
                     )
                 },

@@ -2,17 +2,14 @@ package br.com.zenith.ui.screens.social
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -31,7 +28,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import br.com.zenith.ui.animations.CenteredZenithLoading
-import br.com.zenith.ui.components.app.CustomBottomNavigationBar
 import br.com.zenith.ui.components.profile.ProfileHeader
 import br.com.zenith.ui.components.profile.RecentActivitySection
 import br.com.zenith.ui.components.profile.RecentHeader
@@ -55,14 +51,7 @@ fun PublicProfileScreen(
         }
 
         Scaffold(
-            containerColor = Color.White,
-            bottomBar = {
-                Column {
-                    HorizontalDivider(thickness = 1.dp, color = Color.LightGray)
-                    Spacer(modifier = Modifier.height(3.dp))
-                    CustomBottomNavigationBar(navController = navController)
-                }
-            }
+            containerColor = Color.White
         ) { padding ->
             if (isLoading) {
                 CenteredZenithLoading(
@@ -78,11 +67,10 @@ fun PublicProfileScreen(
 
             AnimatedVisibility(
                 visible = contentVisible,
-                enter = fadeIn(animationSpec = tween(220)) +
-                    slideInVertically(
-                        animationSpec = tween(260),
-                        initialOffsetY = { it / 12 }
-                    )
+                enter = slideInVertically(
+                    animationSpec = tween(280),
+                    initialOffsetY = { it / 8 }
+                )
             ) {
                 LazyColumn(
                     modifier = Modifier

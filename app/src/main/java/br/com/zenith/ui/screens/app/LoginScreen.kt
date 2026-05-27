@@ -143,7 +143,7 @@ fun LoginContent(
                 singleLine = true,
                 enabled = !isLoading,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(11.dp)
             )
 
             OutlinedTextField(
@@ -167,7 +167,7 @@ fun LoginContent(
                 singleLine = true,
                 enabled = !isLoading,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(11.dp)
 
                 // TODO: Adicionar o botão de Esqueci a senha
                 // TODO: Resolver isso do gesto de voltar no Xiaomi

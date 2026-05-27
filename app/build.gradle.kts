@@ -51,6 +51,9 @@ android {
     buildFeatures {
         compose = true
     }
+    lint {
+        disable += "FontValidation"
+    }
 }
 
 dependencies {

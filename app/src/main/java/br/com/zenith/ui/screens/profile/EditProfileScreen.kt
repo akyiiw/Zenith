@@ -1,4 +1,4 @@
-package br.com.zenith.ui.screens.profile
+﻿package br.com.zenith.ui.screens.profile
 
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -259,7 +259,7 @@ fun EditProfileContent(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+                .padding(horizontal = 16.dp, vertical = 11.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconButton(onClick = onBack) {
@@ -304,14 +304,14 @@ fun EditProfileContent(
                         onValueChange = { name = it },
                         label = { Text("Nome") },
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(11.dp),
                         singleLine = true,
                         prefix = { Text("@") },
                         enabled = usernameCooldown.canEdit
                     )
                     if (!usernameCooldown.canEdit) {
                         Text(
-                            text = "Você poderá alterar o nome de usuário novamente em ${usernameCooldown.nextEditLabel}.",
+                            text = "VocÃª poderÃ¡ alterar o nome de usuÃ¡rio novamente em ${usernameCooldown.nextEditLabel}.",
                             style = MaterialTheme.typography.bodySmall.copy(
                                 fontFamily = Inter,
                                 color = Color.Gray
@@ -324,9 +324,9 @@ fun EditProfileContent(
                     OutlinedTextField(
                         value = displayName,
                         onValueChange = { displayName = it },
-                        label = { Text("Nome de exibição") },
+                        label = { Text("Nome de exibiÃ§Ã£o") },
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(11.dp),
                         singleLine = true,
                     )
                 }
@@ -336,7 +336,7 @@ fun EditProfileContent(
                         onValueChange = { aboutMe = it },
                         label = { Text("Sobre mim (opcional)") },
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(11.dp),
                         minLines = 3,
                         maxLines = 5
                     )
@@ -345,7 +345,7 @@ fun EditProfileContent(
             }
         }
 
-        // Botão salvar
+        // BotÃ£o salvar
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -369,7 +369,7 @@ fun EditProfileContent(
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF238D25))
                 ) {
                     Text(
-                        "Salvar alterações",
+                        "Salvar alteraÃ§Ãµes",
                         color = Color.White,
                         style = MaterialTheme.typography.titleMedium.copy(
                             fontFamily = Inter,
@@ -381,3 +381,4 @@ fun EditProfileContent(
         }
     }
 }
+

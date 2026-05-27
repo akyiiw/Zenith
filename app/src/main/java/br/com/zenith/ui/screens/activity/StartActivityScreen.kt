@@ -2,6 +2,9 @@ package br.com.zenith.ui.screens.activity
 
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -156,6 +159,11 @@ fun StartActivityContent(
     val isPaused = status == TrackingStatus.PAUSED
 
     var showStopDialog by remember { mutableStateOf(false) }
+    var contentVisible by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        contentVisible = true
+    }
 
     // Camera do mapa — segue o último ponto
     val lastPoint = routePoints.lastOrNull() ?: LatLng(-23.55, -46.63)
@@ -198,32 +206,47 @@ fun StartActivityContent(
 
     Box(modifier = Modifier.fillMaxSize()) {
 
-        // Mapa ocupa a metade superior
-        GoogleMap(
-            modifier = Modifier
-                .fillMaxWidth()
-                .fillMaxHeight(0.5f),
-            cameraPositionState = cameraPositionState,
-            properties = MapProperties(isMyLocationEnabled = true),
-            uiSettings = MapUiSettings(
-                zoomControlsEnabled = false,
-                myLocationButtonEnabled = false
+        AnimatedVisibility(
+            visible = contentVisible,
+            enter = slideInVertically(
+                animationSpec = tween(320),
+                initialOffsetY = { -it / 3 }
             )
         ) {
-            if (routePoints.size >= 2) {
-                Polyline(
-                    points = routePoints,
-                    color = Color(0xFF238D25),
-                    width = 12f
+            // Mapa ocupa a metade superior
+            GoogleMap(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .fillMaxHeight(0.5f),
+                cameraPositionState = cameraPositionState,
+                properties = MapProperties(isMyLocationEnabled = true),
+                uiSettings = MapUiSettings(
+                    zoomControlsEnabled = false,
+                    myLocationButtonEnabled = false
                 )
+            ) {
+                if (routePoints.size >= 2) {
+                    Polyline(
+                        points = routePoints,
+                        color = Color(0xFF238D25),
+                        width = 12f
+                    )
+                }
             }
         }
 
-        // Painel inferior
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .align(Alignment.BottomCenter)
+        AnimatedVisibility(
+            visible = contentVisible,
+            modifier = Modifier.align(Alignment.BottomCenter),
+            enter = slideInVertically(
+                animationSpec = tween(340),
+                initialOffsetY = { it }
+            )
+        ) {
+            // Painel inferior
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
                 .background(
                     if (isPaused) Color(0xFFF5F5F5) else Color.White,
                     RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
@@ -326,6 +349,8 @@ fun StartActivityContent(
             )
         }
     }
+}
+
 }
 
 @Composable

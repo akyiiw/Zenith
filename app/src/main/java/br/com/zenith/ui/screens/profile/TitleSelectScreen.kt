@@ -1,4 +1,4 @@
-package br.com.zenith.ui.screens.profile
+﻿package br.com.zenith.ui.screens.profile
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -37,7 +37,7 @@ fun TitleSelectScreen(navController: NavController) {
         val isLoading by userViewModel.isLoading.collectAsState()
 
         LaunchedEffect(Unit) {
-            if (tituloAtual == null) userViewModel.fetchUserProfile(context) // ← garante que o estado existe
+            if (tituloAtual == null) userViewModel.fetchUserProfile(context) // â† garante que o estado existe
             userViewModel.fetchTitulosDisponiveis(context)
         }
 
@@ -71,7 +71,7 @@ fun TitleSelectContent(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+                .padding(horizontal = 16.dp, vertical = 11.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(onClick = onBack) {
@@ -82,7 +82,7 @@ fun TitleSelectContent(
                 )
             }
             Text(
-                text = "Escolher título",
+                text = "Escolher tÃ­tulo",
                 style = MaterialTheme.typography.titleLarge.copy(
                     fontFamily = Inter,
                     fontWeight = FontWeight.Bold
@@ -108,7 +108,7 @@ fun TitleSelectContent(
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = "Nenhum título desbloqueado ainda.",
+                                text = "Nenhum tÃ­tulo desbloqueado ainda.",
                                 style = MaterialTheme.typography.bodyLarge.copy(color = Color.Gray)
                             )
                         }
@@ -132,7 +132,7 @@ fun TitleSelectContent(
                             .border(
                                 width = if (selecionado) 1.5.dp else 0.5.dp,
                                 color = if (selecionado) cor else Color(0xFFE0E0E0),
-                                shape = RoundedCornerShape(12.dp)
+                                shape = RoundedCornerShape(11.dp)
                             )
                             .clickable { onSelect(titulo) }
                             .padding(horizontal = 16.dp, vertical = 14.dp),
@@ -169,3 +169,4 @@ fun TitleSelectContent(
         }
     }
 }
+

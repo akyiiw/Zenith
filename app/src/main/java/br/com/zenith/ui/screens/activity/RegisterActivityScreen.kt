@@ -1,9 +1,14 @@
-package br.com.zenith.ui.screens.activity
+﻿package br.com.zenith.ui.screens.activity
 
 import android.net.Uri
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -17,6 +22,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
@@ -130,22 +136,24 @@ fun RegisterActivityContent(
     val focusManager = LocalFocusManager.current
 
     var valor by remember {
+        val unidadeInicial = exercicioPreSelecionadoUnidade.lowercase()
         mutableStateOf(
-            if (veioDeTracking)
-                "%.2f".format(trackingResult.distanceMeters / 1000f).replace(",", ".")
-            else ""
+            when {
+                veioDeTracking && unidadeInicial.contains("pass") -> trackingResult.steps.toString()
+                veioDeTracking -> "%.2f".format(trackingResult.distanceMeters / 1000f).replace(",", ".")
+                else -> ""
+            }
         )
+    }
+    var passos by remember {
+        mutableStateOf(if (veioDeTracking) trackingResult.steps.toString() else "")
     }
 
     var duracaoHoras by remember {
-        mutableStateOf(if (duracaoPreenchida >= 60) (duracaoPreenchida / 60).toString() else "")
+        mutableIntStateOf(if (duracaoPreenchida >= 60) duracaoPreenchida / 60 else 0)
     }
     var duracaoMinutos by remember {
-        mutableStateOf(
-            if (duracaoPreenchida > 0) {
-                (duracaoPreenchida % 60).takeIf { it > 0 }?.toString() ?: ""
-            } else ""
-        )
+        mutableIntStateOf(if (duracaoPreenchida > 0) duracaoPreenchida % 60 else 0)
     }
     var titulo by remember { mutableStateOf("") }
     var data by remember {
@@ -166,12 +174,14 @@ fun RegisterActivityContent(
     val inputColors = OutlinedTextFieldDefaults.colors(
         focusedTextColor = Color(0xFF1C1B1F),
         unfocusedTextColor = Color(0xFF1C1B1F),
+        cursorColor = Color(0xFF238D25),
         focusedBorderColor = Color(0xFF238D25),
         focusedLabelColor = Color(0xFF238D25),
         unfocusedLabelColor = Color(0xFF555555),
         focusedPlaceholderColor = Color(0xFF777777),
         unfocusedPlaceholderColor = Color(0xFF777777)
     )
+    val inputShape = RoundedCornerShape(11.dp)
 
     Box(
         modifier = Modifier
@@ -188,7 +198,7 @@ fun RegisterActivityContent(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                    .padding(horizontal = 16.dp, vertical = 11.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = {
@@ -206,7 +216,7 @@ fun RegisterActivityContent(
                     )
                 }
                 Text(
-                    text = if (step == 0) "Qual exercício?" else "Detalhes da atividade",
+                    text = if (step == 0) "Qual exercÃ­cio?" else "Detalhes da atividade",
                     style = MaterialTheme.typography.titleLarge.copy(
                         fontFamily = Inter,
                         fontWeight = FontWeight.Bold
@@ -254,14 +264,14 @@ fun RegisterActivityContent(
                     OutlinedTextField(
                         value = query,
                         onValueChange = { query = it },
-                        placeholder = { Text("Buscar exercício...") },
+                        placeholder = { Text("Buscar exercÃ­cio...") },
                         leadingIcon = {
                             Icon(Icons.Default.Search, null, tint = Color(0xFF238D25))
                         },
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 24.dp),
-                        shape = RoundedCornerShape(12.dp),
+                        shape = inputShape,
                         singleLine = true,
                         colors = inputColors
                     )
@@ -284,6 +294,10 @@ fun RegisterActivityContent(
 
             step == 1 -> {
                 val ex = exercicioSelecionado!!
+                val unidadeEhDuracao = remember(ex.unidade) {
+                    val unidade = ex.unidade.lowercase()
+                    unidade.contains("min") || unidade.contains("dura")
+                }
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxSize()
@@ -292,7 +306,7 @@ fun RegisterActivityContent(
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
 
-                    // Card do exercício (sempre)
+                    // Card do exercÃ­cio (sempre)
                     item {
                         Row(
                             modifier = Modifier
@@ -319,22 +333,20 @@ fun RegisterActivityContent(
                         }
                     }
 
-                    // Título
+                    // TÃ­tulo
                     item {
                         OutlinedTextField(
                             value = titulo,
                             onValueChange = { titulo = it },
-                            label = { Text("Título (opcional)") },
+                            label = { Text("TÃ­tulo (opcional)") },
                             modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
+                            shape = inputShape,
                             singleLine = true,
-                            placeholder = { Text("Ex: Pedalada confortável") },
+                            placeholder = { Text("Ex: Pedalada confortÃ¡vel") },
                             colors = inputColors
                         )
                     }
-
-                    // Valor — editável apenas se não veio do tracking
-                    if (!veioDeTracking) {
+                    if (!unidadeEhDuracao) {
                         item {
                             OutlinedTextField(
                                 value = valor,
@@ -342,84 +354,50 @@ fun RegisterActivityContent(
                                 label = { Text("${ex.unidade} realizados *") },
                                 modifier = Modifier.fillMaxWidth(),
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                                shape = RoundedCornerShape(12.dp),
+                                shape = inputShape,
                                 singleLine = true,
                                 colors = inputColors
                             )
                         }
-                        item {
-                            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                OutlinedTextField(
-                                    value = duracaoHoras,
-                                    onValueChange = { duracaoHoras = it.filter(Char::isDigit) },
-                                    label = { Text("Horas") },
-                                    modifier = Modifier.weight(1f),
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                    shape = RoundedCornerShape(12.dp),
-                                    singleLine = true,
-                                    colors = inputColors
-                                )
-                                OutlinedTextField(
-                                    value = duracaoMinutos,
-                                    onValueChange = { input ->
-                                        duracaoMinutos = input.filter(Char::isDigit).take(2)
-                                    },
-                                    label = { Text("Minutos") },
-                                    modifier = Modifier.weight(1f),
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                    shape = RoundedCornerShape(12.dp),
-                                    singleLine = true,
-                                    colors = inputColors
-                                )
-                            }
-                        }
+                    }
+
+                    if (veioDeTracking) {
                         item {
                             OutlinedTextField(
-                                value = data,
-                                onValueChange = { data = it },
-                                label = { Text("Data e horário *") },
+                                value = passos,
+                                onValueChange = { passos = it.filter(Char::isDigit) },
+                                label = { Text("Passos") },
                                 modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(12.dp),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                shape = inputShape,
                                 singleLine = true,
-                                placeholder = { Text("dd/MM/yyyy HH:mm") },
                                 colors = inputColors
                             )
                         }
-                    } else {
-                        item {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                TrackingInfoCard(
-                                    label = "Distância",
-                                    value = "%.2f km".format(trackingResult.distanceMeters / 1000f),
-                                    modifier = Modifier.weight(1f)
-                                )
-                                TrackingInfoCard(
-                                    label = "Passos",
-                                    value = "${trackingResult.steps}",
-                                    modifier = Modifier.weight(1f)
-                                )
-                            }
-                        }
-                        item {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                TrackingInfoCard(
-                                    label = "Duração",
-                                    value = "$duracaoPreenchida min",
-                                    modifier = Modifier.weight(1f)
-                                )
-                                TrackingInfoCard(
-                                    label = "Horário",
-                                    value = data,
-                                    modifier = Modifier.weight(1f)
-                                )
-                            }
-                        }
+                    }
+
+                    item {
+                        DurationPicker(
+                            hours = duracaoHoras,
+                            minutes = duracaoMinutos,
+                            inputShape = inputShape,
+                            inputColors = inputColors,
+                            onHoursChange = { duracaoHoras = it },
+                            onMinutesChange = { duracaoMinutos = it }
+                        )
+                    }
+
+                    item {
+                        OutlinedTextField(
+                            value = data,
+                            onValueChange = { data = it },
+                            label = { Text("Data e horÃ¡rio *") },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = inputShape,
+                            singleLine = true,
+                            placeholder = { Text("dd/MM/yyyy HH:mm") },
+                            colors = inputColors
+                        )
                     }
 
                     // Nota
@@ -487,7 +465,7 @@ fun RegisterActivityContent(
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            listOf("otimo" to "Ótimo", "ok" to "Ok", "cansado" to "Cansado").forEach { (op, label) ->
+                            listOf("otimo" to "Ã“timo", "ok" to "Ok", "cansado" to "Cansado").forEach { (op, label) ->
                                 FilterChip(
                                     selected = humor == op,
                                     onClick = { humor = if (humor == op) null else op },
@@ -506,7 +484,7 @@ fun RegisterActivityContent(
             }
         }
 
-        // Botão salvar
+        // BotÃ£o salvar
         if (step == 1) {
             Column(
                 modifier = Modifier
@@ -522,13 +500,14 @@ fun RegisterActivityContent(
                 } else {
                     Button(
                         onClick = {
-                            val v = valor.replace(",", ".").toDoubleOrNull() ?: return@Button
-                            val duracaoTotal = if (veioDeTracking) {
-                                duracaoPreenchida.takeIf { it > 0 }
+                            val duracaoTotal = (duracaoHoras * 60 + duracaoMinutos).takeIf { it > 0 }
+                            val unidadeEhDuracaoAtual = exercicioSelecionado!!.unidade
+                                .lowercase()
+                                .let { it.contains("min") || it.contains("dura") }
+                            val v = if (unidadeEhDuracaoAtual) {
+                                duracaoTotal?.toDouble() ?: return@Button
                             } else {
-                                val horas = duracaoHoras.toIntOrNull() ?: 0
-                                val minutos = duracaoMinutos.toIntOrNull() ?: 0
-                                (horas * 60 + minutos).takeIf { it > 0 }
+                                valor.replace(",", ".").toDoubleOrNull() ?: return@Button
                             }
                             onSave(
                                 exercicioSelecionado!!.id,
@@ -544,7 +523,16 @@ fun RegisterActivityContent(
                                 null
                             )
                         },
-                        enabled = valor.isNotBlank(),
+                        enabled = exercicioSelecionado
+                            ?.unidade
+                            ?.lowercase()
+                            ?.let { unidade ->
+                                if (unidade.contains("min") || unidade.contains("dura")) {
+                                    (duracaoHoras * 60 + duracaoMinutos) > 0
+                                } else {
+                                    valor.isNotBlank()
+                                }
+                            } ?: false,
                         modifier = Modifier.fillMaxWidth().height(52.dp),
                         shape = RoundedCornerShape(10.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF238D25))
@@ -562,6 +550,140 @@ fun RegisterActivityContent(
                     }
                 }
             }
+        }
+    }
+}
+
+
+
+@Composable
+fun DurationPicker(
+    hours: Int,
+    minutes: Int,
+    inputShape: RoundedCornerShape,
+    inputColors: TextFieldColors,
+    onHoursChange: (Int) -> Unit,
+    onMinutesChange: (Int) -> Unit
+) {
+    var pickerOpen by remember { mutableStateOf(false) }
+    val value = when {
+        hours > 0 && minutes > 0 -> "${hours}h ${minutes.toString().padStart(2, '0')}min"
+        hours > 0 -> "${hours}h"
+        minutes > 0 -> "${minutes}min"
+        else -> ""
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { pickerOpen = true }
+    ) {
+        OutlinedTextField(
+            value = value,
+            onValueChange = {},
+            label = { Text("Duração") },
+            placeholder = { Text("00h 00min") },
+            readOnly = true,
+            enabled = false,
+            modifier = Modifier.fillMaxWidth(),
+            shape = inputShape,
+            singleLine = true,
+            colors = inputColors
+        )
+    }
+
+    if (pickerOpen) {
+        AlertDialog(
+            onDismissRequest = { pickerOpen = false },
+            title = {
+                Text(
+                    text = "Duração",
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontFamily = Inter,
+                        fontWeight = FontWeight.Bold
+                    )
+                )
+            },
+            text = {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    TimePickerAxis(
+                        label = "Horas",
+                        value = hours,
+                        range = 0..23,
+                        onValueChange = onHoursChange,
+                        modifier = Modifier.weight(1f)
+                    )
+                    TimePickerAxis(
+                        label = "Minutos",
+                        value = minutes,
+                        range = 0..59,
+                        onValueChange = onMinutesChange,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { pickerOpen = false }) {
+                    Text("Ok", color = Color(0xFF238D25), fontFamily = Inter)
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        onHoursChange(0)
+                        onMinutesChange(0)
+                    }
+                ) {
+                    Text("Limpar", color = Color.Gray, fontFamily = Inter)
+                }
+            }
+        )
+    }
+}
+
+@Composable
+private fun TimePickerAxis(
+    label: String,
+    value: Int,
+    range: IntRange,
+    onValueChange: (Int) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .background(Color(0xFFF7F7F7), RoundedCornerShape(11.dp))
+            .border(0.8.dp, Color(0xFFE0E0E0), RoundedCornerShape(11.dp))
+            .padding(vertical = 8.dp, horizontal = 12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(2.dp)
+    ) {
+        TextButton(onClick = {
+            onValueChange(if (value >= range.last) range.first else value + 1)
+        }) {
+            Text("+", color = Color(0xFF238D25), fontWeight = FontWeight.Bold)
+        }
+        Text(
+            text = value.toString().padStart(2, '0'),
+            style = MaterialTheme.typography.headlineSmall.copy(
+                fontFamily = Inter,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF1C1B1F)
+            )
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodySmall.copy(
+                fontFamily = Inter,
+                color = Color(0xFF555555)
+            )
+        )
+        TextButton(onClick = {
+            onValueChange(if (value <= range.first) range.last else value - 1)
+        }) {
+            Text("-", color = Color(0xFF238D25), fontWeight = FontWeight.Bold)
         }
     }
 }
@@ -598,13 +720,35 @@ fun TrackingInfoCard(
 
 @Composable
 fun ExercicioItem(exercicio: Exercicio, onClick: () -> Unit) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.97f else 1f,
+        animationSpec = tween(120),
+        label = "exercise_item_scale"
+    )
+    val backgroundColor by animateColorAsState(
+        targetValue = if (isPressed) Color(0xFFEAF3DE) else Color(0xFFF5F5F5),
+        animationSpec = tween(120),
+        label = "exercise_item_background"
+    )
+    val borderColor by animateColorAsState(
+        targetValue = if (isPressed) Color(0xFF238D25) else Color(0xFFE0E0E0),
+        animationSpec = tween(120),
+        label = "exercise_item_border"
+    )
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Color(0xFFF5F5F5), RoundedCornerShape(10.dp))
-            .border(0.5.dp, Color(0xFFE0E0E0), RoundedCornerShape(10.dp))
-            .clickable { onClick() }
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .scale(scale)
+            .background(backgroundColor, RoundedCornerShape(10.dp))
+            .border(0.5.dp, borderColor, RoundedCornerShape(10.dp))
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null
+            ) { onClick() }
+            .padding(horizontal = 16.dp, vertical = 11.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
@@ -618,3 +762,4 @@ fun ExercicioItem(exercicio: Exercicio, onClick: () -> Unit) {
         )
     }
 }
+

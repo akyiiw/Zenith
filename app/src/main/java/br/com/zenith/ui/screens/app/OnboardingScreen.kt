@@ -73,8 +73,8 @@ fun OnboardingContent(
     AnimatedContent(
         targetState = step,
         transitionSpec = {
-            slideInHorizontally { it } + fadeIn() togetherWith
-                    slideOutHorizontally { -it } + fadeOut()
+            slideInHorizontally { it } togetherWith
+                    slideOutHorizontally { -it }
         },
         label = "onboarding_step"
     ) { currentStep ->
@@ -120,6 +120,7 @@ fun StepUsername(
             label = { Text("Nome") },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
+            shape = RoundedCornerShape(11.dp),
             prefix = { Text("@") }
         )
     }
@@ -143,6 +144,7 @@ fun StepDisplayName(
             onValueChange = onDisplayNameChange,
             label = { Text("Nome de exibição") },
             modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(11.dp),
             singleLine = true
         )
     }

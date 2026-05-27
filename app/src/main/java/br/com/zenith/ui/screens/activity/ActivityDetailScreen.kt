@@ -1,4 +1,4 @@
-package br.com.zenith.ui.screens.activity
+﻿package br.com.zenith.ui.screens.activity
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -112,7 +112,7 @@ fun ActivityDetailScreen(navController: NavController, atividadeId: String?) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                                .padding(horizontal = 16.dp, vertical = 11.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             IconButton(onClick = { navController.popBackStack() }) {
@@ -145,7 +145,7 @@ fun ActivityDetailScreen(navController: NavController, atividadeId: String?) {
                     }
 
                     item {
-                        // Card principal — igual ao RecentActivityCard mas expandido
+                        // Card principal â€” igual ao RecentActivityCard mas expandido
                         Column(
                             modifier = Modifier
                                 .padding(horizontal = 24.dp)
@@ -225,7 +225,7 @@ fun ActivityDetailScreen(navController: NavController, atividadeId: String?) {
 
                     item { Spacer(modifier = Modifier.height(16.dp)) }
 
-                    // Informações detalhadas
+                    // InformaÃ§Ãµes detalhadas
                     item {
                         DetailSection(title = "Detalhes") {
                             atividade.intensidade?.let {
@@ -238,7 +238,7 @@ fun ActivityDetailScreen(navController: NavController, atividadeId: String?) {
                                 DetailRow(
                                     label = "Humor",
                                     value = when (it) {
-                                        "otimo" -> "Ótimo"
+                                        "otimo" -> "Ã“timo"
                                         "ok" -> "Ok"
                                         "cansado" -> "Cansado"
                                         else -> it
@@ -351,7 +351,7 @@ fun EditActivityScreenContent(
 ) {
     val exercicioInicial = atividade.exercicio
     var exercicioId by remember(atividade.id) { mutableStateOf(atividade.exercicioId) }
-    var exercicioNome by remember(atividade.id) { mutableStateOf(exercicioInicial?.nome ?: "Exercício") }
+    var exercicioNome by remember(atividade.id) { mutableStateOf(exercicioInicial?.nome ?: "ExercÃ­cio") }
     var exercicioUnidade by remember(atividade.id) { mutableStateOf(exercicioInicial?.unidade ?: "") }
     var menuExerciciosAberto by remember { mutableStateOf(false) }
 
@@ -385,7 +385,7 @@ fun EditActivityScreenContent(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                    .padding(horizontal = 16.dp, vertical = 11.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = onBack) {
@@ -417,7 +417,7 @@ fun EditActivityScreenContent(
                 Box {
                     TextButton(onClick = { menuExerciciosAberto = true }) {
                         Column(modifier = Modifier.fillMaxWidth()) {
-                            Text("Exercício", color = Color.Gray, fontFamily = Inter)
+                            Text("ExercÃ­cio", color = Color.Gray, fontFamily = Inter)
                             Text(
                                 "$exercicioNome $exercicioUnidade",
                                 style = MaterialTheme.typography.bodyLarge.copy(
@@ -451,9 +451,9 @@ fun EditActivityScreenContent(
                 OutlinedTextField(
                     value = titulo,
                     onValueChange = { titulo = it },
-                    label = { Text("Título (opcional)") },
+                    label = { Text("TÃ­tulo (opcional)") },
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(11.dp),
                     singleLine = true,
                     colors = inputColors
                 )
@@ -466,7 +466,7 @@ fun EditActivityScreenContent(
                     label = { Text("$exercicioUnidade realizados *") },
                     modifier = Modifier.fillMaxWidth(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(11.dp),
                     singleLine = true,
                     colors = inputColors
                 )
@@ -476,10 +476,10 @@ fun EditActivityScreenContent(
                 OutlinedTextField(
                     value = duracao,
                     onValueChange = { duracao = it },
-                    label = { Text("Duração em minutos (opcional)") },
+                    label = { Text("DuraÃ§Ã£o em minutos (opcional)") },
                     modifier = Modifier.fillMaxWidth(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(11.dp),
                     singleLine = true,
                     colors = inputColors
                 )
@@ -489,9 +489,9 @@ fun EditActivityScreenContent(
                 OutlinedTextField(
                     value = data,
                     onValueChange = { data = it },
-                    label = { Text("Data e horário *") },
+                    label = { Text("Data e horÃ¡rio *") },
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(11.dp),
                     singleLine = true,
                     placeholder = { Text("dd/MM/yyyy HH:mm") },
                     colors = inputColors
@@ -560,7 +560,7 @@ fun EditActivityScreenContent(
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf("otimo" to "Ótimo", "ok" to "Ok", "cansado" to "Cansado").forEach { (op, label) ->
+                    listOf("otimo" to "Ã“timo", "ok" to "Ok", "cansado" to "Cansado").forEach { (op, label) ->
                         FilterChip(
                             selected = humor == op,
                             onClick = { humor = if (humor == op) null else op },
@@ -611,7 +611,7 @@ fun EditActivityScreenContent(
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF238D25))
                 ) {
                     Text(
-                        "Salvar alterações",
+                        "Salvar alteraÃ§Ãµes",
                         color = Color.White,
                         style = MaterialTheme.typography.titleMedium.copy(
                             fontFamily = Inter,
@@ -685,7 +685,7 @@ fun DetailChip(label: String, color: Color = Color(0xFF238D25)) {
 fun formatarData(isoDate: String): String {
     return try {
         val input = java.time.OffsetDateTime.parse(isoDate)
-        "%02d/%02d/%d às %02d:%02d".format(
+        "%02d/%02d/%d Ã s %02d:%02d".format(
             input.dayOfMonth, input.monthValue, input.year,
             input.hour, input.minute
         )
@@ -706,3 +706,4 @@ fun formatarDataInput(isoDate: String?): String {
             .format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"))
     }
 }
+

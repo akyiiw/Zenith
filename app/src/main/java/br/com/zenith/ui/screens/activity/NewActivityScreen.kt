@@ -1,5 +1,9 @@
-package br.com.zenith.ui.screens.activity
+﻿package br.com.zenith.ui.screens.activity
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -67,6 +71,7 @@ fun NewActivityContent(
 ) {
     var query by remember { mutableStateOf("") }
     var exercicioSelecionado by remember { mutableStateOf<Exercicio?>(null) }
+    var sheetExercise by remember { mutableStateOf<Exercicio?>(null) }
     val keyboardController = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
 
@@ -86,7 +91,7 @@ fun NewActivityContent(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                    .padding(horizontal = 16.dp, vertical = 11.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = onBack) {
@@ -97,7 +102,7 @@ fun NewActivityContent(
                     )
                 }
                 Text(
-                    text = "Qual exercício?",
+                    text = "Qual exercÃ­cio?",
                     style = MaterialTheme.typography.titleLarge.copy(
                         fontFamily = Inter,
                         fontWeight = FontWeight.Bold
@@ -111,14 +116,14 @@ fun NewActivityContent(
             OutlinedTextField(
                 value = query,
                 onValueChange = { query = it },
-                placeholder = { Text("Buscar exercício...") },
+                placeholder = { Text("Buscar exercÃ­cio...") },
                 leadingIcon = {
                     Icon(Icons.Default.Search, null, tint = Color(0xFF238D25))
                 },
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 24.dp),
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(11.dp),
                 singleLine = true
             )
 
@@ -145,18 +150,39 @@ fun NewActivityContent(
             }
         }
 
-        // Bottom sheet de ação ao selecionar exercício
-        exercicioSelecionado?.let { ex ->
+        // Bottom sheet de aÃ§Ã£o ao selecionar exercÃ­cio
+        val selectedExercise = exercicioSelecionado
+        LaunchedEffect(selectedExercise) {
+            if (selectedExercise != null) {
+                sheetExercise = selectedExercise
+            }
+        }
+
+        if (selectedExercise != null) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(Color.Black.copy(alpha = 0.4f))
                     .clickable { exercicioSelecionado = null }
             )
+        }
+
+        AnimatedVisibility(
+            visible = selectedExercise != null,
+            modifier = Modifier.align(Alignment.BottomCenter),
+            enter = slideInVertically(
+                animationSpec = tween(260),
+                initialOffsetY = { it }
+            ),
+            exit = slideOutVertically(
+                animationSpec = tween(220),
+                targetOffsetY = { it }
+            )
+        ) {
+            val ex = sheetExercise ?: return@AnimatedVisibility
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .align(Alignment.BottomCenter)
                     .background(Color.White, RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
                     .padding(24.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -212,3 +238,4 @@ fun NewActivityContent(
         }
     }
 }
+
