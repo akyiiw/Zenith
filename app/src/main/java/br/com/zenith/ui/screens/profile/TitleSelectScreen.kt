@@ -82,7 +82,7 @@ fun TitleSelectContent(
                 )
             }
             Text(
-                text = "Escolher tÃ­tulo",
+                text = "Escolher título",
                 style = MaterialTheme.typography.titleLarge.copy(
                     fontFamily = Inter,
                     fontWeight = FontWeight.Bold
@@ -108,7 +108,7 @@ fun TitleSelectContent(
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = "Nenhum tÃ­tulo desbloqueado ainda.",
+                                text = "Nenhum título desbloqueado ainda.",
                                 style = MaterialTheme.typography.bodyLarge.copy(color = Color.Gray)
                             )
                         }

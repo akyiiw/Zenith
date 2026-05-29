@@ -311,7 +311,7 @@ fun EditProfileContent(
                     )
                     if (!usernameCooldown.canEdit) {
                         Text(
-                            text = "VocÃª poderÃ¡ alterar o nome de usuÃ¡rio novamente em ${usernameCooldown.nextEditLabel}.",
+                            text = "Você poderá alterar o nome de usuário novamente em ${usernameCooldown.nextEditLabel}.",
                             style = MaterialTheme.typography.bodySmall.copy(
                                 fontFamily = Inter,
                                 color = Color.Gray
@@ -324,7 +324,7 @@ fun EditProfileContent(
                     OutlinedTextField(
                         value = displayName,
                         onValueChange = { displayName = it },
-                        label = { Text("Nome de exibiÃ§Ã£o") },
+                        label = { Text("Nome de exibição") },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(11.dp),
                         singleLine = true,
@@ -345,7 +345,7 @@ fun EditProfileContent(
             }
         }
 
-        // BotÃ£o salvar
+        // Botão salvar
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -369,7 +369,7 @@ fun EditProfileContent(
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF238D25))
                 ) {
                     Text(
-                        "Salvar alteraÃ§Ãµes",
+                        "Salvar alterações",
                         color = Color.White,
                         style = MaterialTheme.typography.titleMedium.copy(
                             fontFamily = Inter,

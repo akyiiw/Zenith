@@ -216,7 +216,7 @@ fun RegisterActivityContent(
                     )
                 }
                 Text(
-                    text = if (step == 0) "Qual exercÃ­cio?" else "Detalhes da atividade",
+                    text = if (step == 0) "Qual exercício?" else "Detalhes da atividade",
                     style = MaterialTheme.typography.titleLarge.copy(
                         fontFamily = Inter,
                         fontWeight = FontWeight.Bold
@@ -264,7 +264,7 @@ fun RegisterActivityContent(
                     OutlinedTextField(
                         value = query,
                         onValueChange = { query = it },
-                        placeholder = { Text("Buscar exercÃ­cio...") },
+                        placeholder = { Text("Buscar exercício...") },
                         leadingIcon = {
                             Icon(Icons.Default.Search, null, tint = Color(0xFF238D25))
                         },
@@ -306,7 +306,7 @@ fun RegisterActivityContent(
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
 
-                    // Card do exercÃ­cio (sempre)
+                    // Card do exercício (sempre)
                     item {
                         Row(
                             modifier = Modifier
@@ -333,16 +333,16 @@ fun RegisterActivityContent(
                         }
                     }
 
-                    // TÃ­tulo
+                    // Título
                     item {
                         OutlinedTextField(
                             value = titulo,
                             onValueChange = { titulo = it },
-                            label = { Text("TÃ­tulo (opcional)") },
+                            label = { Text("Título (opcional)") },
                             modifier = Modifier.fillMaxWidth(),
                             shape = inputShape,
                             singleLine = true,
-                            placeholder = { Text("Ex: Pedalada confortÃ¡vel") },
+                            placeholder = { Text("Ex: Pedalada confortável") },
                             colors = inputColors
                         )
                     }
@@ -391,7 +391,7 @@ fun RegisterActivityContent(
                         OutlinedTextField(
                             value = data,
                             onValueChange = { data = it },
-                            label = { Text("Data e horÃ¡rio *") },
+                            label = { Text("Data e horário *") },
                             modifier = Modifier.fillMaxWidth(),
                             shape = inputShape,
                             singleLine = true,
@@ -465,7 +465,7 @@ fun RegisterActivityContent(
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            listOf("otimo" to "Ã“timo", "ok" to "Ok", "cansado" to "Cansado").forEach { (op, label) ->
+                            listOf("otimo" to "Ótimo", "ok" to "Ok", "cansado" to "Cansado").forEach { (op, label) ->
                                 FilterChip(
                                     selected = humor == op,
                                     onClick = { humor = if (humor == op) null else op },
@@ -484,7 +484,7 @@ fun RegisterActivityContent(
             }
         }
 
-        // BotÃ£o salvar
+        // Botão salvar
         if (step == 1) {
             Column(
                 modifier = Modifier

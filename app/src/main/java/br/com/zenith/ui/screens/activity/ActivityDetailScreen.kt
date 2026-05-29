@@ -225,7 +225,7 @@ fun ActivityDetailScreen(navController: NavController, atividadeId: String?) {
 
                     item { Spacer(modifier = Modifier.height(16.dp)) }
 
-                    // InformaÃ§Ãµes detalhadas
+                    // Informações detalhadas
                     item {
                         DetailSection(title = "Detalhes") {
                             atividade.intensidade?.let {
@@ -238,7 +238,7 @@ fun ActivityDetailScreen(navController: NavController, atividadeId: String?) {
                                 DetailRow(
                                     label = "Humor",
                                     value = when (it) {
-                                        "otimo" -> "Ã“timo"
+                                        "otimo" -> "Ótimo"
                                         "ok" -> "Ok"
                                         "cansado" -> "Cansado"
                                         else -> it
@@ -351,7 +351,7 @@ fun EditActivityScreenContent(
 ) {
     val exercicioInicial = atividade.exercicio
     var exercicioId by remember(atividade.id) { mutableStateOf(atividade.exercicioId) }
-    var exercicioNome by remember(atividade.id) { mutableStateOf(exercicioInicial?.nome ?: "ExercÃ­cio") }
+    var exercicioNome by remember(atividade.id) { mutableStateOf(exercicioInicial?.nome ?: "Exercício") }
     var exercicioUnidade by remember(atividade.id) { mutableStateOf(exercicioInicial?.unidade ?: "") }
     var menuExerciciosAberto by remember { mutableStateOf(false) }
 
@@ -417,7 +417,7 @@ fun EditActivityScreenContent(
                 Box {
                     TextButton(onClick = { menuExerciciosAberto = true }) {
                         Column(modifier = Modifier.fillMaxWidth()) {
-                            Text("ExercÃ­cio", color = Color.Gray, fontFamily = Inter)
+                            Text("Exercício", color = Color.Gray, fontFamily = Inter)
                             Text(
                                 "$exercicioNome $exercicioUnidade",
                                 style = MaterialTheme.typography.bodyLarge.copy(
@@ -451,7 +451,7 @@ fun EditActivityScreenContent(
                 OutlinedTextField(
                     value = titulo,
                     onValueChange = { titulo = it },
-                    label = { Text("TÃ­tulo (opcional)") },
+                    label = { Text("Título (opcional)") },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(11.dp),
                     singleLine = true,
@@ -476,7 +476,7 @@ fun EditActivityScreenContent(
                 OutlinedTextField(
                     value = duracao,
                     onValueChange = { duracao = it },
-                    label = { Text("DuraÃ§Ã£o em minutos (opcional)") },
+                    label = { Text("Duração em minutos (opcional)") },
                     modifier = Modifier.fillMaxWidth(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     shape = RoundedCornerShape(11.dp),
@@ -489,7 +489,7 @@ fun EditActivityScreenContent(
                 OutlinedTextField(
                     value = data,
                     onValueChange = { data = it },
-                    label = { Text("Data e horÃ¡rio *") },
+                    label = { Text("Data e horário *") },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(11.dp),
                     singleLine = true,
@@ -560,7 +560,7 @@ fun EditActivityScreenContent(
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf("otimo" to "Ã“timo", "ok" to "Ok", "cansado" to "Cansado").forEach { (op, label) ->
+                    listOf("otimo" to "Ótimo", "ok" to "Ok", "cansado" to "Cansado").forEach { (op, label) ->
                         FilterChip(
                             selected = humor == op,
                             onClick = { humor = if (humor == op) null else op },
@@ -611,7 +611,7 @@ fun EditActivityScreenContent(
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF238D25))
                 ) {
                     Text(
-                        "Salvar alteraÃ§Ãµes",
+                        "Salvar alterações",
                         color = Color.White,
                         style = MaterialTheme.typography.titleMedium.copy(
                             fontFamily = Inter,
@@ -685,7 +685,7 @@ fun DetailChip(label: String, color: Color = Color(0xFF238D25)) {
 fun formatarData(isoDate: String): String {
     return try {
         val input = java.time.OffsetDateTime.parse(isoDate)
-        "%02d/%02d/%d Ã s %02d:%02d".format(
+        "%02d/%02d/%d às %02d:%02d".format(
             input.dayOfMonth, input.monthValue, input.year,
             input.hour, input.minute
         )

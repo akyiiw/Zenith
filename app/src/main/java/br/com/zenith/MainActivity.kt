@@ -38,6 +38,7 @@ import br.com.zenith.ui.screens.activity.ActivityDetailScreen
 import br.com.zenith.ui.screens.activity.ActivityRegisteredScreen
 import br.com.zenith.ui.screens.activity.NewActivityScreen
 import br.com.zenith.ui.screens.activity.RegisterActivityScreen
+import br.com.zenith.ui.screens.activity.SleepSettingsScreen
 import br.com.zenith.ui.screens.activity.StartActivityScreen
 import br.com.zenith.ui.screens.app.LoginScreen
 import br.com.zenith.ui.screens.app.OnboardingScreen
@@ -49,6 +50,7 @@ import br.com.zenith.ui.screens.home.HomeScreen
 import br.com.zenith.ui.screens.profile.EditProfileScreen
 import br.com.zenith.ui.screens.profile.ProfileScreen
 import br.com.zenith.ui.screens.profile.TitleSelectScreen
+import br.com.zenith.ui.screens.ranking.RankingScreen
 import br.com.zenith.ui.screens.settings.SettingsScreen
 import br.com.zenith.ui.screens.social.PublicProfileScreen
 import br.com.zenith.ui.screens.social.SocialScreen
@@ -132,7 +134,8 @@ class MainActivity : ComponentActivity() {
                             modifier = Modifier.fillMaxSize(),
                             enterTransition = {
                                 val target = targetState.destination.route.orEmpty()
-                                if (target.startsWith("new_activity") ||
+                                if (target == "sleep_settings" ||
+                                    target.startsWith("new_activity") ||
                                     target.startsWith("start_activity") ||
                                     target.startsWith("register_activity")
                                 ) {
@@ -149,7 +152,8 @@ class MainActivity : ComponentActivity() {
                             },
                             exitTransition = {
                                 val target = targetState.destination.route.orEmpty()
-                                if (target.startsWith("new_activity") ||
+                                if (target == "sleep_settings" ||
+                                    target.startsWith("new_activity") ||
                                     target.startsWith("start_activity") ||
                                     target.startsWith("register_activity")
                                 ) {
@@ -166,7 +170,8 @@ class MainActivity : ComponentActivity() {
                             },
                             popEnterTransition = {
                                 val target = targetState.destination.route.orEmpty()
-                                if (target.startsWith("new_activity") ||
+                                if (target == "sleep_settings" ||
+                                    target.startsWith("new_activity") ||
                                     target.startsWith("start_activity") ||
                                     target.startsWith("register_activity")
                                 ) {
@@ -183,7 +188,8 @@ class MainActivity : ComponentActivity() {
                             },
                             popExitTransition = {
                                 val initial = initialState.destination.route.orEmpty()
-                                if (initial.startsWith("new_activity") ||
+                                if (initial == "sleep_settings" ||
+                                    initial.startsWith("new_activity") ||
                                     initial.startsWith("start_activity") ||
                                     initial.startsWith("register_activity")
                                 ) {
@@ -224,7 +230,7 @@ class MainActivity : ComponentActivity() {
                         }
 
                         composable("ranking") {
-                            TabPlaceholderScreen(navController, "Ranking")
+                            RankingScreen(navController)
                         }
 
                         composable("social") {
@@ -268,6 +274,10 @@ class MainActivity : ComponentActivity() {
 
                         composable("new_activity") {
                             NewActivityScreen(navController)
+                        }
+
+                        composable("sleep_settings") {
+                            SleepSettingsScreen(navController)
                         }
 
                         composable(
