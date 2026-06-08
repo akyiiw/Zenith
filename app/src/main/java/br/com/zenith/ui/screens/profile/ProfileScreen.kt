@@ -11,8 +11,10 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -30,9 +32,11 @@ import br.com.zenith.ui.theme.ZenithTheme
 import br.com.zenith.ui.components.profile.ProfileHeader
 import br.com.zenith.ui.components.profile.RecentActivitySection
 import br.com.zenith.ui.components.profile.RecentHeader
+import br.com.zenith.ui.theme.items.ZenithTextField
 import br.com.zenith.viewmodels.activity.ActivityViewModel
 import br.com.zenith.viewmodels.profile.UserViewModel
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(
     navController: NavController
@@ -106,34 +110,46 @@ fun ProfileScreen(
         }
 
         if (showStatusDialog) {
-            AlertDialog(
+            ModalBottomSheet(
                 onDismissRequest = { showStatusDialog = false },
-                title = { Text("Atualizar status") },
-                text = {
-                    OutlinedTextField(
+                containerColor = Color.White,
+                scrimColor = Color.Transparent
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp, vertical = 12.dp)
+                        .padding(bottom = 24.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    Text("Atualizar status")
+                    ZenithTextField(
                         value = statusText,
                         onValueChange = { statusText = it.take(80) },
-                        label = { Text("Qual é o seu humor?") },
-                        shape = RoundedCornerShape(11.dp),
+                        label = "Qual é o seu humor?",
+                        modifier = Modifier.fillMaxWidth(),
                         singleLine = true
                     )
-                },
-                confirmButton = {
-                    TextButton(
-                        onClick = {
-                            userViewModel.atualizarStatus(statusText, context)
-                            showStatusDialog = false
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        TextButton(
+                            onClick = { showStatusDialog = false },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("Cancelar")
                         }
-                    ) {
-                        Text("Salvar")
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showStatusDialog = false }) {
-                        Text("Cancelar")
+                        Button(
+                            onClick = {
+                                userViewModel.atualizarStatus(statusText, context)
+                                showStatusDialog = false
+                            },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF238D25))
+                        ) {
+                            Text("Salvar", color = Color.White)
+                        }
                     }
                 }
-            )
+            }
         }
     }
 }

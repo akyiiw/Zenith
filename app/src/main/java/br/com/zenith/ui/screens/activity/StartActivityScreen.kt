@@ -166,6 +166,7 @@ fun StartActivityScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StartActivityContent(
     exercicioNome: String,
@@ -204,28 +205,43 @@ fun StartActivityContent(
     }
 
     if (showStopDialog) {
-        AlertDialog(
+        ModalBottomSheet(
             onDismissRequest = { showStopDialog = false },
-            title = {
+            containerColor = Color.White,
+            scrimColor = Color.Transparent
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp, vertical = 12.dp)
+                    .padding(bottom = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
                 Text("Finalizar atividade?", fontFamily = Inter, fontWeight = FontWeight.Bold)
-            },
-            text = {
                 Text(
                     "O rastreamento será parado e você poderá registrar os detalhes.",
                     fontFamily = Inter
                 )
-            },
-            confirmButton = {
-                TextButton(onClick = { showStopDialog = false; onStop() }) {
-                    Text("Finalizar", color = Color(0xFF238D25), fontFamily = Inter)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showStopDialog = false }) {
-                    Text("Cancelar", fontFamily = Inter)
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    TextButton(
+                        onClick = { showStopDialog = false },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("Cancelar", fontFamily = Inter)
+                    }
+                    Button(
+                        onClick = {
+                            showStopDialog = false
+                            onStop()
+                        },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF238D25))
+                    ) {
+                        Text("Finalizar", color = Color.White, fontFamily = Inter)
+                    }
                 }
             }
-        )
+        }
     }
 
     Box(modifier = Modifier.fillMaxSize()) {

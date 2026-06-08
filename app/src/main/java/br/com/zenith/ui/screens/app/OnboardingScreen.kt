@@ -31,6 +31,7 @@ import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import br.com.zenith.ui.theme.Inter
 import br.com.zenith.ui.theme.ZenithTheme
+import br.com.zenith.ui.theme.items.ZenithTextField
 import br.com.zenith.viewmodels.app.AuthViewModel
 import br.com.zenith.R
 import java.io.File
@@ -114,14 +115,13 @@ fun StepUsername(
         onNext = onNext,
         nextEnabled = username.isNotBlank()
     ) {
-        OutlinedTextField(
+        ZenithTextField(
             value = username,
             onValueChange = { onUsernameChange(it.lowercase().replace(" ", "")) },
-            label = { Text("Nome") },
+            label = "Nome",
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
-            shape = RoundedCornerShape(11.dp),
-            prefix = { Text("@") }
+            prefix = "@"
         )
     }
 }
@@ -139,12 +139,11 @@ fun StepDisplayName(
         onNext = onNext,
         nextEnabled = displayName.isNotBlank()
     ) {
-        OutlinedTextField(
+        ZenithTextField(
             value = displayName,
             onValueChange = onDisplayNameChange,
-            label = { Text("Nome de exibição") },
+            label = "Nome de exibição",
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(11.dp),
             singleLine = true
         )
     }

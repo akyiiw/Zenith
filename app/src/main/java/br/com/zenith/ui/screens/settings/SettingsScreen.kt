@@ -3,13 +3,16 @@ package br.com.zenith.ui.screens.settings
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -37,6 +40,7 @@ import br.com.zenith.ui.theme.ZenithTheme
 import br.com.zenith.viewmodels.app.AuthViewModel
 import io.github.jan.supabase.auth.auth
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(navController: NavController) {
     ZenithTheme {
@@ -100,32 +104,45 @@ fun SettingsScreen(navController: NavController) {
         }
 
         if (showLogoutDialog) {
-            AlertDialog(
+            ModalBottomSheet(
                 onDismissRequest = { showLogoutDialog = false },
-                title = { Text("Sair da conta?") },
-                text = { Text("Você precisará entrar novamente para acessar seus dados.") },
-                confirmButton = {
-                    Button(
-                        onClick = {
-                            showLogoutDialog = false
-                            authViewModel.sairDaConta(context) {
-                                navController.navigate("welcome") {
-                                    popUpTo("home") { inclusive = true }
-                                    launchSingleTop = true
+                containerColor = Color.White,
+                scrimColor = Color.Transparent
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp, vertical = 12.dp)
+                        .padding(bottom = 24.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    Text("Sair da conta?")
+                    Text("Você precisará entrar novamente para acessar seus dados.")
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        OutlinedButton(
+                            onClick = { showLogoutDialog = false },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("Cancelar")
+                        }
+                        Button(
+                            onClick = {
+                                showLogoutDialog = false
+                                authViewModel.sairDaConta(context) {
+                                    navController.navigate("welcome") {
+                                        popUpTo("home") { inclusive = true }
+                                        launchSingleTop = true
+                                    }
                                 }
-                            }
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F))
-                    ) {
-                        Text("Sair")
-                    }
-                },
-                dismissButton = {
-                    OutlinedButton(onClick = { showLogoutDialog = false }) {
-                        Text("Cancelar")
+                            },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F))
+                        ) {
+                            Text("Sair")
+                        }
                     }
                 }
-            )
+            }
         }
     }
 }

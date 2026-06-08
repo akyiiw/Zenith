@@ -23,7 +23,9 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.DirectionsBike
@@ -40,14 +42,17 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -59,6 +64,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -68,8 +74,10 @@ import br.com.zenith.data.models.Exercicio
 import br.com.zenith.ui.animations.CenteredZenithLoading
 import br.com.zenith.ui.theme.Inter
 import br.com.zenith.ui.theme.ZenithTheme
+import br.com.zenith.ui.theme.items.ZenithTextField
 import br.com.zenith.viewmodels.activity.ActivityViewModel
 import br.com.zenith.viewmodels.challenge.ChallengeViewModel
+import br.com.zenith.viewmodels.sleep.SleepRecordViewModel
 import java.net.URLEncoder
 import java.util.Locale
 
@@ -78,6 +86,7 @@ fun NewActivityScreen(navController: NavController) {
     ZenithTheme {
         val viewModel: ActivityViewModel = viewModel()
         val challengeViewModel: ChallengeViewModel = viewModel()
+        val sleepRecordViewModel: SleepRecordViewModel = viewModel()
         val context = LocalContext.current
         val exercicios by viewModel.exercicios.collectAsState()
         val challengeState by challengeViewModel.uiState.collectAsState()
@@ -110,6 +119,9 @@ fun NewActivityScreen(navController: NavController) {
             isLoading = isLoading,
             participatingChallenges = challengeState.challenges.filter { challengeState.isParticipating(it.id) },
             onSleepSettings = { navController.navigate("sleep_settings") },
+            onSaveManualSleep = { hours, quality, onSuccess ->
+                sleepRecordViewModel.addManualSleep(hours, quality, context, onSuccess)
+            },
             onIniciar = ::navigateStart,
             onRegistrar = ::navigateRegister,
             onIniciarDesafio = { challenge ->
@@ -131,6 +143,7 @@ fun NewActivityContent(
     isLoading: Boolean,
     participatingChallenges: List<Desafio> = emptyList(),
     onSleepSettings: () -> Unit,
+    onSaveManualSleep: (Float, Int?, () -> Unit) -> Unit,
     onIniciar: (Exercicio) -> Unit,
     onRegistrar: (Exercicio) -> Unit,
     onIniciarDesafio: (Desafio) -> Unit,
@@ -140,6 +153,7 @@ fun NewActivityContent(
     var query by remember { mutableStateOf("") }
     var selectedActivity by remember { mutableStateOf<ActivitySelection?>(null) }
     var sheetActivity by remember { mutableStateOf<ActivitySelection?>(null) }
+    var showManualSleepSheet by remember { mutableStateOf(false) }
     var outrasExpanded by remember { mutableStateOf(false) }
     val keyboardController = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
@@ -210,15 +224,15 @@ fun NewActivityContent(
             }
 
             if (mode == ActivityMode.Start || mode == ActivityMode.Register) {
-                OutlinedTextField(
+                ZenithTextField(
                     value = query,
                     onValueChange = { query = it },
-                    placeholder = { Text("Buscar exercício...") },
+                    label = "Buscar exercício",
+                    placeholder = "Buscar exercício...",
                     leadingIcon = { Icon(Icons.Default.Search, null, tint = Color(0xFF238D25)) },
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 24.dp),
-                    shape = RoundedCornerShape(11.dp),
                     singleLine = true
                 )
             }
@@ -392,7 +406,10 @@ fun NewActivityContent(
                 Button(
                     onClick = {
                         when {
-                            exercise == null -> onSleepSettings()
+                            exercise == null -> {
+                                selectedActivity = null
+                                showManualSleepSheet = true
+                            }
                             mode == ActivityMode.Start && exercise.isMonitorable() -> onIniciar(exercise)
                             else -> onRegistrar(exercise)
                         }
@@ -403,7 +420,7 @@ fun NewActivityContent(
                 ) {
                     Text(
                         when {
-                            exercise == null -> "Configurações de sono"
+                            exercise == null -> "Registrar sono"
                             mode == ActivityMode.Start && exercise.isMonitorable() -> "Iniciar"
                             else -> "Registrar atividade"
                         },
@@ -426,7 +443,114 @@ fun NewActivityContent(
                         )
                     }
                 }
+                if (exercise == null) {
+                    OutlinedButton(
+                        onClick = {
+                            selectedActivity = null
+                            onSleepSettings()
+                        },
+                        modifier = Modifier.fillMaxWidth().height(52.dp),
+                        shape = RoundedCornerShape(10.dp),
+                        border = androidx.compose.foundation.BorderStroke(2.dp, Color(0xFF238D25))
+                    ) {
+                        Text(
+                            "Configurações de sono",
+                            color = Color.Black,
+                            style = MaterialTheme.typography.titleMedium.copy(fontFamily = Inter, fontWeight = FontWeight.W600)
+                        )
+                    }
+                }
                 Spacer(modifier = Modifier.height(8.dp))
+            }
+        }
+
+        if (showManualSleepSheet) {
+            ManualSleepSheet(
+                onDismiss = { showManualSleepSheet = false },
+                onSave = { hours, quality ->
+                    onSaveManualSleep(hours, quality) {
+                        showManualSleepSheet = false
+                    }
+                }
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ManualSleepSheet(
+    onDismiss: () -> Unit,
+    onSave: (Float, Int?) -> Unit
+) {
+    var hoursText by remember { mutableStateOf("8") }
+    var quality by remember { mutableIntStateOf(4) }
+    val hours = hoursText.replace(",", ".").toFloatOrNull()
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = Color.White,
+        scrimColor = Color.Transparent
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp, vertical = 12.dp)
+                .padding(bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Text(
+                text = "Registrar sono",
+                style = MaterialTheme.typography.titleLarge.copy(
+                    fontFamily = Inter,
+                    fontWeight = FontWeight.Bold
+                )
+            )
+            ZenithTextField(
+                value = hoursText,
+                onValueChange = { input ->
+                    hoursText = input.filter { it.isDigit() || it == ',' || it == '.' }
+                },
+                label = "Duração em horas",
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                singleLine = true
+            )
+            Text("Qualidade", fontFamily = Inter)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                (1..5).forEach { option ->
+                    Surface(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clickable { quality = option },
+                        color = if (quality == option) Color(0xFF238D25) else Color(0xFFEDEDED),
+                        shape = CircleShape
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text(
+                                text = option.toString(),
+                                color = if (quality == option) Color.White else Color.Black
+                            )
+                        }
+                    }
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                TextButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("Cancelar", fontFamily = Inter)
+                }
+                Button(
+                    onClick = {
+                        hours?.let { onSave(it, quality) }
+                    },
+                    enabled = hours != null && hours > 0f,
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF238D25))
+                ) {
+                    Text("Salvar", color = Color.White, fontFamily = Inter)
+                }
             }
         }
     }

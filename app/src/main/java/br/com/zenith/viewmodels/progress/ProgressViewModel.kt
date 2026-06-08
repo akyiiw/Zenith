@@ -7,6 +7,9 @@ import androidx.lifecycle.viewModelScope
 import br.com.zenith.data.SupabaseConfig
 import br.com.zenith.data.models.Atividade
 import br.com.zenith.data.models.SleepRecord
+import br.com.zenith.data.models.PersonalGoal
+import br.com.zenith.data.models.ProgressGoal
+import br.com.zenith.data.repositories.GoalsRepository
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Columns
@@ -14,7 +17,6 @@ import io.github.jan.supabase.postgrest.query.Count
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.OffsetDateTime
-import java.time.ZoneId
 import kotlin.math.roundToInt
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -22,8 +24,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
 
 enum class ProgressPeriod(val days: Int) {
     Weekly(7),
@@ -59,7 +59,9 @@ data class ProgressUiState(
     val monthlyDays: List<ProgressDay> = emptyList(),
     val weeklySummary: ProgressSummary = ProgressSummary(),
     val monthlySummary: ProgressSummary = ProgressSummary(),
-    val sleepRecordsAvailable: Boolean = true
+    val sleepRecordsAvailable: Boolean = true,
+    val weeklyGoals: List<ProgressGoal> = emptyList(),
+    val monthlyGoals: List<ProgressGoal> = emptyList()
 )
 
 class ProgressViewModel : ViewModel() {
@@ -71,6 +73,7 @@ class ProgressViewModel : ViewModel() {
     private var challengesCache: Int = 0
     private var achievementsCache: Int = 0
     private var streakCache: Int = 0
+    private val goalsRepository = GoalsRepository()
 
     fun load(context: Context) {
         viewModelScope.launch {
@@ -111,51 +114,14 @@ class ProgressViewModel : ViewModel() {
 
                 _uiState.value = buildState(
                     isPremium = profile.isPremium,
-                    sleepRecordsAvailable = sleepRecordsAvailable
+                    sleepRecordsAvailable = sleepRecordsAvailable,
+                    activeGoals = goalsRepository.getActiveGoals()
                 )
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     error = e.localizedMessage ?: "Erro ao carregar progresso"
                 )
-            }
-        }
-    }
-
-    fun addManualSleep(
-        hours: Float,
-        quality: Int?,
-        context: Context
-    ) {
-        viewModelScope.launch {
-            try {
-                val client = SupabaseConfig.getClient()
-                val userId = client.auth.currentUserOrNull()?.id
-                    ?: throw Exception("Usuário não autenticado")
-                val durationMinutes = (hours.coerceIn(0.5f, 16f) * 60).roundToInt()
-                val zone = ZoneId.systemDefault()
-                val endedAt = LocalDate.now().atTime(7, 0)
-                val startedAt = endedAt.minusMinutes(durationMinutes.toLong())
-
-                client.postgrest.from("sleep_records").insert(
-                    buildJsonObject {
-                        put("user_id", userId)
-                        put("started_at", startedAt.atZone(zone).toOffsetDateTime().toString())
-                        put("ended_at", endedAt.atZone(zone).toOffsetDateTime().toString())
-                        put("duration_minutes", durationMinutes)
-                        put("source", "manual")
-                        quality?.let { put("quality", it) }
-                    }
-                )
-
-                Toast.makeText(context, "Sono registrado", Toast.LENGTH_SHORT).show()
-                load(context)
-            } catch (e: Exception) {
-                Toast.makeText(
-                    context,
-                    "Erro ao registrar sono: ${e.localizedMessage}",
-                    Toast.LENGTH_SHORT
-                ).show()
             }
         }
     }
@@ -172,7 +138,8 @@ class ProgressViewModel : ViewModel() {
 
     private fun buildState(
         isPremium: Boolean,
-        sleepRecordsAvailable: Boolean
+        sleepRecordsAvailable: Boolean,
+        activeGoals: List<PersonalGoal> = emptyList()
     ): ProgressUiState {
         val weeklyDays = buildDays(ProgressPeriod.Weekly)
         val monthlyDays = buildDays(ProgressPeriod.Monthly)
@@ -184,7 +151,9 @@ class ProgressViewModel : ViewModel() {
             monthlyDays = monthlyDays,
             weeklySummary = summarize(weeklyDays),
             monthlySummary = summarize(monthlyDays),
-            sleepRecordsAvailable = sleepRecordsAvailable
+            sleepRecordsAvailable = sleepRecordsAvailable,
+            weeklyGoals = calculateProgressGoals(activeGoals, ProgressPeriod.Weekly),
+            monthlyGoals = calculateProgressGoals(activeGoals, ProgressPeriod.Monthly)
         )
     }
 
@@ -241,6 +210,43 @@ class ProgressViewModel : ViewModel() {
         passos?.let { return it }
         val unit = exercicio?.unidade.orEmpty().lowercase()
         return if ("pass" in unit) valor.roundToInt() else 0
+    }
+
+    private fun calculateProgressGoals(goals: List<PersonalGoal>, period: ProgressPeriod): List<ProgressGoal> {
+        val today = LocalDate.now()
+        val startDate = when (period) {
+            ProgressPeriod.Weekly -> today.minusDays(6)
+            ProgressPeriod.Monthly -> today.minusDays(29)
+        }
+
+        return goals.filter { it.period == period.name.lowercase() }.map { goal ->
+            val currentVal = when (goal.metric) {
+                "distance_km" -> activitiesCache.filter { it.activityDate()?.isAfter(startDate) == true || it.activityDate() == startDate }.sumOf { it.distanceKm() }
+                "steps" -> activitiesCache.filter { it.activityDate()?.isAfter(startDate) == true || it.activityDate() == startDate }.sumOf { it.stepsValue() }.toDouble()
+                "active_minutes" -> activitiesCache.filter { it.activityDate()?.isAfter(startDate) == true || it.activityDate() == startDate }.sumOf { it.duracaoMin ?: 0 }.toDouble()
+                "activities" -> activitiesCache.filter { it.activityDate()?.isAfter(startDate) == true || it.activityDate() == startDate }.size.toDouble()
+                "sleep_hours" -> sleepCache.filter { it.sleepDate()?.isAfter(startDate) == true || it.sleepDate() == startDate }.sumOf { it.durationMinutes }.toDouble() / 60.0
+                else -> 0.0
+            }
+
+            val progressPercent = (currentVal / goal.targetValue).toFloat().coerceIn(0f, 1f)
+
+            ProgressGoal(
+                title = goal.title,
+                currentValue = currentVal,
+                targetValue = goal.targetValue,
+                unit = when (goal.metric) {
+                    "distance_km" -> "km"
+                    "steps" -> "passos"
+                    "active_minutes" -> "min"
+                    "activities" -> "atividades"
+                    "sleep_hours" -> "horas"
+                    else -> ""
+                },
+                progressPercent = progressPercent,
+                isComplete = currentVal >= goal.targetValue
+            )
+        }
     }
 
     private fun Atividade.distanceKm(): Double {

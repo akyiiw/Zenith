@@ -47,8 +47,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Tab
@@ -685,15 +683,13 @@ private fun ChallengeForumComposer(
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        OutlinedTextField(
+        ZenithTextField(
             value = content,
             onValueChange = { content = it },
-            label = { Text("Publicar no desafio") },
+            label = "Publicar no desafio",
             minLines = 2,
             maxLines = 5,
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(8.dp),
-            colors = inputColors()
+            modifier = Modifier.fillMaxWidth()
         )
         if (imageUris.isNotEmpty()) {
             LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -841,14 +837,12 @@ private fun ChallengeForumPostCard(
         val entryId = item.entry?.id
         if (currentUserParticipating && entryId != null) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(
+                ZenithTextField(
                     value = commentText,
                     onValueChange = { commentText = it },
-                    label = { Text("Comentar") },
+                    label = "Comentar",
                     singleLine = true,
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(8.dp),
-                    colors = inputColors()
+                    modifier = Modifier.weight(1f)
                 )
                 Button(
                     onClick = {
@@ -1134,25 +1128,21 @@ fun CreateChallengeContent(
             }
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    OutlinedTextField(
+                    ZenithTextField(
                         value = goal,
                         onValueChange = { goal = it.filter { char -> char.isDigit() || char == '.' || char == ',' } },
-                        label = { Text("Meta") },
+                        label = "Meta",
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(8.dp),
-                        colors = inputColors()
+                        modifier = Modifier.weight(1f)
                     )
-                    OutlinedTextField(
+                    ZenithTextField(
                         value = days,
                         onValueChange = { days = it.filter(Char::isDigit) },
-                        label = { Text("Dias") },
+                        label = "Dias",
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(8.dp),
-                        colors = inputColors()
+                        modifier = Modifier.weight(1f)
                     )
                 }
             }
@@ -1371,13 +1361,6 @@ private fun EmptyState(text: String) {
             .padding(horizontal = 14.dp, vertical = 12.dp)
     )
 }
-
-@Composable
-private fun inputColors() = OutlinedTextFieldDefaults.colors(
-    focusedBorderColor = Green,
-    focusedLabelColor = Green,
-    cursorColor = Green
-)
 
 private fun rankColor(position: Int): Color {
     return when (position) {

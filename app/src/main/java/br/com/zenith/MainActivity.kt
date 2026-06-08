@@ -47,6 +47,7 @@ import br.com.zenith.ui.screens.app.VerifyEmailScreen
 import br.com.zenith.ui.screens.app.WelcomeScreen
 import br.com.zenith.ui.screens.home.HomeScreen
 import br.com.zenith.ui.screens.progress.ProgressScreen
+import br.com.zenith.ui.screens.goals.GoalsScreen
 import br.com.zenith.ui.screens.profile.EditProfileScreen
 import br.com.zenith.ui.screens.profile.ProfileScreen
 import br.com.zenith.ui.screens.profile.TitleSelectScreen
@@ -254,6 +255,10 @@ class MainActivity : ComponentActivity() {
 
                         composable("progress") {
                             ProgressScreen(navController)
+                        }
+
+                        composable("goals") {
+                            GoalsScreen(navController)
                         }
 
                         composable("settings") {

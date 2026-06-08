@@ -38,6 +38,8 @@ import br.com.zenith.ui.animations.CenteredZenithLoading
 import br.com.zenith.ui.animations.ZenithLoading
 import br.com.zenith.ui.theme.Inter
 import br.com.zenith.ui.theme.ZenithTheme
+import br.com.zenith.ui.theme.items.ZenithDateTimeField
+import br.com.zenith.ui.theme.items.ZenithTextField
 import br.com.zenith.viewmodels.activity.ActivityViewModel
 import java.net.URLEncoder
 
@@ -109,6 +111,7 @@ fun RegisterActivityScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun StartedActivityReviewContent(
     exercicioId: String,
@@ -215,12 +218,11 @@ private fun StartedActivityReviewContent(
                 }
 
                 item {
-                    OutlinedTextField(
+                    ZenithTextField(
                         value = titulo,
                         onValueChange = { titulo = it },
-                        label = { Text("Título (opcional)") },
+                        label = "Título (opcional)",
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(11.dp),
                         singleLine = true
                     )
                 }
@@ -330,32 +332,46 @@ private fun StartedActivityReviewContent(
         }
 
         if (showSubmitDialog) {
-            AlertDialog(
+            ModalBottomSheet(
                 onDismissRequest = { showSubmitDialog = false },
-                title = { Text("Submeter ao desafio?", fontFamily = Inter, fontWeight = FontWeight.Bold) },
-                text = {
+                containerColor = Color.White,
+                scrimColor = Color.Transparent
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp, vertical = 12.dp)
+                        .padding(bottom = 24.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    Text("Submeter ao desafio?", fontFamily = Inter, fontWeight = FontWeight.Bold)
                     Text(
                         "Os dados monitorados não poderão ser alterados e serão usados no ranking.",
                         fontFamily = Inter
                     )
-                },
-                confirmButton = {
-                    TextButton(onClick = {
-                        showSubmitDialog = false
-                        submit(desafioId)
-                    }) {
-                        Text("Submeter", color = Color(0xFF238D25), fontFamily = Inter)
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = {
-                        showSubmitDialog = false
-                        submit(null)
-                    }) {
-                        Text("Salvar sem desafio", fontFamily = Inter)
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        TextButton(
+                            onClick = {
+                                showSubmitDialog = false
+                                submit(null)
+                            },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("Salvar sem desafio", fontFamily = Inter)
+                        }
+                        Button(
+                            onClick = {
+                                showSubmitDialog = false
+                                submit(desafioId)
+                            },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF238D25))
+                        ) {
+                            Text("Submeter", color = Color.White, fontFamily = Inter)
+                        }
                     }
                 }
-            )
+            }
         }
     }
 }
@@ -377,6 +393,7 @@ private fun LockedReviewRow(label: String, value: String) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RegisterActivityContent(
     exercicios: List<Exercicio>,
@@ -450,18 +467,6 @@ fun RegisterActivityContent(
         if (query.isBlank()) exercicios
         else exercicios.filter { it.nome.contains(query, ignoreCase = true) }
     }
-
-    val inputColors = OutlinedTextFieldDefaults.colors(
-        focusedTextColor = Color(0xFF1C1B1F),
-        unfocusedTextColor = Color(0xFF1C1B1F),
-        cursorColor = Color(0xFF238D25),
-        focusedBorderColor = Color(0xFF238D25),
-        focusedLabelColor = Color(0xFF238D25),
-        unfocusedLabelColor = Color(0xFF555555),
-        focusedPlaceholderColor = Color(0xFF777777),
-        unfocusedPlaceholderColor = Color(0xFF777777)
-    )
-    val inputShape = RoundedCornerShape(11.dp)
 
     if (veioDeTracking) {
         StartedActivityReviewContent(
@@ -556,19 +561,18 @@ fun RegisterActivityContent(
                         .fillMaxSize()
                         .padding(top = 100.dp)
                 ) {
-                    OutlinedTextField(
+                    ZenithTextField(
                         value = query,
                         onValueChange = { query = it },
-                        placeholder = { Text("Buscar exercício...") },
+                        label = "Buscar exercício",
+                        placeholder = "Buscar exercício...",
                         leadingIcon = {
                             Icon(Icons.Default.Search, null, tint = Color(0xFF238D25))
                         },
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 24.dp),
-                        shape = inputShape,
-                        singleLine = true,
-                        colors = inputColors
+                        singleLine = true
                     )
                     Spacer(modifier = Modifier.height(12.dp))
                     LazyColumn(
@@ -630,83 +634,79 @@ fun RegisterActivityContent(
 
                     // Título
                     item {
-                        OutlinedTextField(
+                        ZenithTextField(
                             value = titulo,
                             onValueChange = { titulo = it },
-                            label = { Text("Título (opcional)") },
+                            label = "Título (opcional)",
                             modifier = Modifier.fillMaxWidth(),
-                            shape = inputShape,
                             singleLine = true,
-                            placeholder = { Text("Ex: Pedalada confortável") },
-                            colors = inputColors
+                            placeholder = "Ex: Pedalada confortável"
                         )
                     }
                     if (!unidadeEhDuracao) {
                         item {
-                            OutlinedTextField(
+                            ZenithTextField(
                                 value = valor,
-                                onValueChange = { if (!challengeSubmissionLocked) valor = it },
-                                label = { Text("${ex.unidade} realizados *") },
+                                onValueChange = {
+                                    if (!challengeSubmissionLocked) {
+                                        valor = it.filter { char -> char.isDigit() || char == '.' || char == ',' }
+                                    }
+                                },
+                                label = "${ex.unidade} realizados *",
                                 modifier = Modifier.fillMaxWidth(),
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                                shape = inputShape,
                                 singleLine = true,
-                                readOnly = challengeSubmissionLocked,
-                                colors = inputColors
+                                readOnly = challengeSubmissionLocked
                             )
                         }
                     }
 
                     if (veioDeTracking) {
                         item {
-                            OutlinedTextField(
+                            ZenithTextField(
                                 value = passos,
                                 onValueChange = { if (!challengeSubmissionLocked) passos = it.filter(Char::isDigit) },
-                                label = { Text("Passos") },
+                                label = "Passos",
                                 modifier = Modifier.fillMaxWidth(),
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                shape = inputShape,
                                 singleLine = true,
-                                readOnly = challengeSubmissionLocked,
-                                colors = inputColors
+                                readOnly = challengeSubmissionLocked
                             )
                         }
                     }
 
                     item {
                         if (challengeSubmissionLocked) {
-                            OutlinedTextField(
+                            ZenithTextField(
                                 value = "${duracaoHoras}h ${duracaoMinutos.toString().padStart(2, '0')}min",
                                 onValueChange = {},
-                                label = { Text("Duração") },
+                                label = "Duração",
                                 readOnly = true,
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = inputShape,
-                                colors = inputColors
+                                modifier = Modifier.fillMaxWidth()
                             )
                         } else {
-                            DurationPicker(
-                                hours = duracaoHoras,
-                                minutes = duracaoMinutos,
-                                inputShape = inputShape,
-                                inputColors = inputColors,
-                                onHoursChange = { duracaoHoras = it },
-                                onMinutesChange = { duracaoMinutos = it }
+                            ZenithTextField(
+                                value = ((duracaoHoras * 60) + duracaoMinutos).takeIf { it > 0 }?.toString().orEmpty(),
+                                onValueChange = { input ->
+                                    val total = input.filter(Char::isDigit).toIntOrNull() ?: 0
+                                    duracaoHoras = total / 60
+                                    duracaoMinutos = total % 60
+                                },
+                                label = "Duração em minutos",
+                                modifier = Modifier.fillMaxWidth(),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                singleLine = true
                             )
                         }
                     }
 
                     item {
-                        OutlinedTextField(
+                        ZenithDateTimeField(
                             value = data,
-                            onValueChange = { if (!challengeSubmissionLocked) data = it },
-                            label = { Text("Data e horário *") },
+                            onValueChange = { data = it },
+                            label = "Data e horário *",
                             modifier = Modifier.fillMaxWidth(),
-                            shape = inputShape,
-                            singleLine = true,
-                            readOnly = challengeSubmissionLocked,
-                            placeholder = { Text("dd/MM/yyyy HH:mm") },
-                            colors = inputColors
+                            enabled = !challengeSubmissionLocked
                         )
                     }
 
@@ -865,46 +865,60 @@ fun RegisterActivityContent(
         }
 
         if (pendingSave != null) {
-            AlertDialog(
+            ModalBottomSheet(
                 onDismissRequest = { pendingSave = null },
-                title = { Text("Submeter ao desafio?", fontFamily = Inter, fontWeight = FontWeight.Bold) },
-                text = {
+                containerColor = Color.White,
+                scrimColor = Color.Transparent
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp, vertical = 12.dp)
+                        .padding(bottom = 24.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    Text("Submeter ao desafio?", fontFamily = Inter, fontWeight = FontWeight.Bold)
                     Text(
                         "Esse registro será usado na participação e no ranking do desafio.",
                         fontFamily = Inter
                     )
-                },
-                confirmButton = {
-                    TextButton(onClick = {
-                        val action = pendingSave
-                        pendingSave = null
-                        action?.invoke()
-                    }) {
-                        Text("Submeter", color = Color(0xFF238D25), fontFamily = Inter)
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = {
-                        pendingSave = null
-                        onSave(
-                            exercicioSelecionado!!.id,
-                            exercicioSelecionado!!.nome,
-                            exercicioSelecionado!!.unidade,
-                            valor.replace(",", ".").toDoubleOrNull() ?: 0.0,
-                            (duracaoHoras * 60 + duracaoMinutos).takeIf { it > 0 },
-                            titulo.ifBlank { null },
-                            data,
-                            nota?.toInt(),
-                            intensidade,
-                            humor,
-                            null,
-                            null
-                        )
-                    }) {
-                        Text("Salvar sem desafio", fontFamily = Inter)
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        TextButton(
+                            onClick = {
+                                pendingSave = null
+                                onSave(
+                                    exercicioSelecionado!!.id,
+                                    exercicioSelecionado!!.nome,
+                                    exercicioSelecionado!!.unidade,
+                                    valor.replace(",", ".").toDoubleOrNull() ?: 0.0,
+                                    (duracaoHoras * 60 + duracaoMinutos).takeIf { it > 0 },
+                                    titulo.ifBlank { null },
+                                    data,
+                                    nota?.toInt(),
+                                    intensidade,
+                                    humor,
+                                    null,
+                                    null
+                                )
+                            },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("Salvar sem desafio", fontFamily = Inter)
+                        }
+                        Button(
+                            onClick = {
+                                val action = pendingSave
+                                pendingSave = null
+                                action?.invoke()
+                            },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF238D25))
+                        ) {
+                            Text("Submeter", color = Color.White, fontFamily = Inter)
+                        }
                     }
                 }
-            )
+            }
         }
     }
 }
@@ -946,140 +960,6 @@ private fun OptionalSelectionDropdown(
                     }
                 )
             }
-        }
-    }
-}
-
-
-
-@Composable
-fun DurationPicker(
-    hours: Int,
-    minutes: Int,
-    inputShape: RoundedCornerShape,
-    inputColors: TextFieldColors,
-    onHoursChange: (Int) -> Unit,
-    onMinutesChange: (Int) -> Unit
-) {
-    var pickerOpen by remember { mutableStateOf(false) }
-    val value = when {
-        hours > 0 && minutes > 0 -> "${hours}h ${minutes.toString().padStart(2, '0')}min"
-        hours > 0 -> "${hours}h"
-        minutes > 0 -> "${minutes}min"
-        else -> ""
-    }
-
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { pickerOpen = true }
-    ) {
-        OutlinedTextField(
-            value = value,
-            onValueChange = {},
-            label = { Text("Duração") },
-            placeholder = { Text("00h 00min") },
-            readOnly = true,
-            enabled = false,
-            modifier = Modifier.fillMaxWidth(),
-            shape = inputShape,
-            singleLine = true,
-            colors = inputColors
-        )
-    }
-
-    if (pickerOpen) {
-        AlertDialog(
-            onDismissRequest = { pickerOpen = false },
-            title = {
-                Text(
-                    text = "Duração",
-                    style = MaterialTheme.typography.titleMedium.copy(
-                        fontFamily = Inter,
-                        fontWeight = FontWeight.Bold
-                    )
-                )
-            },
-            text = {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    TimePickerAxis(
-                        label = "Horas",
-                        value = hours,
-                        range = 0..23,
-                        onValueChange = onHoursChange,
-                        modifier = Modifier.weight(1f)
-                    )
-                    TimePickerAxis(
-                        label = "Minutos",
-                        value = minutes,
-                        range = 0..59,
-                        onValueChange = onMinutesChange,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { pickerOpen = false }) {
-                    Text("Ok", color = Color(0xFF238D25), fontFamily = Inter)
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = {
-                        onHoursChange(0)
-                        onMinutesChange(0)
-                    }
-                ) {
-                    Text("Limpar", color = Color.Gray, fontFamily = Inter)
-                }
-            }
-        )
-    }
-}
-
-@Composable
-private fun TimePickerAxis(
-    label: String,
-    value: Int,
-    range: IntRange,
-    onValueChange: (Int) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Column(
-        modifier = modifier
-            .background(Color(0xFFF7F7F7), RoundedCornerShape(11.dp))
-            .border(0.8.dp, Color(0xFFE0E0E0), RoundedCornerShape(11.dp))
-            .padding(vertical = 8.dp, horizontal = 12.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(2.dp)
-    ) {
-        TextButton(onClick = {
-            onValueChange(if (value >= range.last) range.first else value + 1)
-        }) {
-            Text("+", color = Color(0xFF238D25), fontWeight = FontWeight.Bold)
-        }
-        Text(
-            text = value.toString().padStart(2, '0'),
-            style = MaterialTheme.typography.headlineSmall.copy(
-                fontFamily = Inter,
-                fontWeight = FontWeight.Bold,
-                color = Color(0xFF1C1B1F)
-            )
-        )
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodySmall.copy(
-                fontFamily = Inter,
-                color = Color(0xFF555555)
-            )
-        )
-        TextButton(onClick = {
-            onValueChange(if (value <= range.first) range.last else value - 1)
-        }) {
-            Text("-", color = Color(0xFF238D25), fontWeight = FontWeight.Bold)
         }
     }
 }

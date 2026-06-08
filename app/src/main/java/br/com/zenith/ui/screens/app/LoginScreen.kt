@@ -24,7 +24,6 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -48,6 +47,7 @@ import androidx.navigation.NavController
 import br.com.zenith.ui.animations.ZenithLoading
 import br.com.zenith.ui.theme.Inter
 import br.com.zenith.ui.theme.ZenithTheme
+import br.com.zenith.ui.theme.items.ZenithTextField
 import br.com.zenith.viewmodels.app.AuthViewModel
 
 @Composable
@@ -125,24 +125,23 @@ fun LoginContent(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            OutlinedTextField(
+            ZenithTextField(
                 value = email,
                 onValueChange = { email = it },
-                label = { Text("Email") },
+                label = "Email",
                 leadingIcon = {
                     Icon(Icons.Default.Email, contentDescription = null, tint = Color(0xFF238D25))
                 },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 enabled = !isLoading,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-                shape = RoundedCornerShape(11.dp)
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
             )
 
-            OutlinedTextField(
+            ZenithTextField(
                 value = senha,
                 onValueChange = { senha = it },
-                label = { Text("Senha") },
+                label = "Senha",
                 leadingIcon = {
                     Icon(Icons.Default.Lock, contentDescription = null, tint = Color(0xFF238D25))
                 },
@@ -159,8 +158,7 @@ fun LoginContent(
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 enabled = !isLoading,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                shape = RoundedCornerShape(11.dp)
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
             )
         }
 

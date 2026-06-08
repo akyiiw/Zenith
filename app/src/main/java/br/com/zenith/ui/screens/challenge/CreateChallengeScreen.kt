@@ -34,7 +34,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -63,6 +62,7 @@ import br.com.zenith.ui.theme.Black
 import br.com.zenith.ui.theme.Inter
 import br.com.zenith.ui.theme.White
 import br.com.zenith.ui.theme.ZenithTheme
+import br.com.zenith.ui.theme.items.ZenithDateField
 import br.com.zenith.ui.theme.items.ZenithTextField
 import br.com.zenith.viewmodels.challenge.ChallengeDraft
 import br.com.zenith.viewmodels.challenge.ChallengeViewModel
@@ -318,11 +318,21 @@ private fun StepChallengeGoal(
             ) { onRankingTypeChange("distancia_total") }
         }
         if (goalMode == "fixa") {
-            OutlinedTextField(
+            ZenithTextField(
                 value = goal,
-                onValueChange = { onGoalChange(it.filter { char -> char.isDigit() || char == '.' || char == ',' }) },
-                label = { Text(goalInputLabel(rankingType)) },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                onValueChange = {
+                    onGoalChange(
+                        if (rankingType == "maior_distancia") {
+                            it.filter(Char::isDigit)
+                        } else {
+                            it.filter { char -> char.isDigit() || char == '.' || char == ',' }
+                        }
+                    )
+                },
+                label = goalInputLabel(rankingType),
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = if (rankingType == "maior_distancia") KeyboardType.Number else KeyboardType.Decimal
+                ),
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
             )
@@ -390,10 +400,10 @@ private fun StepChallengeParticipants(
         if (visibility == "convite") {
             Text("O desafio será privado até que convites sejam enviados.", color = Color.Gray, fontFamily = Inter)
         } else {
-            OutlinedTextField(
+            ZenithTextField(
                 value = maxParticipants,
                 onValueChange = { onMaxParticipantsChange(it.filter(Char::isDigit)) },
-                label = { Text("Máximo de participantes (opcional)") },
+                label = "Máximo de participantes (opcional)",
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
@@ -421,18 +431,16 @@ private fun StepChallengeDates(
         onNext = onNext,
         nextEnabled = start != null && end != null && !end.isBefore(start)
     ) {
-        OutlinedTextField(
+        ZenithDateField(
             value = startDate,
             onValueChange = onStartDateChange,
-            label = { Text("Início") },
-            singleLine = true,
+            label = "Início",
             modifier = Modifier.fillMaxWidth()
         )
-        OutlinedTextField(
+        ZenithDateField(
             value = endDate,
             onValueChange = onEndDateChange,
-            label = { Text("Conclusão") },
-            singleLine = true,
+            label = "Conclusão",
             modifier = Modifier.fillMaxWidth()
         )
     }

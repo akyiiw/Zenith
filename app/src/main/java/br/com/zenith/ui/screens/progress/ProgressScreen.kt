@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -30,13 +31,13 @@ import androidx.compose.material.icons.filled.Route
 import androidx.compose.material.icons.filled.SelfImprovement
 import androidx.compose.material.icons.filled.Timeline
 import androidx.compose.material.icons.filled.Whatshot
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -45,8 +46,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -72,6 +71,7 @@ import br.com.zenith.ui.theme.ZenithTheme
 import br.com.zenith.viewmodels.progress.ProgressDay
 import br.com.zenith.viewmodels.progress.ProgressPeriod
 import br.com.zenith.viewmodels.progress.ProgressSummary
+import br.com.zenith.data.models.ProgressGoal
 import br.com.zenith.viewmodels.progress.ProgressViewModel
 import kotlin.math.max
 import kotlin.math.roundToInt
@@ -83,7 +83,6 @@ fun ProgressScreen(navController: NavController) {
     val state by viewModel.uiState.collectAsState()
     var period by remember { mutableStateOf(ProgressPeriod.Weekly) }
     var showPremiumDialog by remember { mutableStateOf(false) }
-    var showSleepDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         viewModel.load(context)
@@ -142,11 +141,15 @@ fun ProgressScreen(navController: NavController) {
                     }
 
                     item {
-                        GoalCard(
-                            period = period,
-                            summary = summary,
-                            onAddSleep = { showSleepDialog = true }
-                        )
+                        val goals = if (period == ProgressPeriod.Monthly) state.monthlyGoals else state.weeklyGoals
+                        if (goals.isNotEmpty()) {
+                            GoalsSection(
+                                goals = goals,
+                                onManageGoals = { navController.navigate("goals") }
+                            )
+                        } else {
+                            EmptyGoalsCard(onManageGoals = { navController.navigate("goals") })
+                        }
                     }
 
                     item {
@@ -170,16 +173,6 @@ fun ProgressScreen(navController: NavController) {
 
         if (showPremiumDialog) {
             PremiumDialog(onDismiss = { showPremiumDialog = false })
-        }
-
-        if (showSleepDialog) {
-            ManualSleepDialog(
-                onDismiss = { showSleepDialog = false },
-                onSave = { hours, quality ->
-                    showSleepDialog = false
-                    viewModel.addManualSleep(hours, quality, context)
-                }
-            )
         }
     }
 }
@@ -280,10 +273,9 @@ private fun PremiumReportCard(onClick: () -> Unit) {
 }
 
 @Composable
-private fun GoalCard(
-    period: ProgressPeriod,
-    summary: ProgressSummary,
-    onAddSleep: () -> Unit
+private fun GoalsSection(
+    goals: List<ProgressGoal>,
+    onManageGoals: () -> Unit
 ) {
     Surface(
         modifier = Modifier
@@ -302,51 +294,89 @@ private fun GoalCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = if (period == ProgressPeriod.Monthly) "Metas do mês" else "Metas da semana",
+                    text = "Minhas Metas",
                     style = MaterialTheme.typography.titleLarge.copy(fontFamily = Poppins)
                 )
-                TextButton(onClick = onAddSleep) {
-                    Text("registrar sono", color = Green, fontFamily = Inter)
+                TextButton(onClick = onManageGoals) {
+                    Text(
+                        text = "Gerenciar",
+                        style = MaterialTheme.typography.labelLarge.copy(
+                            fontFamily = Inter,
+                            color = Green,
+                            fontWeight = FontWeight.Bold
+                        )
+                    )
                 }
             }
 
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier
-                        .size(82.dp)
-                        .background(Color(0xFFE9F8E9), CircleShape)
-                        .border(1.dp, Color(0xFFB8D9B8), CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Route,
-                        contentDescription = null,
-                        tint = Color.Black,
-                        modifier = Modifier.size(42.dp)
-                    )
-                }
-                Spacer(modifier = Modifier.width(18.dp))
-                Column {
-                    Text(
-                        text = "Trilha",
-                        style = MaterialTheme.typography.titleMedium.copy(fontFamily = Poppins)
-                    )
-                    Text(
-                        text = "${formatDistance(summary.distanceKm)} km",
-                        style = MaterialTheme.typography.headlineLarge.copy(
-                            fontFamily = Poppins,
-                            color = Green
-                        )
-                    )
-                    Text(
-                        text = "${summary.activities} atividades registradas",
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            fontFamily = Inter,
-                            color = Color(0xFF606060)
-                        )
-                    )
-                }
+            goals.take(3).forEach { goal ->
+                GoalItem(goal = goal)
+                Spacer(modifier = Modifier.height(12.dp))
             }
+        }
+    }
+}
+
+@Composable
+private fun GoalItem(goal: ProgressGoal) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = goal.title,
+                style = MaterialTheme.typography.titleMedium.copy(fontFamily = Poppins)
+            )
+            Text(
+                text = "${formatOneDecimal(goal.currentValue)} / ${formatOneDecimal(goal.targetValue)} ${goal.unit}",
+                style = MaterialTheme.typography.bodyMedium.copy(fontFamily = Inter)
+            )
+        }
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(8.dp)
+                .background(Color(0xFFE9F8E9), CircleShape)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(goal.progressPercent)
+                    .fillMaxHeight()
+                    .background(Green, CircleShape)
+            )
+        }
+    }
+}
+
+@Composable
+private fun EmptyGoalsCard(onManageGoals: () -> Unit) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(1.dp, SecondaryGreen, RoundedCornerShape(8.dp))
+            .clickable { onManageGoals() },
+        color = Color(0xFFF8FFF8),
+        shape = RoundedCornerShape(8.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(18.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                text = "Crie sua primeira meta",
+                style = MaterialTheme.typography.titleMedium.copy(fontFamily = Poppins)
+            )
+            Text(
+                text = "Defina objetivos semanais ou mensais para acompanhar sua evolução.",
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    fontFamily = Inter,
+                    color = Color(0xFF606060),
+                    textAlign = TextAlign.Center
+                )
+            )
         }
     }
 }
@@ -665,87 +695,40 @@ private fun ErrorCard(message: String, onRetry: () -> Unit) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun PremiumDialog(onDismiss: () -> Unit) {
-    AlertDialog(
+    ModalBottomSheet(
         onDismissRequest = onDismiss,
-        icon = {
+        containerColor = Color.White,
+        scrimColor = Color.Transparent
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp, vertical = 12.dp)
+                .padding(bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+            horizontalAlignment = Alignment.Start
+        ) {
             Icon(Icons.Default.MilitaryTech, contentDescription = null, tint = Green)
-        },
-        title = { Text("Relatório mensal Premium") },
-        text = {
-            Text("Assine o Premium para comparar 30 dias, ver tendências completas e acompanhar sua evolução com mais contexto.")
-        },
-        confirmButton = {
+            Text(
+                text = "Relatório mensal Premium",
+                style = MaterialTheme.typography.titleLarge.copy(fontFamily = Inter, fontWeight = FontWeight.Bold)
+            )
+            Text(
+                text = "Assine o Premium para comparar 30 dias, ver tendências completas e acompanhar sua evolução com mais contexto.",
+                fontFamily = Inter
+            )
             Button(
                 onClick = onDismiss,
+                modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.buttonColors(containerColor = Green)
             ) {
                 Text("Entendi")
             }
         }
-    )
-}
-
-@Composable
-private fun ManualSleepDialog(
-    onDismiss: () -> Unit,
-    onSave: (Float, Int?) -> Unit
-) {
-    var hours by remember { mutableFloatStateOf(8f) }
-    var quality by remember { mutableIntStateOf(4) }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Registrar sono") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                Text(
-                    text = "Duração: ${formatOneDecimal(hours.toDouble())}h",
-                    fontFamily = Inter
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf(6f, 7f, 8f, 9f).forEach { option ->
-                        OutlinedButton(onClick = { hours = option }) {
-                            Text("${option.toInt()}h")
-                        }
-                    }
-                }
-                Text("Qualidade", fontFamily = Inter)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    (1..5).forEach { option ->
-                        Surface(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clickable { quality = option },
-                            color = if (quality == option) Green else Color(0xFFEDEDED),
-                            shape = CircleShape
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Text(
-                                    text = option.toString(),
-                                    color = if (quality == option) Color.White else Color.Black
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = { onSave(hours, quality) },
-                colors = ButtonDefaults.buttonColors(containerColor = Green)
-            ) {
-                Text("Salvar")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancelar")
-            }
-        }
-    )
+    }
 }
 
 private fun chartLabels(days: List<ProgressDay>): List<String> {

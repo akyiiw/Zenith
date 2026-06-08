@@ -14,24 +14,28 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Bedtime
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -301,6 +305,7 @@ private fun RestWindowCard(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun RestWindowDialog(
     initialStart: Int,
@@ -313,9 +318,18 @@ private fun RestWindowDialog(
     var endHour by remember { mutableIntStateOf(initialEnd / 60) }
     var endMinute by remember { mutableIntStateOf(initialEnd % 60) }
 
-    AlertDialog(
+    ModalBottomSheet(
         onDismissRequest = onDismiss,
-        title = {
+        containerColor = Color.White,
+        scrimColor = Color.Transparent
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp, vertical = 12.dp)
+                .padding(bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
             Text(
                 text = "Janela de descanso",
                 style = MaterialTheme.typography.titleMedium.copy(
@@ -323,44 +337,42 @@ private fun RestWindowDialog(
                     fontWeight = FontWeight.Bold
                 )
             )
-        },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                TimeRow(
-                    label = "Início",
-                    hour = startHour,
-                    minute = startMinute,
-                    onHourChange = { startHour = it },
-                    onMinuteChange = { startMinute = it }
-                )
-                TimeRow(
-                    label = "Fim",
-                    hour = endHour,
-                    minute = endMinute,
-                    onHourChange = { endHour = it },
-                    onMinuteChange = { endMinute = it }
-                )
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    onConfirm(
-                        startHour * 60 + startMinute,
-                        endHour * 60 + endMinute
-                    )
-                },
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF238D25))
-            ) {
-                Text("Salvar", color = Color.White, fontFamily = Inter)
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancelar", color = Color.Gray, fontFamily = Inter)
+            TimeRow(
+                label = "Início",
+                hour = startHour,
+                minute = startMinute,
+                onHourChange = { startHour = it },
+                onMinuteChange = { startMinute = it }
+            )
+            TimeRow(
+                label = "Fim",
+                hour = endHour,
+                minute = endMinute,
+                onHourChange = { endHour = it },
+                onMinuteChange = { endMinute = it }
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                TextButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("Cancelar", color = Color.Gray, fontFamily = Inter)
+                }
+                Button(
+                    onClick = {
+                        onConfirm(
+                            startHour * 60 + startMinute,
+                            endHour * 60 + endMinute
+                        )
+                    },
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF238D25))
+                ) {
+                    Text("Salvar", color = Color.White, fontFamily = Inter)
+                }
             }
         }
-    )
+    }
 }
 
 @Composable
@@ -410,26 +422,17 @@ private fun TimePickerAxis(
     onValueChange: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val values = remember(range) { range.toList() }
+    val state = rememberLazyListState(initialFirstVisibleItemIndex = values.indexOf(value).coerceAtLeast(0))
+    LaunchedEffect(state.firstVisibleItemIndex) {
+        onValueChange(values.getOrElse(state.firstVisibleItemIndex) { range.first })
+    }
+
     Column(
-        modifier = modifier
-            .background(Color(0xFFF7F7F7), RoundedCornerShape(11.dp))
-            .padding(vertical = 8.dp, horizontal = 12.dp),
+        modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(2.dp)
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        TextButton(onClick = {
-            onValueChange(if (value >= range.last) range.first else value + 1)
-        }) {
-            Text("+", color = Color(0xFF238D25), fontWeight = FontWeight.Bold)
-        }
-        Text(
-            text = value.toString().padStart(2, '0'),
-            style = MaterialTheme.typography.headlineSmall.copy(
-                fontFamily = Inter,
-                fontWeight = FontWeight.Bold,
-                color = Color(0xFF1C1B1F)
-            )
-        )
         Text(
             text = label,
             style = MaterialTheme.typography.bodySmall.copy(
@@ -437,10 +440,27 @@ private fun TimePickerAxis(
                 color = Color(0xFF555555)
             )
         )
-        TextButton(onClick = {
-            onValueChange(if (value <= range.first) range.last else value - 1)
-        }) {
-            Text("-", color = Color(0xFF238D25), fontWeight = FontWeight.Bold)
+        LazyColumn(
+            state = state,
+            modifier = Modifier
+                .width(112.dp)
+                .height(176.dp)
+                .background(Color(0xFFF7F7F7), RoundedCornerShape(11.dp)),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            items(values.size) { index ->
+                val item = values[index]
+                val selected = item == value
+                Text(
+                    text = item.toString().padStart(2, '0'),
+                    style = MaterialTheme.typography.headlineSmall.copy(
+                        fontFamily = Inter,
+                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                        color = if (selected) Color(0xFF238D25) else Color(0xFF555555)
+                    ),
+                    modifier = Modifier.padding(vertical = 9.dp)
+                )
+            }
         }
     }
 }

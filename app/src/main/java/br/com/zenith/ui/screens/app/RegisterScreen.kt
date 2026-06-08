@@ -11,7 +11,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -31,6 +30,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import br.com.zenith.ui.animations.ZenithLoading
 import br.com.zenith.ui.theme.ZenithTheme
+import br.com.zenith.ui.theme.items.ZenithTextField
 import br.com.zenith.viewmodels.app.AuthViewModel
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -128,24 +128,23 @@ fun RegisterContent(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            OutlinedTextField(
+            ZenithTextField(
                 value = email,
                 onValueChange = { email = it },
-                label = { Text("Email") },
+                label = "Email",
                 leadingIcon = {
                     Icon(Icons.Default.Email, contentDescription = null, tint = Color(0xFF238D25))
                 },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 enabled = !isLoading,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-                shape = RoundedCornerShape(11.dp)
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
             )
 
-            OutlinedTextField(
+            ZenithTextField(
                 value = senha,
                 onValueChange = { senha = it },
-                label = { Text("Senha") },
+                label = "Senha",
                 leadingIcon = {
                     Icon(Icons.Default.Lock, contentDescription = null, tint = Color(0xFF238D25))
                 },
@@ -162,14 +161,13 @@ fun RegisterContent(
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 enabled = !isLoading,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                shape = RoundedCornerShape(11.dp)
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
             )
 
-            OutlinedTextField(
+            ZenithTextField(
                 value = confirmarSenha,
                 onValueChange = { confirmarSenha = it },
-                label = { Text("Confirmar senha") },
+                label = "Confirmar senha",
                 leadingIcon = {
                     Icon(Icons.Default.Lock, contentDescription = null, tint = Color(0xFF238D25))
                 },
@@ -183,8 +181,7 @@ fun RegisterContent(
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 enabled = !isLoading,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                shape = RoundedCornerShape(11.dp)
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
             )
         }
 

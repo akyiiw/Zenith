@@ -32,6 +32,8 @@ import br.com.zenith.ui.components.profile.formattedDuration
 import br.com.zenith.ui.components.profile.tempoRelativo
 import br.com.zenith.ui.theme.Inter
 import br.com.zenith.ui.theme.ZenithTheme
+import br.com.zenith.ui.theme.items.ZenithDateTimeField
+import br.com.zenith.ui.theme.items.ZenithTextField
 import br.com.zenith.viewmodels.activity.ActivityViewModel
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.CameraPosition
@@ -363,14 +365,6 @@ fun EditActivityScreenContent(
     var intensidade by remember(atividade.id) { mutableStateOf(atividade.intensidade) }
     var humor by remember(atividade.id) { mutableStateOf(atividade.humor) }
 
-    val inputColors = OutlinedTextFieldDefaults.colors(
-        focusedTextColor = Color(0xFF1C1B1F),
-        unfocusedTextColor = Color(0xFF1C1B1F),
-        focusedBorderColor = Color(0xFF238D25),
-        focusedLabelColor = Color(0xFF238D25),
-        unfocusedLabelColor = Color(0xFF555555)
-    )
-
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -448,53 +442,43 @@ fun EditActivityScreenContent(
             }
 
             item {
-                OutlinedTextField(
+                ZenithTextField(
                     value = titulo,
                     onValueChange = { titulo = it },
-                    label = { Text("Título (opcional)") },
+                    label = "Título (opcional)",
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(11.dp),
-                    singleLine = true,
-                    colors = inputColors
+                    singleLine = true
                 )
             }
 
             item {
-                OutlinedTextField(
+                ZenithTextField(
                     value = valor,
-                    onValueChange = { valor = it },
-                    label = { Text("$exercicioUnidade realizados *") },
+                    onValueChange = { valor = it.filter { char -> char.isDigit() || char == '.' || char == ',' } },
+                    label = "$exercicioUnidade realizados *",
                     modifier = Modifier.fillMaxWidth(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    shape = RoundedCornerShape(11.dp),
-                    singleLine = true,
-                    colors = inputColors
+                    singleLine = true
                 )
             }
 
             item {
-                OutlinedTextField(
+                ZenithTextField(
                     value = duracao,
-                    onValueChange = { duracao = it },
-                    label = { Text("Duração em minutos (opcional)") },
+                    onValueChange = { duracao = it.filter(Char::isDigit) },
+                    label = "Duração em minutos (opcional)",
                     modifier = Modifier.fillMaxWidth(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    shape = RoundedCornerShape(11.dp),
-                    singleLine = true,
-                    colors = inputColors
+                    singleLine = true
                 )
             }
 
             item {
-                OutlinedTextField(
+                ZenithDateTimeField(
                     value = data,
                     onValueChange = { data = it },
-                    label = { Text("Data e horário *") },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(11.dp),
-                    singleLine = true,
-                    placeholder = { Text("dd/MM/yyyy HH:mm") },
-                    colors = inputColors
+                    label = "Data e horário *",
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
 
