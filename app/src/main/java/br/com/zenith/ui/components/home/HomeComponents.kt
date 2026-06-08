@@ -31,7 +31,7 @@ import br.com.zenith.R
 import br.com.zenith.data.SupabaseConfig
 import br.com.zenith.data.models.Profile
 import br.com.zenith.ui.theme.Green
-import br.com.zenith.ui.theme.SGreen
+import br.com.zenith.ui.theme.SecondaryGreen
 import coil.compose.AsyncImage
 import io.github.jan.supabase.storage.storage
 
@@ -158,7 +158,7 @@ fun ActivityCard(title: String, activityName: String, progress: String, goal: St
                         .size(56.dp)
                         .clip(CircleShape)
                         .background(Color.White)
-                        .border(1.dp, SGreen, CircleShape)
+                        .border(1.dp, SecondaryGreen, CircleShape)
                         .padding(12.dp),
                     contentAlignment = Alignment.Center
                 ) {

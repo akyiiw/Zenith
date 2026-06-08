@@ -73,7 +73,7 @@ fun ActivityDetailScreen(navController: NavController, atividadeId: String?) {
     }
 
     ZenithTheme {
-        if (editando && !atividade.verificada) {
+        if (editando && !atividade.verificada && atividade.desafioId == null) {
             EditActivityScreenContent(
                 atividade = atividade,
                 exercicios = exercicios,
@@ -132,7 +132,7 @@ fun ActivityDetailScreen(navController: NavController, atividadeId: String?) {
                                     .weight(1f)
                                     .padding(start = 8.dp)
                             )
-                            if (!atividade.verificada) {
+                            if (!atividade.verificada && atividade.desafioId == null) {
                                 IconButton(onClick = { editando = true }) {
                                     Icon(
                                         Icons.Default.Edit,
@@ -538,19 +538,16 @@ fun EditActivityScreenContent(
                     style = MaterialTheme.typography.bodyMedium.copy(color = Color.Gray)
                 )
                 Spacer(modifier = Modifier.height(8.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf("leve", "moderada", "intensa").forEach { op ->
-                        FilterChip(
-                            selected = intensidade == op,
-                            onClick = { intensidade = if (intensidade == op) null else op },
-                            label = { Text(op.replaceFirstChar { it.uppercase() }) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = Color(0xFF238D25),
-                                selectedLabelColor = Color.White
-                            )
-                        )
-                    }
-                }
+                OptionalSelectionDropdown(
+                    selectedValue = intensidade,
+                    placeholder = "Selecionar intensidade",
+                    options = listOf(
+                        "leve" to "Leve",
+                        "moderada" to "Moderada",
+                        "intensa" to "Intensa"
+                    ),
+                    onSelected = { intensidade = it }
+                )
             }
 
             item {
@@ -559,19 +556,16 @@ fun EditActivityScreenContent(
                     style = MaterialTheme.typography.bodyMedium.copy(color = Color.Gray)
                 )
                 Spacer(modifier = Modifier.height(8.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf("otimo" to "Ótimo", "ok" to "Ok", "cansado" to "Cansado").forEach { (op, label) ->
-                        FilterChip(
-                            selected = humor == op,
-                            onClick = { humor = if (humor == op) null else op },
-                            label = { Text(label) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = Color(0xFF238D25),
-                                selectedLabelColor = Color.White
-                            )
-                        )
-                    }
-                }
+                OptionalSelectionDropdown(
+                    selectedValue = humor,
+                    placeholder = "Selecionar humor",
+                    options = listOf(
+                        "otimo" to "Ótimo",
+                        "ok" to "Ok",
+                        "cansado" to "Cansado"
+                    ),
+                    onSelected = { humor = it }
+                )
             }
 
             item { Spacer(modifier = Modifier.height(88.dp)) }
@@ -619,6 +613,47 @@ fun EditActivityScreenContent(
                         )
                     )
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun OptionalSelectionDropdown(
+    selectedValue: String?,
+    placeholder: String,
+    options: List<Pair<String, String>>,
+    onSelected: (String?) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val selectedLabel = options.firstOrNull { it.first == selectedValue }?.second ?: placeholder
+
+    Box {
+        OutlinedButton(
+            onClick = { expanded = true },
+            shape = RoundedCornerShape(8.dp)
+        ) {
+            Text(selectedLabel, fontFamily = Inter, color = Color(0xFF238D25))
+        }
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false }
+        ) {
+            DropdownMenuItem(
+                text = { Text("Não definido", fontFamily = Inter) },
+                onClick = {
+                    onSelected(null)
+                    expanded = false
+                }
+            )
+            options.forEach { (value, label) ->
+                DropdownMenuItem(
+                    text = { Text(label, fontFamily = Inter) },
+                    onClick = {
+                        onSelected(value)
+                        expanded = false
+                    }
+                )
             }
         }
     }
@@ -689,7 +724,7 @@ fun formatarData(isoDate: String): String {
             input.dayOfMonth, input.monthValue, input.year,
             input.hour, input.minute
         )
-    } catch (e: Exception) {
+    } catch (_: Exception) {
         isoDate
     }
 }
@@ -701,9 +736,8 @@ fun formatarDataInput(isoDate: String?): String {
             input.dayOfMonth, input.monthValue, input.year,
             input.hour, input.minute
         )
-    } catch (e: Exception) {
+    } catch (_: Exception) {
         java.time.LocalDateTime.now()
             .format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"))
     }
 }
-

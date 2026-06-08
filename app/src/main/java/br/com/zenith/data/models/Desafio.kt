@@ -14,7 +14,18 @@ data class Desafio(
     val unidade: String = "atividades",
     @SerialName("inicio_em") val inicioEm: String? = null,
     @SerialName("fim_em") val fimEm: String? = null,
-    @SerialName("criado_em") val criadoEm: String? = null
+    @SerialName("criado_em") val criadoEm: String? = null,
+    @SerialName("banner_hash") val bannerHash: String? = null,
+    @SerialName("atividade_designada") val atividadeDesignada: String = "caminhada",
+    @SerialName("apenas_premium") val apenasPremium: Boolean = false,
+    @SerialName("modo_meta") val modoMeta: String = "fixa",
+    val metrica: String = "distancia",
+    val visibilidade: String = "publico",
+    @SerialName("max_participantes") val maxParticipantes: Int? = null,
+    @SerialName("aceita_registro_manual") val aceitaRegistroManual: Boolean = false,
+    @SerialName("ranking_tipo") val rankingTipo: String = "menor_tempo",
+    @SerialName("objetivo_metrica") val objetivoMetrica: String? = "distancia",
+    @SerialName("objetivo_valor") val objetivoValor: Double? = null
 )
 
 @Serializable

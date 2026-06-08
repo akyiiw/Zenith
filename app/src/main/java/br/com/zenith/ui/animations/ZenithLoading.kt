@@ -18,11 +18,19 @@ import kotlin.math.exp
 fun CenteredZenithLoading(
     modifier: Modifier = Modifier,
     size: androidx.compose.ui.unit.Dp = 120.dp,
+    contentPadding: PaddingValues = PaddingValues(0.dp),
+    respectStatusBars: Boolean = false,
 ) {
     Box(
         modifier = modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
     ) {
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .then(if (respectStatusBars) Modifier.statusBarsPadding() else Modifier)
+                .padding(contentPadding)
+        )
         ZenithLoading(modifier = Modifier.size(size))
     }
 }

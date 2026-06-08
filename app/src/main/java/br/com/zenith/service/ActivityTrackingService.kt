@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
+import android.location.Location
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
@@ -48,6 +49,21 @@ class ActivityTrackingService : Service(), SensorEventListener {
     private val _distanceMeters = MutableStateFlow(0f)
     val distanceMeters: StateFlow<Float> = _distanceMeters
 
+    private val _rawDistanceMeters = MutableStateFlow(0f)
+    val rawDistanceMeters: StateFlow<Float> = _rawDistanceMeters
+
+    private val _acceptedGpsPoints = MutableStateFlow(0)
+    val acceptedGpsPoints: StateFlow<Int> = _acceptedGpsPoints
+
+    private val _rejectedGpsPoints = MutableStateFlow(0)
+    val rejectedGpsPoints: StateFlow<Int> = _rejectedGpsPoints
+
+    private val _averageAccuracyMeters = MutableStateFlow(0f)
+    val averageAccuracyMeters: StateFlow<Float> = _averageAccuracyMeters
+
+    private val _gpsQuality = MutableStateFlow("ruim")
+    val gpsQuality: StateFlow<String> = _gpsQuality
+
     private val _routePoints = MutableStateFlow<List<LatLng>>(emptyList())
     val routePoints: StateFlow<List<LatLng>> = _routePoints
 
@@ -62,6 +78,12 @@ class ActivityTrackingService : Service(), SensorEventListener {
     // GPS
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     private var lastLatLng: LatLng? = null
+    private var lastRawLatLng: LatLng? = null
+    private var lastAcceptedLocation: Location? = null
+    private var accuracySum = 0f
+    private var targetDistanceMeters: Float? = null
+    private var targetSeconds: Long? = null
+    private var exerciseKind: String = "corrida"
     private val locationRequest = LocationRequest.Builder(
         Priority.PRIORITY_HIGH_ACCURACY, 5000L
     ).setMinUpdateDistanceMeters(5f).build()
@@ -72,11 +94,36 @@ class ActivityTrackingService : Service(), SensorEventListener {
             val location = result.lastLocation ?: return
             val newPoint = LatLng(location.latitude, location.longitude)
 
-            lastLatLng?.let { last ->
-                _distanceMeters.value += haversine(last, newPoint)
+            lastRawLatLng?.let { last ->
+                _rawDistanceMeters.value += haversine(last, newPoint)
             }
-            lastLatLng = newPoint
-            _routePoints.value += newPoint
+            lastRawLatLng = newPoint
+
+            if (!isUsableLocation(location)) {
+                rejectPoint()
+                return
+            }
+
+            val lastAccepted = lastAcceptedLocation
+            if (lastAccepted != null) {
+                val distance = location.distanceTo(lastAccepted)
+                val seconds = ((location.time - lastAccepted.time).coerceAtLeast(1000L) / 1000f)
+                val speed = distance / seconds
+                val noiseFloor = max(6f, ((location.accuracy + lastAccepted.accuracy) / 2f) * 0.65f)
+
+                if (distance < noiseFloor || speed > maxSpeedForExercise()) {
+                    rejectPoint()
+                    return
+                }
+
+                _distanceMeters.value += distance
+            }
+
+            acceptPoint(location, newPoint)
+
+            targetDistanceMeters?.let { target ->
+                if (_distanceMeters.value >= target) stop()
+            }
         }
     }
 
@@ -90,7 +137,7 @@ class ActivityTrackingService : Service(), SensorEventListener {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
-            ACTION_START -> start()
+            ACTION_START -> start(intent)
             ACTION_PAUSE -> pause()
             ACTION_RESUME -> resume()
             ACTION_STOP -> stop()
@@ -98,12 +145,25 @@ class ActivityTrackingService : Service(), SensorEventListener {
         return START_STICKY
     }
 
-    private fun start() {
+    private fun start(intent: Intent?) {
+        exerciseKind = intent?.getStringExtra(EXTRA_EXERCISE_KIND) ?: "corrida"
+        targetDistanceMeters = intent?.getFloatExtra(EXTRA_TARGET_DISTANCE_METERS, -1f)
+            ?.takeIf { it > 0f }
+        targetSeconds = intent?.getLongExtra(EXTRA_TARGET_SECONDS, -1L)
+            ?.takeIf { it > 0L }
         _elapsedSeconds.value = 0L
         _steps.value = 0
         _distanceMeters.value = 0f
+        _rawDistanceMeters.value = 0f
+        _acceptedGpsPoints.value = 0
+        _rejectedGpsPoints.value = 0
+        _averageAccuracyMeters.value = 0f
+        _gpsQuality.value = "ruim"
         _routePoints.value = emptyList()
         lastLatLng = null
+        lastRawLatLng = null
+        lastAcceptedLocation = null
+        accuracySum = 0f
         initialStepCount = -1
         _status.value = TrackingStatus.RUNNING
 
@@ -145,8 +205,50 @@ class ActivityTrackingService : Service(), SensorEventListener {
             while (true) {
                 delay(1000)
                 _elapsedSeconds.value++
+                targetSeconds?.let { target ->
+                    if (_elapsedSeconds.value >= target) stop()
+                }
                 updateNotification()
             }
+        }
+    }
+
+    private fun isUsableLocation(location: Location): Boolean {
+        return location.hasAccuracy() && location.accuracy <= MAX_ACCEPTABLE_ACCURACY_METERS
+    }
+
+    private fun acceptPoint(location: Location, point: LatLng) {
+        lastAcceptedLocation = location
+        lastLatLng = point
+        _routePoints.value += point
+        _acceptedGpsPoints.value += 1
+        accuracySum += location.accuracy
+        _averageAccuracyMeters.value = accuracySum / _acceptedGpsPoints.value.coerceAtLeast(1)
+        updateGpsQuality()
+    }
+
+    private fun rejectPoint() {
+        _rejectedGpsPoints.value += 1
+        updateGpsQuality()
+    }
+
+    private fun updateGpsQuality() {
+        val accepted = _acceptedGpsPoints.value
+        val rejected = _rejectedGpsPoints.value
+        val total = accepted + rejected
+        val rejectionRate = if (total == 0) 1f else rejected.toFloat() / total
+        _gpsQuality.value = when {
+            accepted < 4 || _averageAccuracyMeters.value > 25f || rejectionRate > 0.4f -> "ruim"
+            _averageAccuracyMeters.value > 15f || rejectionRate > 0.2f -> "media"
+            else -> "boa"
+        }
+    }
+
+    private fun maxSpeedForExercise(): Float {
+        return when (exerciseKind.lowercase()) {
+            "caminhada" -> 3.2f
+            "ciclismo" -> 20f
+            else -> 8.5f
         }
     }
 
@@ -243,6 +345,10 @@ class ActivityTrackingService : Service(), SensorEventListener {
         const val ACTION_PAUSE = "ACTION_PAUSE"
         const val ACTION_RESUME = "ACTION_RESUME"
         const val ACTION_STOP = "ACTION_STOP"
+        const val EXTRA_EXERCISE_KIND = "EXTRA_EXERCISE_KIND"
+        const val EXTRA_TARGET_DISTANCE_METERS = "EXTRA_TARGET_DISTANCE_METERS"
+        const val EXTRA_TARGET_SECONDS = "EXTRA_TARGET_SECONDS"
+        private const val MAX_ACCEPTABLE_ACCURACY_METERS = 30f
         const val CHANNEL_ID = "zenith_tracking"
         const val NOTIFICATION_ID = 1001
 

@@ -2,7 +2,6 @@ package br.com.zenith.viewmodels.profile
 
 import android.content.Context
 import android.net.Uri
-import android.util.Log
 import android.widget.Toast
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -208,7 +207,6 @@ class UserViewModel : ViewModel() {
                     }
                     .decodeSingle<Profile>()
                 _userState.value = profile
-                Log.d("BADGE_DEBUG", "badgeId do perfil: ${profile.badgeId}")
 
                 profile.badgeId?.let { badgeId ->
                     val badge = client.postgrest.from("badge")
@@ -258,8 +256,7 @@ class UserViewModel : ViewModel() {
                     conquistas = conquistas.toInt()
                 )
 
-            } catch (e: Exception) {
-                e.printStackTrace()
+            } catch (_: Exception) {
             } finally {
                 _isLoading.value = false
             }
@@ -273,14 +270,10 @@ class UserViewModel : ViewModel() {
                 val client = SupabaseConfig.getClient()
                 val userId = client.auth.currentUserOrNull()?.id ?: return@launch
 
-                Log.d("TITULO_DEBUG", "userId: $userId")
-
                 val ids = client.postgrest.from("usuario_titulos")
                     .select { filter { eq("user_id", userId) } }
                     .decodeList<UsuarioTitulo>()
                     .map { it.tituloId }
-
-                Log.d("TITULO_DEBUG", "ids encontrados: $ids")
 
                 if (ids.isEmpty()) {
                     _titulosDisponiveis.value = emptyList()
@@ -291,17 +284,10 @@ class UserViewModel : ViewModel() {
                     .select()
                     .decodeList<Titulo>()
 
-                Log.d("TITULO_DEBUG", "todos os titulos ids: ${todosOsTitulos.map { it.id }}")
-                Log.d("TITULO_DEBUG", "ids buscados: $ids")
-
                 val titulos = todosOsTitulos.filter { it.id in ids }
 
-                Log.d("TITULO_DEBUG", "titulos filtrados: $titulos")
-
                 _titulosDisponiveis.value = titulos
-            } catch (e: Exception) {
-                Log.e("TITULO_DEBUG", "erro: ${e.localizedMessage}")
-                e.printStackTrace()
+            } catch (_: Exception) {
             } finally {
                 _isLoading.value = false
             }

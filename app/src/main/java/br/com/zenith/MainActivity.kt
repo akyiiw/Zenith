@@ -43,16 +43,17 @@ import br.com.zenith.ui.screens.activity.StartActivityScreen
 import br.com.zenith.ui.screens.app.LoginScreen
 import br.com.zenith.ui.screens.app.OnboardingScreen
 import br.com.zenith.ui.screens.app.RegisterScreen
-import br.com.zenith.ui.screens.app.TabPlaceholderScreen
 import br.com.zenith.ui.screens.app.VerifyEmailScreen
 import br.com.zenith.ui.screens.app.WelcomeScreen
 import br.com.zenith.ui.screens.home.HomeScreen
+import br.com.zenith.ui.screens.progress.ProgressScreen
 import br.com.zenith.ui.screens.profile.EditProfileScreen
 import br.com.zenith.ui.screens.profile.ProfileScreen
 import br.com.zenith.ui.screens.profile.TitleSelectScreen
-import br.com.zenith.ui.screens.ranking.RankingScreen
+import br.com.zenith.ui.screens.challenge.CreateChallengeScreen
+import br.com.zenith.ui.screens.challenge.ChallengeScreen
 import br.com.zenith.ui.screens.settings.SettingsScreen
-import br.com.zenith.ui.screens.social.PublicProfileScreen
+import br.com.zenith.ui.screens.profile.PublicProfileScreen
 import br.com.zenith.ui.screens.social.SocialScreen
 import br.com.zenith.ui.theme.White
 import br.com.zenith.ui.theme.ZenithTheme
@@ -68,7 +69,6 @@ class MainActivity : ComponentActivity() {
 
         requestPermissionsIfNeeded()
 
-        //teste commit
         enableEdgeToEdge()
 
         setContent {
@@ -119,7 +119,7 @@ class MainActivity : ComponentActivity() {
                     val navBackStackEntry by navController.currentBackStackEntryAsState()
                     val currentRoute = navBackStackEntry?.destination?.route.orEmpty()
                     val showBottomBar = currentRoute in setOf(
-                        "ranking",
+                        "challenge",
                         "social",
                         "home",
                         "progress",
@@ -135,6 +135,7 @@ class MainActivity : ComponentActivity() {
                             enterTransition = {
                                 val target = targetState.destination.route.orEmpty()
                                 if (target == "sleep_settings" ||
+                                    target == "create_challenge" ||
                                     target.startsWith("new_activity") ||
                                     target.startsWith("start_activity") ||
                                     target.startsWith("register_activity")
@@ -153,6 +154,7 @@ class MainActivity : ComponentActivity() {
                             exitTransition = {
                                 val target = targetState.destination.route.orEmpty()
                                 if (target == "sleep_settings" ||
+                                    target == "create_challenge" ||
                                     target.startsWith("new_activity") ||
                                     target.startsWith("start_activity") ||
                                     target.startsWith("register_activity")
@@ -171,6 +173,7 @@ class MainActivity : ComponentActivity() {
                             popEnterTransition = {
                                 val target = targetState.destination.route.orEmpty()
                                 if (target == "sleep_settings" ||
+                                    target == "create_challenge" ||
                                     target.startsWith("new_activity") ||
                                     target.startsWith("start_activity") ||
                                     target.startsWith("register_activity")
@@ -189,6 +192,7 @@ class MainActivity : ComponentActivity() {
                             popExitTransition = {
                                 val initial = initialState.destination.route.orEmpty()
                                 if (initial == "sleep_settings" ||
+                                    initial == "create_challenge" ||
                                     initial.startsWith("new_activity") ||
                                     initial.startsWith("start_activity") ||
                                     initial.startsWith("register_activity")
@@ -229,8 +233,12 @@ class MainActivity : ComponentActivity() {
                             HomeScreen(navController)
                         }
 
-                        composable("ranking") {
-                            RankingScreen(navController)
+                        composable("challenge") {
+                            ChallengeScreen(navController)
+                        }
+
+                        composable("create_challenge") {
+                            CreateChallengeScreen(navController)
                         }
 
                         composable("social") {
@@ -245,7 +253,7 @@ class MainActivity : ComponentActivity() {
                         }
 
                         composable("progress") {
-                            TabPlaceholderScreen(navController, "Progresso")
+                            ProgressScreen(navController)
                         }
 
                         composable("settings") {
@@ -301,6 +309,33 @@ class MainActivity : ComponentActivity() {
                                         ?.getString("exercicioUnidade") ?: "",
                                     "UTF-8"
                                 )
+                            )
+                        }
+
+                        composable(
+                            "start_activity/{exercicioId}/{exercicioNome}/{exercicioUnidade}/{desafioId}"
+                        ) { back ->
+
+                            StartActivityScreen(
+                                navController = navController,
+
+                                exercicioId = back.arguments
+                                    ?.getString("exercicioId") ?: "",
+
+                                exercicioNome = URLDecoder.decode(
+                                    back.arguments
+                                        ?.getString("exercicioNome") ?: "",
+                                    "UTF-8"
+                                ),
+
+                                exercicioUnidade = URLDecoder.decode(
+                                    back.arguments
+                                        ?.getString("exercicioUnidade") ?: "",
+                                    "UTF-8"
+                                ),
+
+                                desafioId = back.arguments
+                                    ?.getString("desafioId")
                             )
                         }
 
@@ -361,6 +396,41 @@ class MainActivity : ComponentActivity() {
                                 verificada = back.arguments
                                     ?.getString("verificada")
                                     ?.toBooleanStrictOrNull() ?: false
+                            )
+                        }
+
+                        composable(
+                            "register_activity/{exercicioId}/{exercicioNome}/{exercicioUnidade}/{duracaoMin}/{verificada}/{desafioId}"
+                        ) { back ->
+
+                            RegisterActivityScreen(
+                                navController = navController,
+
+                                exercicioId = back.arguments
+                                    ?.getString("exercicioId") ?: "",
+
+                                exercicioNome = URLDecoder.decode(
+                                    back.arguments
+                                        ?.getString("exercicioNome") ?: "",
+                                    "UTF-8"
+                                ),
+
+                                exercicioUnidade = URLDecoder.decode(
+                                    back.arguments
+                                        ?.getString("exercicioUnidade") ?: "",
+                                    "UTF-8"
+                                ),
+
+                                duracaoMin = back.arguments
+                                    ?.getString("duracaoMin")
+                                    ?.toIntOrNull() ?: 0,
+
+                                verificada = back.arguments
+                                    ?.getString("verificada")
+                                    ?.toBooleanStrictOrNull() ?: false,
+
+                                desafioId = back.arguments
+                                    ?.getString("desafioId")
                             )
                         }
 
@@ -429,7 +499,6 @@ class MainActivity : ComponentActivity() {
 
         val permissions = mutableListOf<String>()
 
-        // Localização
         if (
             ContextCompat.checkSelfPermission(
                 this,
@@ -448,7 +517,6 @@ class MainActivity : ComponentActivity() {
             permissions.add(Manifest.permission.ACCESS_COARSE_LOCATION)
         }
 
-        // Notificações Android 13+
         if (
             ContextCompat.checkSelfPermission(
                 this,
@@ -458,7 +526,6 @@ class MainActivity : ComponentActivity() {
             permissions.add(Manifest.permission.POST_NOTIFICATIONS)
         }
 
-        // Activity Recognition
         if (
             ContextCompat.checkSelfPermission(
                 this,

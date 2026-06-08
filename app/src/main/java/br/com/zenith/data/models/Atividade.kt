@@ -18,11 +18,16 @@ data class Atividade(
     val clima: String? = null,
     @SerialName("foto_hash") val fotoHash: String? = null,
     @SerialName("desafio_id") val desafioId: String? = null,
+    val passos: Int? = null,
+    @SerialName("distancia_bruta") val distanciaBruta: Double? = null,
+    @SerialName("gps_accuracy_media") val gpsAccuracyMedia: Double? = null,
+    @SerialName("gps_pontos_aceitos") val gpsPontosAceitos: Int? = null,
+    @SerialName("gps_pontos_rejeitados") val gpsPontosRejeitados: Int? = null,
+    @SerialName("gps_qualidade") val gpsQualidade: String? = null,
     val rota: String? = null,
     @SerialName("realizada_em") val realizadaEm: String? = null,
     @SerialName("criada_em") val criadaEm: String? = null,
 
-    // join com exercicios
     @SerialName("exercicios")
     val exercicio: Exercicio? = null
 )

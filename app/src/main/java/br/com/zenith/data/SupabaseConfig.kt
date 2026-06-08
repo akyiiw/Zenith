@@ -5,7 +5,6 @@ import io.github.jan.supabase.createSupabaseClient
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.Auth
 import io.github.jan.supabase.postgrest.Postgrest
-import io.github.jan.supabase.realtime.Realtime
 import io.github.jan.supabase.storage.Storage
 import java.util.Properties
 
@@ -25,11 +24,10 @@ object SupabaseConfig {
                 client = createSupabaseClient(url, key) {
                     install(Postgrest)
                     install(Auth)
-                    install(Realtime)
                     install(Storage)
                 }
-            } catch (e: Exception) {
-                e.printStackTrace()
+            } catch (_: Exception) {
+                client = null
             }
         }
     }

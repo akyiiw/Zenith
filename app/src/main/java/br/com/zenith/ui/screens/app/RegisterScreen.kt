@@ -140,7 +140,7 @@ fun RegisterContent(
                 enabled = !isLoading,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
                 shape = RoundedCornerShape(11.dp)
-            ) // TODO: O input está corrigindo (corretor). Deve tirar
+            )
 
             OutlinedTextField(
                 value = senha,

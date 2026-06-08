@@ -82,6 +82,13 @@ class ActivityViewModel : ViewModel() {
         humor: String?,
         fotoUri: Uri?,
         rota: String? = null,
+        desafioId: String? = null,
+        passos: Int? = null,
+        distanciaBruta: Double? = null,
+        gpsAccuracyMedia: Double? = null,
+        gpsPontosAceitos: Int? = null,
+        gpsPontosRejeitados: Int? = null,
+        gpsQualidade: String? = null,
         context: Context,
         onSucesso: () -> Unit
     ) {
@@ -112,6 +119,13 @@ class ActivityViewModel : ViewModel() {
                         intensidade?.let { put("intensidade", it) }
                         humor?.let { put("humor", it) }
                         rota?.let { put("rota", it) }
+                        desafioId?.takeIf { it.isNotBlank() }?.let { put("desafio_id", it) }
+                        passos?.let { put("passos", it) }
+                        distanciaBruta?.let { put("distancia_bruta", it) }
+                        gpsAccuracyMedia?.let { put("gps_accuracy_media", it) }
+                        gpsPontosAceitos?.let { put("gps_pontos_aceitos", it) }
+                        gpsPontosRejeitados?.let { put("gps_pontos_rejeitados", it) }
+                        gpsQualidade?.let { put("gps_qualidade", it) }
                     }
                 )
 

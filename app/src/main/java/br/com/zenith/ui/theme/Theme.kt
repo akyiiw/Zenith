@@ -1,7 +1,5 @@
 package br.com.zenith.ui.theme
 
-import android.app.Activity
-import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
@@ -13,11 +11,11 @@ import androidx.compose.ui.platform.LocalContext
 
 private val DarkColorScheme = darkColorScheme(
     primary = Green,
-    secondary = SGreen,
+    secondary = SecondaryGreen,
 )
 private val LightColorScheme = lightColorScheme(
     primary = Green,
-    secondary = SGreen,
+    secondary = SecondaryGreen,
 )
 
 @Composable

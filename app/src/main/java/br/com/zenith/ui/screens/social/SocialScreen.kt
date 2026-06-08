@@ -11,6 +11,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -37,6 +38,7 @@ import br.com.zenith.ui.components.social.SocialSectionTitle
 import br.com.zenith.ui.components.social.SocialUserRow
 import br.com.zenith.ui.theme.Inter
 import br.com.zenith.ui.theme.ZenithTheme
+import br.com.zenith.ui.theme.items.ZenithTextField
 import br.com.zenith.viewmodels.social.SocialUiState
 import br.com.zenith.viewmodels.social.SocialViewModel
 
@@ -103,9 +105,9 @@ private fun SocialContent(
         if (isLoading) {
             CenteredZenithLoading(
                 modifier = Modifier
-                    .background(Color.White)
-                    .padding(padding)
-                    .statusBarsPadding()
+                    .background(Color.White),
+                contentPadding = padding,
+                respectStatusBars = true
             )
             return@Scaffold
         }
@@ -131,25 +133,17 @@ private fun SocialContent(
             }
 
             item {
-                OutlinedTextField(
+                ZenithTextField(
                     value = query,
                     onValueChange = onQueryChange,
-                    placeholder = { Text("Buscar por nome ou @usuario") },
+                    label = "Buscar por nome ou @usuario",
                     leadingIcon = {
-                        androidx.compose.material3.Icon(
+                        Icon(
                             Icons.Default.Search,
                             contentDescription = null,
                             tint = Color(0xFF238D25)
                         )
-                    },
-                    singleLine = true,
-                    modifier = Modifier.fillParentMaxWidth(),
-                    shape = RoundedCornerShape(11.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Color(0xFF238D25),
-                        focusedLabelColor = Color(0xFF238D25),
-                        cursorColor = Color(0xFF238D25)
-                    )
+                    }
                 )
             }
 

@@ -26,11 +26,13 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import br.com.zenith.data.TrackingResultHolder
+import br.com.zenith.data.models.Desafio
 import br.com.zenith.service.ActivityTrackingService
 import br.com.zenith.service.TrackingStatus
 import br.com.zenith.ui.theme.Inter
 import br.com.zenith.ui.theme.ZenithTheme
 import br.com.zenith.viewmodels.activity.ActiveActivityViewModel
+import br.com.zenith.viewmodels.challenge.ChallengeViewModel
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
@@ -43,17 +45,23 @@ fun StartActivityScreen(
     navController: NavController,
     exercicioId: String,
     exercicioNome: String,
-    exercicioUnidade: String
+    exercicioUnidade: String,
+    desafioId: String? = null
 ) {
     ZenithTheme {
         val viewModel: ActiveActivityViewModel = viewModel()
+        val challengeViewModel: ChallengeViewModel = viewModel()
         val context = LocalContext.current
 
         val elapsedSeconds by viewModel.elapsedSeconds.collectAsState()
         val status by viewModel.status.collectAsState()
         val steps by viewModel.steps.collectAsState()
         val distanceMeters by viewModel.distanceMeters.collectAsState()
+        val gpsQuality by viewModel.gpsQuality.collectAsState()
         val routePoints by viewModel.routePoints.collectAsState()
+        val challengeState by challengeViewModel.uiState.collectAsState()
+        val challenge = challengeState.challenges.firstOrNull { it.id == desafioId }
+        var started by remember { mutableStateOf(false) }
 
         // Permissões necessárias
         val permissions = rememberMultiplePermissionsState(
@@ -64,17 +72,25 @@ fun StartActivityScreen(
         )
 
         LaunchedEffect(Unit) {
-            if (permissions.allPermissionsGranted) {
-                viewModel.bindAndStart(context)
-            } else {
+            if (!desafioId.isNullOrBlank()) {
+                challengeViewModel.fetchChallenges(context)
+            }
+            if (!permissions.allPermissionsGranted) {
                 permissions.launchMultiplePermissionRequest()
             }
         }
 
         // Quando permissões forem concedidas, inicia
-        LaunchedEffect(permissions.allPermissionsGranted) {
-            if (permissions.allPermissionsGranted && status == TrackingStatus.IDLE) {
-                viewModel.bindAndStart(context)
+        LaunchedEffect(permissions.allPermissionsGranted, challenge?.id, status) {
+            val challengeReady = desafioId.isNullOrBlank() || challenge != null
+            if (permissions.allPermissionsGranted && status == TrackingStatus.IDLE && !started && challengeReady) {
+                started = true
+                viewModel.bindAndStart(
+                    context = context,
+                    exerciseKind = challenge?.atividadeDesignada ?: inferExerciseKind(exercicioNome),
+                    targetDistanceMeters = challenge?.targetDistanceMeters(),
+                    targetSeconds = challenge?.targetSeconds()
+                )
             }
         }
 
@@ -85,7 +101,13 @@ fun StartActivityScreen(
                 val duracaoMin = (result.duracaoSeconds / 60).coerceAtLeast(1)
                 val nome = URLEncoder.encode(exercicioNome, "UTF-8")
                 val unidade = URLEncoder.encode(exercicioUnidade, "UTF-8")
-                navController.navigate("register_activity/$exercicioId/$nome/$unidade/$duracaoMin/true") {
+                val submitChallengeId = desafioId?.takeIf { result.gpsQuality != "ruim" }
+                val route = if (submitChallengeId.isNullOrBlank()) {
+                    "register_activity/$exercicioId/$nome/$unidade/$duracaoMin/true"
+                } else {
+                    "register_activity/$exercicioId/$nome/$unidade/$duracaoMin/true/$submitChallengeId"
+                }
+                navController.navigate(route) {
                     popUpTo("start_activity/$exercicioId/$nome/$unidade") { inclusive = true }
                 }
             }
@@ -134,6 +156,7 @@ fun StartActivityScreen(
                 status = status,
                 steps = steps,
                 distanceMeters = distanceMeters,
+                gpsQuality = gpsQuality,
                 routePoints = routePoints,
                 onPause = { viewModel.pause(context) },
                 onResume = { viewModel.resume(context) },
@@ -150,6 +173,7 @@ fun StartActivityContent(
     status: TrackingStatus,
     steps: Int,
     distanceMeters: Float,
+    gpsQuality: String,
     routePoints: List<LatLng>,
     onPause: () -> Unit,
     onResume: () -> Unit,
@@ -302,6 +326,10 @@ fun StartActivityContent(
                     label = "Passos",
                     value = "$steps"
                 )
+                StatItem(
+                    label = "GPS",
+                    value = gpsQuality.replaceFirstChar { it.uppercase() }
+                )
             }
 
             // Botões
@@ -371,5 +399,28 @@ fun StatItem(label: String, value: String) {
                 color = Color.Gray
             )
         )
+    }
+}
+
+private fun Desafio.targetDistanceMeters(): Float? {
+    return when (rankingTipo) {
+        "menor_tempo", "menor_pace" -> ((objetivoValor ?: meta) * 1000.0).toFloat()
+        else -> null
+    }
+}
+
+private fun Desafio.targetSeconds(): Long? {
+    return when (rankingTipo) {
+        "maior_distancia" -> ((objetivoValor ?: meta) * 60.0).toLong()
+        else -> null
+    }
+}
+
+private fun inferExerciseKind(name: String): String {
+    val text = name.lowercase()
+    return when {
+        text.contains("cicl") || text.contains("bike") -> "ciclismo"
+        text.contains("caminh") || text.contains("walk") -> "caminhada"
+        else -> "corrida"
     }
 }

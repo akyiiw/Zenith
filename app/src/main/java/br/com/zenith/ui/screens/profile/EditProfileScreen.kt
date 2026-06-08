@@ -35,6 +35,7 @@ import br.com.zenith.ui.animations.CenteredZenithLoading
 import br.com.zenith.ui.animations.ZenithLoading
 import br.com.zenith.ui.theme.Inter
 import br.com.zenith.ui.theme.ZenithTheme
+import br.com.zenith.ui.theme.items.ZenithTextField
 import br.com.zenith.viewmodels.profile.UserViewModel
 import coil.compose.AsyncImage
 import io.github.jan.supabase.storage.storage
@@ -299,14 +300,11 @@ fun EditProfileContent(
                     )
                 }
                 item {
-                    OutlinedTextField(
+                    ZenithTextField(
                         value = name,
                         onValueChange = { name = it },
-                        label = { Text("Nome") },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(11.dp),
-                        singleLine = true,
-                        prefix = { Text("@") },
+                        label = "Nome de usuário",
+                        prefix = "@",
                         enabled = usernameCooldown.canEdit
                     )
                     if (!usernameCooldown.canEdit) {
@@ -321,22 +319,17 @@ fun EditProfileContent(
                     }
                 }
                 item {
-                    OutlinedTextField(
+                    ZenithTextField(
                         value = displayName,
                         onValueChange = { displayName = it },
-                        label = { Text("Nome de exibição") },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(11.dp),
-                        singleLine = true,
+                        label = "Nome de exibição"
                     )
                 }
                 item {
-                    OutlinedTextField(
+                    ZenithTextField(
                         value = aboutMe,
                         onValueChange = { aboutMe = it },
-                        label = { Text("Sobre mim (opcional)") },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(11.dp),
+                        label = "Sobre mim",
                         minLines = 3,
                         maxLines = 5
                     )

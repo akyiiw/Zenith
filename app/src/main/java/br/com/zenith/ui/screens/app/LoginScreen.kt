@@ -125,13 +125,6 @@ fun LoginContent(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            /*
-            TODO: Mudar a cor desses inputs quando selecionados
-             e deixar os textos mais escuros
-             TODOS os inputs na verdade
-            */
-            // TODO: Essa identidade visual não compactua muito (borderradius)
-
             OutlinedTextField(
                 value = email,
                 onValueChange = { email = it },
@@ -168,17 +161,9 @@ fun LoginContent(
                 enabled = !isLoading,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                 shape = RoundedCornerShape(11.dp)
-
-                // TODO: Adicionar o botão de Esqueci a senha
-                // TODO: Resolver isso do gesto de voltar no Xiaomi
-                // TODO: Avisar sobre erros de forma mais concreta (avisos na tela)
-                /* TODO: Adicionar um delay antes de carregar a Home,
-                     para dar um fetch interessante e mostrar a logo girando
-                */
             )
         }
 
-        // Botão fixo na base
         Column(
             modifier = Modifier
                 .fillMaxWidth()

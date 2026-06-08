@@ -15,10 +15,10 @@ import androidx.navigation.NavController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import br.com.zenith.R
 import br.com.zenith.ui.theme.Green
-import br.com.zenith.ui.theme.SGreen
+import br.com.zenith.ui.theme.SecondaryGreen
 
 sealed class NavItem(val route: String, val iconRes: Int, val contentDescription: String) {
-    object Ranking : NavItem("ranking", R.drawable.nav_ranking, "Ranking")
+    object Challenge : NavItem("challenge", R.drawable.nav_challenge, "Desafios")
     object Social : NavItem("social", R.drawable.nav_social, "Social")
     object Home : NavItem("home", R.drawable.nav_home, "Home")
     object Progress : NavItem("progress", R.drawable.nav_progress, "Progress")
@@ -28,7 +28,7 @@ sealed class NavItem(val route: String, val iconRes: Int, val contentDescription
 @Composable
 fun CustomBottomNavigationBar(navController: NavController) {
     val items = listOf(
-        NavItem.Ranking,
+        NavItem.Challenge,
         NavItem.Social,
         NavItem.Home,
         NavItem.Progress,
@@ -79,7 +79,7 @@ fun CustomBottomNavigationBar(navController: NavController) {
                 colors = NavigationBarItemDefaults.colors(
                     selectedIconColor = Green,
                     unselectedIconColor = Color.Gray,
-                    indicatorColor = SGreen.copy(alpha = 0.3f)
+                    indicatorColor = SecondaryGreen.copy(alpha = 0.3f)
                 ),
                 alwaysShowLabel = false
             )

@@ -30,6 +30,21 @@ class ActiveActivityViewModel(application: Application) : AndroidViewModel(appli
     private val _distanceMeters = MutableStateFlow(0f)
     val distanceMeters: StateFlow<Float> = _distanceMeters
 
+    private val _rawDistanceMeters = MutableStateFlow(0f)
+    val rawDistanceMeters: StateFlow<Float> = _rawDistanceMeters
+
+    private val _acceptedGpsPoints = MutableStateFlow(0)
+    val acceptedGpsPoints: StateFlow<Int> = _acceptedGpsPoints
+
+    private val _rejectedGpsPoints = MutableStateFlow(0)
+    val rejectedGpsPoints: StateFlow<Int> = _rejectedGpsPoints
+
+    private val _averageAccuracyMeters = MutableStateFlow(0f)
+    val averageAccuracyMeters: StateFlow<Float> = _averageAccuracyMeters
+
+    private val _gpsQuality = MutableStateFlow("ruim")
+    val gpsQuality: StateFlow<String> = _gpsQuality
+
     private val _routePoints = MutableStateFlow<List<LatLng>>(emptyList())
     val routePoints: StateFlow<List<LatLng>> = _routePoints
 
@@ -55,6 +70,21 @@ class ActiveActivityViewModel(application: Application) : AndroidViewModel(appli
                 service!!.distanceMeters.collectLatest { _distanceMeters.value = it }
             }
             viewModelScope.launch {
+                service!!.rawDistanceMeters.collectLatest { _rawDistanceMeters.value = it }
+            }
+            viewModelScope.launch {
+                service!!.acceptedGpsPoints.collectLatest { _acceptedGpsPoints.value = it }
+            }
+            viewModelScope.launch {
+                service!!.rejectedGpsPoints.collectLatest { _rejectedGpsPoints.value = it }
+            }
+            viewModelScope.launch {
+                service!!.averageAccuracyMeters.collectLatest { _averageAccuracyMeters.value = it }
+            }
+            viewModelScope.launch {
+                service!!.gpsQuality.collectLatest { _gpsQuality.value = it }
+            }
+            viewModelScope.launch {
                 service!!.routePoints.collectLatest { _routePoints.value = it }
             }
         }
@@ -65,9 +95,17 @@ class ActiveActivityViewModel(application: Application) : AndroidViewModel(appli
         }
     }
 
-    fun bindAndStart(context: Context) {
+    fun bindAndStart(
+        context: Context,
+        exerciseKind: String,
+        targetDistanceMeters: Float? = null,
+        targetSeconds: Long? = null
+    ) {
         val intent = Intent(context, ActivityTrackingService::class.java).apply {
             action = ActivityTrackingService.ACTION_START
+            putExtra(ActivityTrackingService.EXTRA_EXERCISE_KIND, exerciseKind)
+            targetDistanceMeters?.let { putExtra(ActivityTrackingService.EXTRA_TARGET_DISTANCE_METERS, it) }
+            targetSeconds?.let { putExtra(ActivityTrackingService.EXTRA_TARGET_SECONDS, it) }
         }
         context.startForegroundService(intent)
         context.bindService(intent, connection, Context.BIND_AUTO_CREATE)
@@ -117,6 +155,11 @@ class ActiveActivityViewModel(application: Application) : AndroidViewModel(appli
         val duracaoSeconds: Long,
         val steps: Int,
         val distanceMeters: Float,
+        val rawDistanceMeters: Float,
+        val averageAccuracyMeters: Float,
+        val acceptedGpsPoints: Int,
+        val rejectedGpsPoints: Int,
+        val gpsQuality: String,
         val rotaJson: String
     )
 
@@ -125,6 +168,11 @@ class ActiveActivityViewModel(application: Application) : AndroidViewModel(appli
             duracaoSeconds = _elapsedSeconds.value,
             steps = _steps.value,
             distanceMeters = _distanceMeters.value,
+            rawDistanceMeters = _rawDistanceMeters.value,
+            averageAccuracyMeters = _averageAccuracyMeters.value,
+            acceptedGpsPoints = _acceptedGpsPoints.value,
+            rejectedGpsPoints = _rejectedGpsPoints.value,
+            gpsQuality = _gpsQuality.value,
             rotaJson = serializarRota(_routePoints.value)
         )
         sendAction(context, ActivityTrackingService.ACTION_STOP)

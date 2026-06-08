@@ -1,4 +1,4 @@
-package br.com.zenith.ui.screens.social
+package br.com.zenith.ui.screens.profile
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
@@ -55,7 +55,7 @@ fun PublicProfileScreen(
         ) { padding ->
             if (isLoading) {
                 CenteredZenithLoading(
-                    modifier = Modifier.padding(padding)
+                    contentPadding = padding
                 )
                 return@Scaffold
             }

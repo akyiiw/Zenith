@@ -60,7 +60,7 @@ fun ProfileScreen(
             containerColor = Color.White
         ) { padding ->
             if (isLoading) {
-                CenteredZenithLoading(modifier = Modifier.padding(padding))
+                CenteredZenithLoading(contentPadding = padding)
                 return@Scaffold
             }
 

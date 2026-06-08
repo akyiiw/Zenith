@@ -21,8 +21,6 @@ class AuthViewModel : ViewModel() {
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading
 
-    // ─── Auth ────────────────────────────────────────────────────────────────
-
     fun registrarUsuario(
         emailInput: String,
         senhaInput: String,
@@ -87,8 +85,6 @@ class AuthViewModel : ViewModel() {
         }
     }
 
-    // ─── Onboarding ──────────────────────────────────────────────────────────
-
     fun salvarPerfil(
         name: String,
         displayName: String,
@@ -107,7 +103,6 @@ class AuthViewModel : ViewModel() {
                 val email = client.auth.currentUserOrNull()?.email
                     ?: throw Exception("Email não encontrado")
 
-                // 1. Upload da foto se existir
                 val pictureHash: String? = try {
                     photoUri?.let { uri ->
                         val bytes = context.contentResolver
@@ -115,7 +110,7 @@ class AuthViewModel : ViewModel() {
                             ?.readBytes()
 
                         if (bytes == null || bytes.isEmpty()) {
-                            null // ignora silenciosamente, não quebra o fluxo
+                            null
                         } else {
                             val path = "avatars/$userId.jpg"
                             client.storage.from("profiles").upload(path, bytes) {
@@ -124,12 +119,10 @@ class AuthViewModel : ViewModel() {
                             path
                         }
                     }
-                } catch (e: Exception) {
-                    android.util.Log.e("UPLOAD_FOTO", "Erro no upload da foto: ${e.localizedMessage}")
-                    null // falha no upload não impede salvar o perfil
+                } catch (_: Exception) {
+                    null
                 }
 
-                // 2. Tenta insert, se falhar faz update
                 val perfil = buildJsonObject {
                     put("id", userId)
                     put("name", name)
@@ -141,12 +134,8 @@ class AuthViewModel : ViewModel() {
                 }
 
                 try {
-                    val userId = client.auth.currentUserOrNull()?.id
-                    android.util.Log.d("SUPABASE_DEBUG", "userId: $userId")
-                    android.util.Log.d("SUPABASE_DEBUG", "session: ${client.auth.currentSessionOrNull()}")
-
                     client.postgrest.from("profiles").insert(perfil)
-                } catch (e: Exception) {
+                } catch (_: Exception) {
                     client.postgrest.from("profiles").update(
                         buildJsonObject {
                             put("name", name)
