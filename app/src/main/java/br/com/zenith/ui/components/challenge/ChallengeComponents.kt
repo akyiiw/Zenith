@@ -191,7 +191,7 @@ fun ChallengeContent(
                             }
                         }
 
-                        item { SectionTitle("Challenge do desafio") }
+                        item { RankingHeader(challenge = challenge) }
 
                         if (selectedChallengeDetails.entries.isEmpty()) {
                             item { EmptyState("Nenhuma atividade vinculada a este desafio ainda") }
@@ -254,7 +254,7 @@ private enum class ChallengeTab(val label: String) {
 }
 
 private enum class ChallengeDetailTab(val label: String) {
-    Participantes("Participantes"),
+    Participantes("Ranking"),
     Informacoes("Informações")
 }
 
@@ -372,7 +372,7 @@ private fun ChallengeHeader(
     onBack: () -> Unit,
     onJoin: () -> Unit
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
@@ -394,7 +394,18 @@ private fun ChallengeHeader(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
+                Text(
+                    text = "${formatChallengeDate(challenge.inicioEm)} - ${formatChallengeDate(challenge.fimEm)}",
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        fontFamily = Inter,
+                        fontWeight = FontWeight.Medium,
+                        color = Color(0xFF6F6C6C)
+                    ),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
             }
+            ChallengeBanner(challenge = challenge)
         }
 
         if (!isParticipating) {
@@ -407,6 +418,28 @@ private fun ChallengeHeader(
                 Text("Entrar no desafio", fontFamily = Inter, color = Green)
             }
         }
+    }
+}
+
+@Composable
+private fun RankingHeader(challenge: Challenge) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(
+            text = "Ranking do desafio",
+            style = MaterialTheme.typography.titleMedium.copy(
+                fontFamily = Inter,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF151515)
+            )
+        )
+        Text(
+            text = challengeGoalLabel(challenge),
+            style = MaterialTheme.typography.bodySmall.copy(
+                fontFamily = Inter,
+                fontWeight = FontWeight.Medium,
+                color = Color(0xFF6F6C6C)
+            )
+        )
     }
 }
 
@@ -894,6 +927,10 @@ private fun challengeGoalLabel(challenge: Challenge): String {
 }
 
 private fun challengeEntryValue(entry: ChallengeEntry, challenge: Challenge): String {
+    val usesSteps = challenge.metrica == "passos" || challenge.unidade.contains("pass", ignoreCase = true)
+    if (usesSteps && challenge.rankingTipo != "menor_tempo" && challenge.rankingTipo != "menor_pace") {
+        return "${formatGoal(entry.progress)} passos"
+    }
     return when (challenge.rankingTipo) {
         "menor_tempo" -> "${entry.minutes} min"
         "menor_pace" -> {
@@ -966,27 +1003,19 @@ private fun ChallengeDetailsRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = 78.dp)
-            .background(if (isCurrentUser) Color(0xFFF0FAF0) else Color(0xFFF8F8F8), RoundedCornerShape(8.dp))
-            .border(1.dp, if (isCurrentUser) Color(0xFFB7DEB8) else Color(0xFFE6E6E6), RoundedCornerShape(8.dp))
+            .heightIn(min = 66.dp)
+            .background(if (isCurrentUser) Color(0xFFFFFBED) else Color.White, RoundedCornerShape(5.dp))
+            .border(1.dp, if (isCurrentUser) Color(0xFF9A894C) else Color(0xFF3E3E3E), RoundedCornerShape(5.dp))
             .clickable { onClick() }
-            .padding(horizontal = 12.dp, vertical = 10.dp),
+            .padding(horizontal = 14.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(
-            modifier = Modifier
-                .size(34.dp)
-                .clip(CircleShape)
-                .background(rankColor(position)),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = position.toString(),
-                color = Color.White,
-                style = MaterialTheme.typography.bodyMedium.copy(fontFamily = Inter, fontWeight = FontWeight.Bold)
-            )
-        }
-        Spacer(modifier = Modifier.width(12.dp))
+        Text(
+            text = "#$position",
+            color = rankColor(position),
+            style = MaterialTheme.typography.bodyLarge.copy(fontFamily = Inter, fontWeight = FontWeight.Bold)
+        )
+        Spacer(modifier = Modifier.width(14.dp))
         ChallengeAvatar(entry.profile)
         Spacer(modifier = Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
@@ -1005,7 +1034,7 @@ private fun ChallengeDetailsRow(
         }
         Text(
             text = challengeEntryValue(entry, challenge),
-            style = MaterialTheme.typography.bodyLarge.copy(fontFamily = Inter, fontWeight = FontWeight.Bold, color = Green)
+            style = MaterialTheme.typography.bodyLarge.copy(fontFamily = Inter, fontWeight = FontWeight.Bold, color = Color(0xFF777777))
         )
     }
 }

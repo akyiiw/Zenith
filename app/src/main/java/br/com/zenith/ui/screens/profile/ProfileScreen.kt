@@ -48,6 +48,7 @@ fun ProfileScreen(
     val stats by userViewModel.statsState.collectAsState()
     val badge by userViewModel.badgeState.collectAsState(initial = null)
     val atividades by activityViewModel.atividades.collectAsState()
+    val desafios by activityViewModel.desafios.collectAsState()
     val isLoading by userViewModel.isLoading.collectAsState()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     var showStatusDialog by remember { mutableStateOf(false) }
@@ -103,7 +104,11 @@ fun ProfileScreen(
                         Spacer(modifier = Modifier.height(8.dp))
                         RecentHeader()
                         Spacer(modifier = Modifier.height(8.dp))
-                        RecentActivitySection(navController = navController, atividades)
+                        RecentActivitySection(
+                            navController = navController,
+                            atividades = atividades,
+                            desafios = desafios
+                        )
                     }
                 }
             }

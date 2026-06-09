@@ -47,11 +47,13 @@ import io.github.jan.supabase.storage.storage
 import androidx.core.graphics.toColorInt
 import androidx.navigation.NavController
 import br.com.zenith.data.models.Atividade
+import br.com.zenith.data.models.Desafio
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import java.util.Locale
 
 private data class BadgeConfig(
     val backgroundColor: Color,
@@ -305,7 +307,11 @@ fun formattedDuration(duracaoMin: Int?): String {
 }
 
 @Composable
-fun RecentActivitySection(navController: NavController, atividades: List<Atividade>) {
+fun RecentActivitySection(
+    navController: NavController,
+    atividades: List<Atividade>,
+    desafios: Map<String, Desafio> = emptyMap()
+) {
     val recent = remember(atividades) {
         atividades.sortedByDescending { it.realizadaEm }.take(5)
     }
@@ -313,6 +319,7 @@ fun RecentActivitySection(navController: NavController, atividades: List<Ativida
         recent.forEach { atividade ->
             RecentActivityCard(
                 atividade = atividade,
+                desafio = atividade.desafioId?.let { desafios[it] },
                 onClick = { navController.navigate("activity_detail/${atividade.id}") }
             )
         }
@@ -320,7 +327,7 @@ fun RecentActivitySection(navController: NavController, atividades: List<Ativida
 }
 
 @Composable
-fun RecentActivityCard(atividade: Atividade, onClick: () -> Unit) {
+fun RecentActivityCard(atividade: Atividade, desafio: Desafio? = null, onClick: () -> Unit) {
     ZenithTheme {
         Column(
             modifier = Modifier
@@ -334,80 +341,147 @@ fun RecentActivityCard(atividade: Atividade, onClick: () -> Unit) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.Top
             ) {
-                Text(
-                    text = tempoRelativo(atividade.realizadaEm),
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.W500,
-                    color = Color(0xFF000000),
-                    fontStyle = FontStyle.Italic
-                )
-                Box(
-                    modifier = Modifier
-                        .padding(1.dp)
-                        .width(24.dp)
-                        .height(16.dp)
-                        .background(color = Color(0x5CC9C9C9), shape = RoundedCornerShape(size = 25.dp))
+                Column(
+                    modifier = Modifier.weight(1f)
                 ) {
-                    Icon(
-                        painter = painterResource(
-                            id = if (atividade.verificada) R.drawable.act_verified else R.drawable.nav_social
+                    Text(
+                        text = tempoRelativo(atividade.realizadaEm),
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.W500,
+                        color = Color(0xFF000000),
+                        fontStyle = FontStyle.Italic
+                    )
+                    Spacer(modifier = Modifier.height(14.dp))
+                    Text(
+                        text = activityType(atividade),
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.W600,
+                        color = Color(0xFF238D25)
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = activityGroup(atividade),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color(0xFF6F6C6C)
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        text = atividade.titulo ?: "Atividade registrada:",
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.W600,
+                        color = Color(0xFF000000)
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = formattedActivityValue(atividade),
+                        style = MaterialTheme.typography.displayMedium.copy(
+                            fontSize = 27.sp,
+                            fontStyle = FontStyle.Italic,
+                            fontWeight = FontWeight.W700,
                         ),
-                        contentDescription = "Status da Atividade",
-                        tint = Color.Unspecified,
-                        modifier = Modifier
-                            .padding(start = 3.dp, top = 3.dp, bottom = 3.dp)
-                            .size(18.dp)
+                        color = Color(0xFF1B820E)
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "Duracao: ${formattedDuration(atividade.duracaoMin)}",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontSize = 12.sp,
+                        color = Color(0xFF6F6C6C)
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Nota do usuario: ${atividade.nota?.let { "$it/10" } ?: "-"}",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontSize = 12.sp,
+                        color = Color(0xFF6F6C6C)
                     )
                 }
+                Spacer(modifier = Modifier.width(10.dp))
+                Column(
+                    modifier = Modifier.width(92.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    ActivityStatusBadge(verificada = atividade.verificada)
+                    RouteSparkline(rota = atividade.rota)
+                }
             }
-            Spacer(modifier = Modifier.height(14.dp))
-            Text(
-                text = activityType(atividade),
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.W600,
-                color = Color(0xFF238D25)
-            )
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = activityGroup(atividade),
-                style = MaterialTheme.typography.labelSmall,
-                color = Color(0xFF6F6C6C)
-            )
-            Spacer(modifier = Modifier.height(10.dp))
-            Text(
-                text = atividade.titulo ?: "Atividade registrada:",
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.W600,
-                color = Color(0xFF000000)
-            )
-            RouteSparkline(rota = atividade.rota)
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = formattedActivityValue(atividade),
-                style = MaterialTheme.typography.displayMedium.copy(
-                    fontSize = 27.sp,
-                    fontStyle = FontStyle.Italic,
-                    fontWeight = FontWeight.W700,
-                ),
-                color = Color(0xFF1B820E)
-            )
-            Spacer(modifier = Modifier.height(6.dp))
-            Text(
-                text = "Duracao: ${formattedDuration(atividade.duracaoMin)}",
-                style = MaterialTheme.typography.labelSmall,
-                fontSize = 12.sp,
-                color = Color(0xFF6F6C6C)
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = "Nota do usuario: ${atividade.nota?.let { "$it/10" } ?: "-"}",
-                style = MaterialTheme.typography.labelSmall,
-                fontSize = 12.sp,
-                color = Color(0xFF6F6C6C)
-            )
+            ChallengeActivitySummary(desafio = desafio, atividade = atividade)
         }
+    }
+}
+
+@Composable
+private fun ActivityStatusBadge(verificada: Boolean) {
+    Box(
+        modifier = Modifier
+            .padding(1.dp)
+            .width(24.dp)
+            .height(16.dp)
+            .background(color = Color(0x5CC9C9C9), shape = RoundedCornerShape(size = 25.dp))
+    ) {
+        Icon(
+            painter = painterResource(
+                id = if (verificada) R.drawable.act_verified else R.drawable.nav_social
+            ),
+            contentDescription = "Status da Atividade",
+            tint = Color.Unspecified,
+            modifier = Modifier
+                .padding(start = 3.dp, top = 3.dp, bottom = 3.dp)
+                .size(18.dp)
+        )
+    }
+}
+
+@Composable
+fun ChallengeActivitySummary(desafio: Desafio?, atividade: Atividade) {
+    if (atividade.desafioId.isNullOrBlank()) return
+
+    Spacer(modifier = Modifier.height(10.dp))
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color(0xFFEAF3DE), RoundedCornerShape(5.dp))
+            .border(1.dp, Color(0x33238D25), RoundedCornerShape(5.dp))
+            .padding(horizontal = 10.dp, vertical = 8.dp)
+    ) {
+        Text(
+            text = desafio?.titulo?.takeIf { it.isNotBlank() } ?: "Desafio vinculado",
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.W700,
+            color = Color(0xFF238D25)
+        )
+        Text(
+            text = desafio?.let { "${challengeModeLabel(it)} - conta para o ranking" }
+                ?: "Conta para o ranking do desafio",
+            style = MaterialTheme.typography.labelSmall,
+            fontSize = 12.sp,
+            color = Color(0xFF4F664F)
+        )
+        val status = when {
+            atividade.gpsQualidade == "ruim" -> "GPS ruim"
+            atividade.verificada -> "Atividade verificada"
+            else -> "Registro manual"
+        }
+        Text(
+            text = status,
+            style = MaterialTheme.typography.labelSmall,
+            fontSize = 12.sp,
+            color = Color(0xFF6F6C6C)
+        )
+    }
+}
+
+fun challengeModeLabel(challenge: Desafio): String {
+    val objective = challenge.objetivoValor ?: challenge.meta
+    return when (challenge.rankingTipo) {
+        "menor_tempo" -> "${formatDecimal(objective)} km - menor tempo"
+        "maior_distancia" -> "${formatDecimal(objective)} min - maior distancia"
+        "menor_pace" -> "${formatDecimal(objective)} km - menor pace"
+        "tempo_total" -> "tempo total"
+        "distancia_total" -> "distancia total"
+        else -> "${challenge.unidade.lowercase(Locale.ROOT)} no ranking"
     }
 }
 
@@ -416,13 +490,12 @@ private fun RouteSparkline(rota: String?) {
     val points = remember(rota) { parseRouteSparklinePoints(rota) }
     if (points.size < 2) return
 
-    Spacer(modifier = Modifier.height(8.dp))
+    Spacer(modifier = Modifier.height(14.dp))
     Canvas(
         modifier = Modifier
-            .fillMaxWidth()
-            .height(54.dp)
-            .background(Color(0xFFECECEC), RoundedCornerShape(5.dp))
-            .padding(8.dp)
+            .width(90.dp)
+            .height(56.dp)
+            .padding(4.dp)
     ) {
         val minLat = points.minOf { it.first }
         val maxLat = points.maxOf { it.first }
@@ -430,18 +503,26 @@ private fun RouteSparkline(rota: String?) {
         val maxLng = points.maxOf { it.second }
         val latRange = (maxLat - minLat).takeIf { it != 0.0 } ?: 1.0
         val lngRange = (maxLng - minLng).takeIf { it != 0.0 } ?: 1.0
+        val scale = minOf(
+            size.width / lngRange.toFloat(),
+            size.height / latRange.toFloat()
+        )
+        val drawnWidth = lngRange.toFloat() * scale
+        val drawnHeight = latRange.toFloat() * scale
+        val offsetX = (size.width - drawnWidth) / 2f
+        val offsetY = (size.height - drawnHeight) / 2f
 
         val path = Path()
         points.forEachIndexed { index, point ->
-            val x = ((point.second - minLng) / lngRange).toFloat() * size.width
-            val y = size.height - ((point.first - minLat) / latRange).toFloat() * size.height
+            val x = offsetX + ((point.second - minLng).toFloat() * scale)
+            val y = offsetY + drawnHeight - ((point.first - minLat).toFloat() * scale)
             if (index == 0) path.moveTo(x, y) else path.lineTo(x, y)
         }
 
         drawPath(
             path = path,
-            color = Color(0xFF454545),
-            style = Stroke(width = 6f, cap = StrokeCap.Round)
+            color = Color(0xFF6B6B6B),
+            style = Stroke(width = 4f, cap = StrokeCap.Round)
         )
     }
 }

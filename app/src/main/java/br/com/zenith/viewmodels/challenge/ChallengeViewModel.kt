@@ -577,9 +577,9 @@ class ChallengeViewModel : ViewModel() {
                 val selectedActivities = rankedActivitiesForChallenge(activities, challenge)
                 val progress = when (challenge.rankingTipo) {
                     "menor_tempo", "menor_pace" -> selectedActivities.firstOrNull()?.duracaoMin?.toDouble() ?: 0.0
-                    "maior_distancia" -> selectedActivities.firstOrNull()?.let { distanceValue(it) } ?: 0.0
+                    "maior_distancia" -> selectedActivities.firstOrNull()?.let { activityMetric(it, challenge) } ?: 0.0
                     "tempo_total" -> minutes.toDouble()
-                    else -> activities.sumOf { distanceValue(it) }
+                    else -> activities.sumOf { activityMetric(it, challenge) }
                 }
                 ChallengeEntry(
                     profile = profile,
@@ -612,17 +612,17 @@ class ChallengeViewModel : ViewModel() {
             "maior_distancia" -> activities
                 .filter { (it.duracaoMin ?: 0).toDouble() <= (challenge.objetivoValor ?: challenge.meta) && (it.duracaoMin ?: 0) > 0 }
                 .sortedWith(
-                    compareByDescending<UserActivity> { distanceValue(it) }
+                    compareByDescending<UserActivity> { activityMetric(it, challenge) }
                         .thenBy { it.duracaoMin ?: Int.MAX_VALUE }
                         .thenByDescending { it.verificada }
                 )
                 .take(1)
             else -> activities
-                .filter { distanceValue(it) >= (challenge.objetivoValor ?: challenge.meta) }
+                .filter { activityMetric(it, challenge) >= (challenge.objetivoValor ?: challenge.meta) }
                 .sortedWith(
                     compareBy<UserActivity> { rankingDurationOrPace(it, challenge) }
                         .thenByDescending { it.verificada }
-                        .thenByDescending { distanceValue(it) }
+                        .thenByDescending { activityMetric(it, challenge) }
                 )
                 .take(1)
         }

@@ -7,6 +7,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import br.com.zenith.data.SupabaseConfig
 import br.com.zenith.data.models.Atividade
+import br.com.zenith.data.models.Desafio
 import br.com.zenith.data.models.Exercicio
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.postgrest.postgrest
@@ -21,6 +22,8 @@ class ActivityViewModel : ViewModel() {
 
     private val _atividades = MutableStateFlow<List<Atividade>>(value = emptyList())
     val atividades: StateFlow<List<Atividade>> = _atividades
+    private val _desafios = MutableStateFlow<Map<String, Desafio>>(emptyMap())
+    val desafios: StateFlow<Map<String, Desafio>> = _desafios
     private val _exercicios = MutableStateFlow<List<Exercicio>>(emptyList())
     val exercicios: StateFlow<List<Exercicio>> = _exercicios
 
@@ -54,7 +57,7 @@ class ActivityViewModel : ViewModel() {
             try {
                 SupabaseConfig.init(context)
                 val client = SupabaseConfig.getClient()
-                _atividades.value = client.postgrest
+                val atividades = client.postgrest
                     .from(table = "atividades")
                     .select(columns = Columns.raw("*, exercicios(*)")) {
                         filter {
@@ -62,6 +65,21 @@ class ActivityViewModel : ViewModel() {
                         }
                     }
                     .decodeList<Atividade>()
+                _atividades.value = atividades
+
+                val linkedChallengeIds = atividades.mapNotNull { it.desafioId }.toSet()
+                _desafios.value = if (linkedChallengeIds.isEmpty()) {
+                    emptyMap()
+                } else {
+                    runCatching {
+                        client.postgrest
+                            .from("desafios")
+                            .select()
+                            .decodeList<Desafio>()
+                            .filter { it.id in linkedChallengeIds }
+                            .associateBy { it.id }
+                    }.getOrDefault(emptyMap())
+                }
             } catch (e: Exception) {
                 Toast.makeText(context, "Erro ao carregar atividades", Toast.LENGTH_SHORT).show()
             } finally {

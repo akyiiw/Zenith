@@ -27,6 +27,8 @@ import br.com.zenith.ui.animations.CenteredZenithLoading
 import br.com.zenith.ui.animations.ZenithLoading
 import br.com.zenith.ui.components.profile.activityGroup
 import br.com.zenith.ui.components.profile.activityType
+import br.com.zenith.ui.components.profile.ChallengeActivitySummary
+import br.com.zenith.ui.components.profile.challengeModeLabel
 import br.com.zenith.ui.components.profile.formattedActivityValue
 import br.com.zenith.ui.components.profile.formattedDuration
 import br.com.zenith.ui.components.profile.tempoRelativo
@@ -54,6 +56,7 @@ fun ActivityDetailScreen(navController: NavController, atividadeId: String?) {
     val viewModel: ActivityViewModel = viewModel()
     val context = LocalContext.current
     val atividades by viewModel.atividades.collectAsState()
+    val desafios by viewModel.desafios.collectAsState()
     val exercicios by viewModel.exercicios.collectAsState()
     val isSaving by viewModel.isSaving.collectAsState()
 
@@ -69,6 +72,7 @@ fun ActivityDetailScreen(navController: NavController, atividadeId: String?) {
     }
 
     var editando by remember(atividade.id) { mutableStateOf(false) }
+    val desafio = atividade.desafioId?.let { desafios[it] }
 
     LaunchedEffect(editando) {
         if (editando && exercicios.isEmpty()) viewModel.fetchExercicios(context)
@@ -218,6 +222,8 @@ fun ActivityDetailScreen(navController: NavController, atividadeId: String?) {
                                     color = if (atividade.verificada) Color(0xFF238D25) else Color.Gray
                                 )
                             }
+
+                            ChallengeActivitySummary(desafio = desafio, atividade = atividade)
                         }
                     }
 
@@ -262,8 +268,14 @@ fun ActivityDetailScreen(navController: NavController, atividadeId: String?) {
                             atividade.realizadaEm?.let {
                                 DetailRow(label = "Data", value = formatarData(it))
                             }
-                            atividade.desafioId?.let {
-                                DetailRow(label = "Desafio vinculado", value = it)
+                            atividade.desafioId?.let { challengeId ->
+                                DetailRow(
+                                    label = "Desafio vinculado",
+                                    value = desafio?.titulo?.takeIf { it.isNotBlank() } ?: challengeId
+                                )
+                                desafio?.let {
+                                    DetailRow(label = "Regra do ranking", value = challengeModeLabel(it))
+                                }
                             }
                         }
                     }
