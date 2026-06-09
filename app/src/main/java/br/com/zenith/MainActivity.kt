@@ -18,8 +18,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -34,6 +32,7 @@ import androidx.navigation.compose.rememberNavController
 import br.com.zenith.data.SupabaseConfig
 import br.com.zenith.ui.animations.ZenithLoading
 import br.com.zenith.ui.components.app.CustomBottomNavigationBar
+import br.com.zenith.ui.notifications.ZenithTopNotificationHost
 import br.com.zenith.ui.screens.activity.ActivityDetailScreen
 import br.com.zenith.ui.screens.activity.ActivityRegisteredScreen
 import br.com.zenith.ui.screens.activity.NewActivityScreen
@@ -62,6 +61,38 @@ import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.status.SessionStatus
 import kotlinx.coroutines.flow.collectLatest
 import java.net.URLDecoder
+
+private val bottomTabRoutes = listOf(
+    "challenge",
+    "social",
+    "home",
+    "progress",
+    "settings"
+)
+
+private fun isBottomTabRoute(route: String): Boolean = route in bottomTabRoutes
+
+private fun bottomTabDirection(initialRoute: String, targetRoute: String): Int {
+    val initialIndex = bottomTabRoutes.indexOf(initialRoute)
+    val targetIndex = bottomTabRoutes.indexOf(targetRoute)
+    return if (initialIndex >= 0 && targetIndex >= 0) {
+        targetIndex.compareTo(initialIndex)
+    } else {
+        0
+    }
+}
+
+private fun isVerticalForwardRoute(route: String): Boolean =
+    route == "sleep_settings" ||
+        route == "create_challenge" ||
+        route.startsWith("new_activity") ||
+        route.startsWith("start_activity") ||
+        route.startsWith("register_activity")
+
+private fun isSameTabReload(initialRoute: String, targetRoute: String): Boolean =
+    initialRoute == targetRoute &&
+        targetRoute != "home" &&
+        isBottomTabRoute(targetRoute)
 
 class MainActivity : ComponentActivity() {
 
@@ -134,13 +165,21 @@ class MainActivity : ComponentActivity() {
                             startDestination = stableDestination,
                             modifier = Modifier.fillMaxSize(),
                             enterTransition = {
+                                val initial = initialState.destination.route.orEmpty()
                                 val target = targetState.destination.route.orEmpty()
-                                if (target == "sleep_settings" ||
-                                    target == "create_challenge" ||
-                                    target.startsWith("new_activity") ||
-                                    target.startsWith("start_activity") ||
-                                    target.startsWith("register_activity")
-                                ) {
+                                val tabDirection = bottomTabDirection(initial, target)
+
+                                if (isSameTabReload(initial, target)) {
+                                    slideInVertically(
+                                        animationSpec = tween(260),
+                                        initialOffsetY = { -it / 3 }
+                                    )
+                                } else if (tabDirection != 0) {
+                                    slideInHorizontally(
+                                        animationSpec = tween(260),
+                                        initialOffsetX = { if (tabDirection > 0) it else -it }
+                                    )
+                                } else if (isVerticalForwardRoute(target)) {
                                     slideInVertically(
                                         animationSpec = tween(320),
                                         initialOffsetY = { it }
@@ -153,13 +192,21 @@ class MainActivity : ComponentActivity() {
                                 }
                             },
                             exitTransition = {
+                                val initial = initialState.destination.route.orEmpty()
                                 val target = targetState.destination.route.orEmpty()
-                                if (target == "sleep_settings" ||
-                                    target == "create_challenge" ||
-                                    target.startsWith("new_activity") ||
-                                    target.startsWith("start_activity") ||
-                                    target.startsWith("register_activity")
-                                ) {
+                                val tabDirection = bottomTabDirection(initial, target)
+
+                                if (isSameTabReload(initial, target)) {
+                                    slideOutVertically(
+                                        animationSpec = tween(240),
+                                        targetOffsetY = { it }
+                                    )
+                                } else if (tabDirection != 0) {
+                                    slideOutHorizontally(
+                                        animationSpec = tween(240),
+                                        targetOffsetX = { if (tabDirection > 0) -it else it }
+                                    )
+                                } else if (isVerticalForwardRoute(target)) {
                                     slideOutVertically(
                                         animationSpec = tween(260),
                                         targetOffsetY = { -it / 4 }
@@ -173,12 +220,7 @@ class MainActivity : ComponentActivity() {
                             },
                             popEnterTransition = {
                                 val target = targetState.destination.route.orEmpty()
-                                if (target == "sleep_settings" ||
-                                    target == "create_challenge" ||
-                                    target.startsWith("new_activity") ||
-                                    target.startsWith("start_activity") ||
-                                    target.startsWith("register_activity")
-                                ) {
+                                if (isVerticalForwardRoute(target)) {
                                     slideInVertically(
                                         animationSpec = tween(260),
                                         initialOffsetY = { -it / 4 }
@@ -192,12 +234,7 @@ class MainActivity : ComponentActivity() {
                             },
                             popExitTransition = {
                                 val initial = initialState.destination.route.orEmpty()
-                                if (initial == "sleep_settings" ||
-                                    initial == "create_challenge" ||
-                                    initial.startsWith("new_activity") ||
-                                    initial.startsWith("start_activity") ||
-                                    initial.startsWith("register_activity")
-                                ) {
+                                if (isVerticalForwardRoute(initial)) {
                                     slideOutVertically(
                                         animationSpec = tween(280),
                                         targetOffsetY = { it }
@@ -480,20 +517,20 @@ class MainActivity : ComponentActivity() {
                         }
 
                         if (showBottomBar) {
-                            Column(
+                            Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .align(Alignment.BottomCenter)
                             ) {
-                                HorizontalDivider(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    thickness = 1.dp,
-                                    color = Color.LightGray
-                                )
-                                Spacer(modifier = Modifier.height(3.dp))
                                 CustomBottomNavigationBar(navController = navController)
                             }
                         }
+
+                        ZenithTopNotificationHost(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .align(Alignment.TopCenter)
+                        )
                     }
                 }
             }

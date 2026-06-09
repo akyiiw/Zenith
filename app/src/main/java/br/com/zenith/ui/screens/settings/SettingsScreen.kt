@@ -9,12 +9,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.LaunchedEffect
@@ -27,15 +28,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import br.com.zenith.data.SupabaseConfig
+import br.com.zenith.ui.components.common.ScreenHeader
 import br.com.zenith.ui.components.settings.AccountSettingsGroup
 import br.com.zenith.ui.components.settings.LogoutButton
 import br.com.zenith.ui.components.settings.SettingsSectionTitle
-import br.com.zenith.ui.theme.Inter
 import br.com.zenith.ui.theme.ZenithTheme
 import br.com.zenith.viewmodels.app.AuthViewModel
 import io.github.jan.supabase.auth.auth
@@ -65,16 +65,12 @@ fun SettingsScreen(navController: NavController) {
                     .statusBarsPadding()
                     .padding(horizontal = 20.dp),
                 verticalArrangement = Arrangement.spacedBy(24.dp),
-                contentPadding = PaddingValues(top = 19.dp, bottom = 24.dp)
+                contentPadding = PaddingValues(top = 19.dp, bottom = 104.dp)
             ) {
                 item {
-                    Text(
-                        text = "Configurações",
-                        style = MaterialTheme.typography.titleLarge.copy(
-                            fontFamily = Inter,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF1A1A1A)
-                        )
+                    ScreenHeader(
+                        title = "Configurações",
+                        icon = Icons.Default.Settings
                     )
                 }
 

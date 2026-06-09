@@ -68,6 +68,7 @@ import br.com.zenith.ui.theme.Inter
 import br.com.zenith.ui.theme.Poppins
 import br.com.zenith.ui.theme.SecondaryGreen
 import br.com.zenith.ui.theme.ZenithTheme
+import br.com.zenith.ui.components.common.ScreenHeader
 import br.com.zenith.viewmodels.progress.ProgressDay
 import br.com.zenith.viewmodels.progress.ProgressPeriod
 import br.com.zenith.viewmodels.progress.ProgressSummary
@@ -184,26 +185,10 @@ private fun ProgressHeader(
     onTogglePeriod: () -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = if (period == ProgressPeriod.Monthly) "Relatório Mensal" else "Relatório Semanal",
-                style = MaterialTheme.typography.headlineLarge.copy(
-                    fontFamily = Poppins,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.Black
-                )
-            )
-            Icon(
-                imageVector = Icons.Default.Timeline,
-                contentDescription = null,
-                tint = Green,
-                modifier = Modifier.size(34.dp)
-            )
-        }
+        ScreenHeader(
+            title = if (period == ProgressPeriod.Monthly) "Relatório Mensal" else "Relatório Semanal",
+            icon = Icons.Default.Timeline
+        )
 
         Row(
             modifier = Modifier

@@ -1,6 +1,5 @@
 package br.com.zenith.ui.screens.activity
 
-import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.slideInVertically
@@ -72,6 +71,7 @@ import androidx.navigation.NavController
 import br.com.zenith.data.models.Desafio
 import br.com.zenith.data.models.Exercicio
 import br.com.zenith.ui.animations.CenteredZenithLoading
+import br.com.zenith.ui.notifications.ZenithNotifier
 import br.com.zenith.ui.theme.Inter
 import br.com.zenith.ui.theme.ZenithTheme
 import br.com.zenith.ui.theme.items.ZenithTextField
@@ -127,7 +127,7 @@ fun NewActivityScreen(navController: NavController) {
             onIniciarDesafio = { challenge ->
                 val exercise = exercicios.findChallengeExercise(challenge)
                 if (exercise == null) {
-                    Toast.makeText(context, "Exercício do desafio indisponível", Toast.LENGTH_SHORT).show()
+                    ZenithNotifier.warning("Exercício do desafio indisponível")
                 } else {
                     navigateStart(exercise, challenge.id)
                 }

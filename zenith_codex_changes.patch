@@ -1,0 +1,1546 @@
+diff --git a/app/src/main/java/br/com/zenith/MainActivity.kt b/app/src/main/java/br/com/zenith/MainActivity.kt
+index a1b2426..e9f4cfb 100644
+--- a/app/src/main/java/br/com/zenith/MainActivity.kt
++++ b/app/src/main/java/br/com/zenith/MainActivity.kt
+@@ -34,6 +34,7 @@ import androidx.navigation.compose.rememberNavController
+ import br.com.zenith.data.SupabaseConfig
+ import br.com.zenith.ui.animations.ZenithLoading
+ import br.com.zenith.ui.components.app.CustomBottomNavigationBar
++import br.com.zenith.ui.notifications.ZenithTopNotificationHost
+ import br.com.zenith.ui.screens.activity.ActivityDetailScreen
+ import br.com.zenith.ui.screens.activity.ActivityRegisteredScreen
+ import br.com.zenith.ui.screens.activity.NewActivityScreen
+@@ -494,6 +495,12 @@ class MainActivity : ComponentActivity() {
+                                 CustomBottomNavigationBar(navController = navController)
+                             }
+                         }
++
++                        ZenithTopNotificationHost(
++                            modifier = Modifier
++                                .fillMaxWidth()
++                                .align(Alignment.TopCenter)
++                        )
+                     }
+                 }
+             }
+diff --git a/app/src/main/java/br/com/zenith/data/models/Profile.kt b/app/src/main/java/br/com/zenith/data/models/Profile.kt
+index de807cb..5af5f23 100644
+--- a/app/src/main/java/br/com/zenith/data/models/Profile.kt
++++ b/app/src/main/java/br/com/zenith/data/models/Profile.kt
+@@ -17,6 +17,7 @@ data class Profile(
+     @SerialName("accountStatus") val accountStatus: Boolean = true,
+     val email: String,
+     val streak: Int = 0,
++    @SerialName("last_streak_activity_date") val lastStreakActivityDate: String? = null,
+     val status: String? = null,
+     @SerialName("titulo_id") val tituloId: String? = null,
+     @SerialName("titulos") val titulo: Titulo? = null,
+diff --git a/app/src/main/java/br/com/zenith/ui/components/home/HomeComponents.kt b/app/src/main/java/br/com/zenith/ui/components/home/HomeComponents.kt
+index 1b3b98c..d198ef6 100644
+--- a/app/src/main/java/br/com/zenith/ui/components/home/HomeComponents.kt
++++ b/app/src/main/java/br/com/zenith/ui/components/home/HomeComponents.kt
+@@ -15,8 +15,14 @@ import androidx.compose.foundation.pager.rememberPagerState
+ import androidx.compose.foundation.shape.RoundedCornerShape
+ import androidx.compose.material.icons.Icons
+ import androidx.compose.material.icons.automirrored.filled.DirectionsRun
++import androidx.compose.material.icons.filled.EmojiEvents
++import androidx.compose.material.icons.filled.Groups
++import androidx.compose.material.icons.filled.MilitaryTech
+ import androidx.compose.material.icons.filled.Notifications
++import androidx.compose.material.icons.filled.NotificationsNone
++import androidx.compose.material.icons.filled.Tag
+ import androidx.compose.material3.MaterialTheme
++import androidx.compose.material3.Surface
+ import androidx.compose.material3.Text
+ import androidx.compose.runtime.Composable
+ import androidx.compose.ui.Alignment
+@@ -31,12 +37,20 @@ import br.com.zenith.R
+ import br.com.zenith.data.SupabaseConfig
+ import br.com.zenith.data.models.Profile
+ import br.com.zenith.ui.theme.Green
++import br.com.zenith.ui.theme.Inter
+ import br.com.zenith.ui.theme.SecondaryGreen
++import br.com.zenith.viewmodels.home.HomeNotificationItem
++import br.com.zenith.viewmodels.home.HomeNotificationType
+ import coil.compose.AsyncImage
+ import io.github.jan.supabase.storage.storage
+ 
+ @Composable
+-fun Header(pictureHash: String?, onProfileClick: () -> Unit) {
++fun Header(
++    pictureHash: String?,
++    notificationCount: Int = 0,
++    onNotificationsClick: () -> Unit,
++    onProfileClick: () -> Unit
++) {
+     Row(
+         modifier = Modifier
+             .fillMaxWidth()
+@@ -44,13 +58,38 @@ fun Header(pictureHash: String?, onProfileClick: () -> Unit) {
+         horizontalArrangement = Arrangement.SpaceBetween,
+         verticalAlignment = Alignment.CenterVertically
+     ) {
+-        Icon(
+-            imageVector = Icons.Default.Notifications,
+-            contentDescription = "Notificações",
+-            tint = Color.Black,
++        Box(
+             modifier = Modifier
+                 .size(41.dp)
+-        )
++                .clickable { onNotificationsClick() },
++            contentAlignment = Alignment.Center
++        ) {
++            Icon(
++                imageVector = Icons.Default.Notifications,
++                contentDescription = "Notificações",
++                tint = Color.Black,
++                modifier = Modifier.size(32.dp)
++            )
++            if (notificationCount > 0) {
++                Box(
++                    modifier = Modifier
++                        .align(Alignment.TopEnd)
++                        .size(18.dp)
++                        .background(Color(0xFFE53935), CircleShape)
++                        .border(2.dp, Color.White, CircleShape),
++                    contentAlignment = Alignment.Center
++                ) {
++                    Text(
++                        text = notificationCount.coerceAtMost(9).toString(),
++                        style = MaterialTheme.typography.labelSmall.copy(
++                            fontFamily = Inter,
++                            fontWeight = FontWeight.Bold,
++                            color = Color.White
++                        )
++                    )
++                }
++            }
++        }
+         Image(
+             painter = painterResource(id = R.drawable.zenith),
+             contentDescription = "Logo",
+@@ -86,6 +125,185 @@ fun Header(pictureHash: String?, onProfileClick: () -> Unit) {
+     }
+ }
+ 
++@Composable
++fun NotificationsDrawer(
++    notifications: List<HomeNotificationItem>,
++    isLoading: Boolean,
++    onNotificationClick: (HomeNotificationItem) -> Unit
++) {
++    Surface(
++        modifier = Modifier
++            .fillMaxHeight()
++            .width(318.dp),
++        color = Color.White,
++        shadowElevation = 14.dp,
++        shape = RoundedCornerShape(topEnd = 22.dp, bottomEnd = 22.dp)
++    ) {
++        Column(
++            modifier = Modifier
++                .fillMaxSize()
++                .padding(start = 18.dp, top = 28.dp, end = 16.dp, bottom = 24.dp),
++            verticalArrangement = Arrangement.spacedBy(14.dp)
++        ) {
++            Text(
++                text = "Notificações",
++                style = MaterialTheme.typography.headlineSmall.copy(
++                    fontFamily = Inter,
++                    fontWeight = FontWeight.Bold,
++                    color = Color.Black
++                )
++            )
++            Text(
++                text = "Atualizações do Zenith",
++                style = MaterialTheme.typography.bodySmall.copy(
++                    fontFamily = Inter,
++                    color = Color(0xFF667067)
++                )
++            )
++
++            if (isLoading) {
++                NotificationSkeleton()
++            } else if (notifications.isEmpty()) {
++                EmptyNotifications()
++            } else {
++                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
++                    notifications.forEach { notification ->
++                        NotificationRow(
++                            notification = notification,
++                            onClick = { onNotificationClick(notification) }
++                        )
++                    }
++                }
++            }
++        }
++    }
++}
++
++@Composable
++private fun NotificationSkeleton() {
++    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
++        repeat(4) {
++            Box(
++                modifier = Modifier
++                    .fillMaxWidth()
++                    .height(72.dp)
++                    .clip(RoundedCornerShape(18.dp))
++                    .background(Color(0xFFF1F4F1))
++            )
++        }
++    }
++}
++
++@Composable
++private fun EmptyNotifications() {
++    Column(
++        modifier = Modifier
++            .fillMaxWidth()
++            .padding(top = 36.dp),
++        horizontalAlignment = Alignment.CenterHorizontally,
++        verticalArrangement = Arrangement.spacedBy(10.dp)
++    ) {
++        Box(
++            modifier = Modifier
++                .size(52.dp)
++                .background(Color(0xFFF0F5F1), CircleShape),
++            contentAlignment = Alignment.Center
++        ) {
++            Icon(
++                imageVector = Icons.Default.NotificationsNone,
++                contentDescription = null,
++                tint = Green,
++                modifier = Modifier.size(28.dp)
++            )
++        }
++        Text(
++            text = "Nada novo por aqui",
++            style = MaterialTheme.typography.bodyMedium.copy(
++                fontFamily = Inter,
++                fontWeight = FontWeight.SemiBold,
++                color = Color.Black
++            )
++        )
++    }
++}
++
++@Composable
++private fun NotificationRow(
++    notification: HomeNotificationItem,
++    onClick: () -> Unit
++) {
++    val color = notification.type.color()
++    Row(
++        modifier = Modifier
++            .fillMaxWidth()
++            .clip(RoundedCornerShape(18.dp))
++            .background(Color(0xFFF8FAF8))
++            .border(1.dp, Color(0xFFE3EAE3), RoundedCornerShape(18.dp))
++            .clickable { onClick() }
++            .padding(12.dp),
++        horizontalArrangement = Arrangement.spacedBy(10.dp),
++        verticalAlignment = Alignment.Top
++    ) {
++        Box(
++            modifier = Modifier
++                .size(34.dp)
++                .background(color.copy(alpha = 0.14f), CircleShape),
++            contentAlignment = Alignment.Center
++        ) {
++            Icon(
++                imageVector = notification.type.icon(),
++                contentDescription = null,
++                tint = color,
++                modifier = Modifier.size(19.dp)
++            )
++        }
++        Column(
++            modifier = Modifier.weight(1f),
++            verticalArrangement = Arrangement.spacedBy(4.dp)
++        ) {
++            Text(
++                text = notification.title,
++                style = MaterialTheme.typography.bodyMedium.copy(
++                    fontFamily = Inter,
++                    fontWeight = FontWeight.Bold,
++                    color = Color.Black
++                )
++            )
++            Text(
++                text = notification.body,
++                style = MaterialTheme.typography.bodySmall.copy(
++                    fontFamily = Inter,
++                    color = Color(0xFF536057)
++                )
++            )
++            notification.actionLabel?.let {
++                Text(
++                    text = it,
++                    style = MaterialTheme.typography.labelMedium.copy(
++                        fontFamily = Inter,
++                        fontWeight = FontWeight.Bold,
++                        color = Green
++                    )
++                )
++            }
++        }
++    }
++}
++
++private fun HomeNotificationType.color(): Color = when (this) {
++    HomeNotificationType.FriendRequest -> Color(0xFF238D25)
++    HomeNotificationType.Mention -> Color(0xFF5A6EE8)
++    HomeNotificationType.Ranking -> Color(0xFFE0A500)
++    HomeNotificationType.Achievement -> Color(0xFF8B5CF6)
++}
++
++private fun HomeNotificationType.icon() = when (this) {
++    HomeNotificationType.FriendRequest -> Icons.Default.Groups
++    HomeNotificationType.Mention -> Icons.Default.Tag
++    HomeNotificationType.Ranking -> Icons.Default.MilitaryTech
++    HomeNotificationType.Achievement -> Icons.Default.EmojiEvents
++}
++
+ @Composable
+ fun WelcomeCard(user: Profile?) {
+     Row(
+diff --git a/app/src/main/java/br/com/zenith/ui/screens/activity/NewActivityScreen.kt b/app/src/main/java/br/com/zenith/ui/screens/activity/NewActivityScreen.kt
+index 2663308..19aa658 100644
+--- a/app/src/main/java/br/com/zenith/ui/screens/activity/NewActivityScreen.kt
++++ b/app/src/main/java/br/com/zenith/ui/screens/activity/NewActivityScreen.kt
+@@ -1,6 +1,5 @@
+ package br.com.zenith.ui.screens.activity
+ 
+-import android.widget.Toast
+ import androidx.compose.animation.AnimatedVisibility
+ import androidx.compose.animation.core.tween
+ import androidx.compose.animation.slideInVertically
+@@ -72,6 +71,7 @@ import androidx.navigation.NavController
+ import br.com.zenith.data.models.Desafio
+ import br.com.zenith.data.models.Exercicio
+ import br.com.zenith.ui.animations.CenteredZenithLoading
++import br.com.zenith.ui.notifications.ZenithNotifier
+ import br.com.zenith.ui.theme.Inter
+ import br.com.zenith.ui.theme.ZenithTheme
+ import br.com.zenith.ui.theme.items.ZenithTextField
+@@ -127,7 +127,7 @@ fun NewActivityScreen(navController: NavController) {
+             onIniciarDesafio = { challenge ->
+                 val exercise = exercicios.findChallengeExercise(challenge)
+                 if (exercise == null) {
+-                    Toast.makeText(context, "Exercício do desafio indisponível", Toast.LENGTH_SHORT).show()
++                    ZenithNotifier.warning("Exercício do desafio indisponível")
+                 } else {
+                     navigateStart(exercise, challenge.id)
+                 }
+diff --git a/app/src/main/java/br/com/zenith/ui/screens/app/VerifyEmailScreen.kt b/app/src/main/java/br/com/zenith/ui/screens/app/VerifyEmailScreen.kt
+index 2581829..4e2f661 100644
+--- a/app/src/main/java/br/com/zenith/ui/screens/app/VerifyEmailScreen.kt
++++ b/app/src/main/java/br/com/zenith/ui/screens/app/VerifyEmailScreen.kt
+@@ -19,7 +19,6 @@ import androidx.compose.runtime.Composable
+ import androidx.compose.ui.Alignment
+ import androidx.compose.ui.Modifier
+ import androidx.compose.ui.graphics.Color
+-import androidx.compose.ui.platform.LocalContext
+ import androidx.compose.ui.text.font.FontWeight
+ import androidx.compose.ui.text.style.TextAlign
+ import androidx.compose.ui.unit.dp
+@@ -31,19 +30,18 @@ import kotlinx.coroutines.CoroutineScope
+ import kotlinx.coroutines.Dispatchers
+ import kotlinx.coroutines.launch
+ import kotlinx.coroutines.withContext
+-import android.widget.Toast
+ import androidx.compose.runtime.getValue
+ import androidx.compose.runtime.mutableStateOf
+ import androidx.compose.runtime.remember
+ import androidx.compose.runtime.setValue
+ import br.com.zenith.data.SupabaseConfig
+ import br.com.zenith.ui.animations.ZenithLoading
++import br.com.zenith.ui.notifications.ZenithNotifier
+ import io.github.jan.supabase.auth.auth
+ 
+ @Composable
+ fun VerifyEmailScreen(navController: NavController) {
+     ZenithTheme {
+-        val context = LocalContext.current
+         var isChecking by remember { mutableStateOf(false) }
+ 
+         Box(
+@@ -109,21 +107,15 @@ fun VerifyEmailScreen(navController: NavController) {
+                                             }
+                                         } else {
+                                             isChecking = false
+-                                            Toast.makeText(
+-                                                context,
+-                                                "Email ainda não confirmado. Verifique sua caixa de entrada.",
+-                                                Toast.LENGTH_SHORT
+-                                            ).show()
++                                            ZenithNotifier.warning(
++                                                "Email ainda não confirmado. Verifique sua caixa de entrada."
++                                            )
+                                         }
+                                     }
+                                 } catch (e: Exception) {
+                                     withContext(Dispatchers.Main) {
+                                         isChecking = false
+-                                        Toast.makeText(
+-                                            context,
+-                                            "Erro ao verificar: ${e.localizedMessage}",
+-                                            Toast.LENGTH_SHORT
+-                                        ).show()
++                                        ZenithNotifier.error("Erro ao verificar: ${e.localizedMessage}")
+                                     }
+                                 }
+                             }
+diff --git a/app/src/main/java/br/com/zenith/ui/screens/home/HomeScreen.kt b/app/src/main/java/br/com/zenith/ui/screens/home/HomeScreen.kt
+index fc4446d..33329cd 100644
+--- a/app/src/main/java/br/com/zenith/ui/screens/home/HomeScreen.kt
++++ b/app/src/main/java/br/com/zenith/ui/screens/home/HomeScreen.kt
+@@ -1,6 +1,12 @@
+ package br.com.zenith.ui.screens.home
+ 
++import androidx.compose.animation.AnimatedVisibility
++import androidx.compose.animation.fadeIn
++import androidx.compose.animation.fadeOut
++import androidx.compose.animation.slideInHorizontally
++import androidx.compose.animation.slideOutHorizontally
+ import androidx.compose.foundation.background
++import androidx.compose.foundation.clickable
+ import androidx.compose.foundation.layout.Arrangement
+ import androidx.compose.foundation.layout.Box
+ import androidx.compose.foundation.layout.PaddingValues
+@@ -16,6 +22,9 @@ import androidx.compose.runtime.Composable
+ import androidx.compose.runtime.LaunchedEffect
+ import androidx.compose.runtime.collectAsState
+ import androidx.compose.runtime.getValue
++import androidx.compose.runtime.mutableStateOf
++import androidx.compose.runtime.remember
++import androidx.compose.runtime.setValue
+ import androidx.compose.ui.Alignment
+ import androidx.compose.ui.Modifier
+ import androidx.compose.ui.graphics.Color
+@@ -25,69 +34,111 @@ import androidx.lifecycle.viewmodel.compose.viewModel
+ import androidx.navigation.NavController
+ import br.com.zenith.ui.components.home.ActivitySection
+ import br.com.zenith.ui.components.home.Header
++import br.com.zenith.ui.components.home.NotificationsDrawer
+ import br.com.zenith.ui.components.home.WelcomeCard
+ import br.com.zenith.ui.theme.Green
+ import br.com.zenith.ui.theme.ZenithTheme
++import br.com.zenith.viewmodels.home.HomeNotificationsViewModel
+ import br.com.zenith.viewmodels.profile.UserViewModel
+ 
+ @Composable
+ fun HomeScreen(navController: NavController) {
+     val context = LocalContext.current
+     val userViewModel: UserViewModel = viewModel()
++    val notificationsViewModel: HomeNotificationsViewModel = viewModel()
+     val user by userViewModel.userState.collectAsState()
+     val isLoading by userViewModel.isLoading.collectAsState()
++    val notificationsState by notificationsViewModel.uiState.collectAsState()
++    var showNotifications by remember { mutableStateOf(false) }
+ 
+     LaunchedEffect(Unit) {
+         userViewModel.fetchUserProfile(context)
++        notificationsViewModel.load(context)
+     }
+ 
+     ZenithTheme {
+         Scaffold(
+             containerColor = Color.White
+         ) { padding ->
+-            LazyColumn(
++            Box(
+                 modifier = Modifier
+                     .fillMaxSize()
+                     .padding(paddingValues = padding)
+-                    .padding(horizontal = 20.dp),
+-                verticalArrangement = Arrangement.spacedBy(24.dp),
+-                contentPadding = PaddingValues(top = 19.dp, bottom = 24.dp)
+             ) {
+-                item {
+-                    if (isLoading || user == null) {
+-                        Box(
+-                            modifier = Modifier
+-                                .fillMaxWidth()
+-                                .height(40.dp),
+-                            contentAlignment = Alignment.Center
+-                        ) {
+-                            CircularProgressIndicator(color = Green, strokeWidth = 3.dp)
+-                        }
+-                    } else {
+-                        Header(
+-                            pictureHash = user?.pictureHash,
+-                            onProfileClick = {
+-                                navController.navigate("profile")
++                LazyColumn(
++                    modifier = Modifier
++                        .fillMaxSize()
++                        .padding(horizontal = 20.dp),
++                    verticalArrangement = Arrangement.spacedBy(24.dp),
++                    contentPadding = PaddingValues(top = 19.dp, bottom = 24.dp)
++                ) {
++                    item {
++                        if (isLoading || user == null) {
++                            Box(
++                                modifier = Modifier
++                                    .fillMaxWidth()
++                                    .height(40.dp),
++                                contentAlignment = Alignment.Center
++                            ) {
++                                CircularProgressIndicator(color = Green, strokeWidth = 3.dp)
+                             }
+-                        )
++                        } else {
++                            Header(
++                                pictureHash = user?.pictureHash,
++                                notificationCount = notificationsState.unreadCount,
++                                onNotificationsClick = { showNotifications = true },
++                                onProfileClick = {
++                                    navController.navigate("profile")
++                                }
++                            )
++                        }
+                     }
+-                }
+ 
+-                item {
+-                    if (isLoading || user == null) {
+-                        Box(
+-                            modifier = Modifier
+-                                .fillMaxWidth()
+-                                .height(49.dp)
+-                                .background(Color.LightGray.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
+-                        )
+-                    } else {
+-                        WelcomeCard(user = user)
++                    item {
++                        if (isLoading || user == null) {
++                            Box(
++                                modifier = Modifier
++                                    .fillMaxWidth()
++                                    .height(49.dp)
++                                    .background(Color.LightGray.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
++                            )
++                        } else {
++                            WelcomeCard(user = user)
++                        }
+                     }
++
++                    item {
++                        ActivitySection()
++                    }
++                }
++
++                AnimatedVisibility(
++                    visible = showNotifications,
++                    enter = fadeIn(),
++                    exit = fadeOut()
++                ) {
++                    Box(
++                        modifier = Modifier
++                            .fillMaxSize()
++                            .background(Color.Black.copy(alpha = 0.18f))
++                            .clickable { showNotifications = false }
++                    )
+                 }
+ 
+-                item {
+-                    ActivitySection()
++                AnimatedVisibility(
++                    visible = showNotifications,
++                    enter = slideInHorizontally(initialOffsetX = { -it }),
++                    exit = slideOutHorizontally(targetOffsetX = { -it }),
++                    modifier = Modifier.align(Alignment.CenterStart)
++                ) {
++                    NotificationsDrawer(
++                        notifications = notificationsState.notifications,
++                        isLoading = notificationsState.isLoading,
++                        onNotificationClick = { notification ->
++                            showNotifications = false
++                            notification.targetRoute?.let { navController.navigate(it) }
++                        }
++                    )
+                 }
+             }
+         }
+diff --git a/app/src/main/java/br/com/zenith/viewmodels/activity/ActivityViewModel.kt b/app/src/main/java/br/com/zenith/viewmodels/activity/ActivityViewModel.kt
+index 56e6dc7..8d7828f 100644
+--- a/app/src/main/java/br/com/zenith/viewmodels/activity/ActivityViewModel.kt
++++ b/app/src/main/java/br/com/zenith/viewmodels/activity/ActivityViewModel.kt
+@@ -2,15 +2,19 @@ package br.com.zenith.viewmodels.activity
+ 
+ import android.content.Context
+ import android.net.Uri
+-import android.widget.Toast
+ import androidx.lifecycle.ViewModel
+ import androidx.lifecycle.viewModelScope
+ import br.com.zenith.data.SupabaseConfig
+ import br.com.zenith.data.models.Atividade
+ import br.com.zenith.data.models.Exercicio
++import br.com.zenith.data.repositories.StreakRepository
++import br.com.zenith.ui.notifications.ZenithNotifier
+ import io.github.jan.supabase.auth.auth
+ import io.github.jan.supabase.postgrest.postgrest
+ import io.github.jan.supabase.postgrest.query.Columns
++import java.time.LocalDateTime
++import java.time.ZoneId
++import java.time.format.DateTimeFormatter
+ import kotlinx.coroutines.flow.MutableStateFlow
+ import kotlinx.coroutines.flow.StateFlow
+ import kotlinx.coroutines.launch
+@@ -29,6 +33,7 @@ class ActivityViewModel : ViewModel() {
+ 
+     private val _isSaving = MutableStateFlow(false)
+     val isSaving: StateFlow<Boolean> = _isSaving
++    private val streakRepository = StreakRepository()
+ 
+     fun fetchExercicios(context: Context) {
+         viewModelScope.launch {
+@@ -41,7 +46,7 @@ class ActivityViewModel : ViewModel() {
+                     .select()
+                     .decodeList<Exercicio>()
+             } catch (e: Exception) {
+-                Toast.makeText(context, "Erro ao carregar exercícios", Toast.LENGTH_SHORT).show()
++                ZenithNotifier.error("Erro ao carregar exercícios")
+             } finally {
+                 _isLoading.value = false
+             }
+@@ -63,7 +68,7 @@ class ActivityViewModel : ViewModel() {
+                     }
+                     .decodeList<Atividade>()
+             } catch (e: Exception) {
+-                Toast.makeText(context, "Erro ao carregar atividades", Toast.LENGTH_SHORT).show()
++                ZenithNotifier.error("Erro ao carregar atividades")
+             } finally {
+                 _isLoading.value = false
+             }
+@@ -99,11 +104,10 @@ class ActivityViewModel : ViewModel() {
+                 val userId = client.auth.currentUserOrNull()?.id
+                     ?: throw Exception("Usuário não autenticado")
+ 
+-                // Parse da data
+-                val formatter = java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")
+-                val localDateTime = java.time.LocalDateTime.parse(data, formatter)
++                val localDateTime = parseActivityDate(data)
+                 val realizadaEm = localDateTime
+-                    .atOffset(java.time.ZoneOffset.systemDefault().rules.getOffset(localDateTime))
++                    .atZone(ZoneId.systemDefault())
++                    .toOffsetDateTime()
+                     .toString()
+ 
+                 client.postgrest.from("atividades").insert(
+@@ -129,10 +133,18 @@ class ActivityViewModel : ViewModel() {
+                     }
+                 )
+ 
+-                Toast.makeText(context, "Atividade registrada!", Toast.LENGTH_SHORT).show()
++                val streakUpdated = runCatching {
++                    streakRepository.recordActivity(localDateTime.toLocalDate())
++                }.isSuccess
++
++                if (streakUpdated) {
++                    ZenithNotifier.success("Atividade registrada!")
++                } else {
++                    ZenithNotifier.warning("Atividade registrada, mas o streak não foi atualizado")
++                }
+                 onSucesso()
+             } catch (e: Exception) {
+-                Toast.makeText(context, "Erro: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
++                ZenithNotifier.error("Erro: ${e.localizedMessage}")
+             } finally {
+                 _isSaving.value = false
+             }
+@@ -155,10 +167,10 @@ class ActivityViewModel : ViewModel() {
+         viewModelScope.launch {
+             _isSaving.value = true
+             try {
+-                val formatter = java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")
+-                val localDateTime = java.time.LocalDateTime.parse(data, formatter)
++                val localDateTime = parseActivityDate(data)
+                 val realizadaEm = localDateTime
+-                    .atOffset(java.time.ZoneOffset.systemDefault().rules.getOffset(localDateTime))
++                    .atZone(ZoneId.systemDefault())
++                    .toOffsetDateTime()
+                     .toString()
+ 
+                 SupabaseConfig.getClient().postgrest.from("atividades").update(
+@@ -179,14 +191,23 @@ class ActivityViewModel : ViewModel() {
+                     }
+                 }
+ 
+-                Toast.makeText(context, "Atividade atualizada!", Toast.LENGTH_SHORT).show()
++                ZenithNotifier.success("Atividade atualizada!")
+                 fetchAtividades(context)
+                 onSucesso()
+             } catch (e: Exception) {
+-                Toast.makeText(context, "Erro: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
++                ZenithNotifier.error("Erro: ${e.localizedMessage}")
+             } finally {
+                 _isSaving.value = false
+             }
+         }
+     }
++
++    private fun parseActivityDate(data: String): LocalDateTime {
++        return LocalDateTime.parse(data, ACTIVITY_DATE_FORMATTER)
++    }
++
++    companion object {
++        private val ACTIVITY_DATE_FORMATTER: DateTimeFormatter =
++            DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")
++    }
+ }
+diff --git a/app/src/main/java/br/com/zenith/viewmodels/app/AuthViewModel.kt b/app/src/main/java/br/com/zenith/viewmodels/app/AuthViewModel.kt
+index c3806c2..338b6b5 100644
+--- a/app/src/main/java/br/com/zenith/viewmodels/app/AuthViewModel.kt
++++ b/app/src/main/java/br/com/zenith/viewmodels/app/AuthViewModel.kt
+@@ -2,10 +2,10 @@ package br.com.zenith.viewmodels.app
+ 
+ import android.content.Context
+ import android.net.Uri
+-import android.widget.Toast
+ import androidx.lifecycle.ViewModel
+ import androidx.lifecycle.viewModelScope
+ import br.com.zenith.data.SupabaseConfig
++import br.com.zenith.ui.notifications.ZenithNotifier
+ import io.github.jan.supabase.auth.auth
+ import io.github.jan.supabase.auth.providers.builtin.Email
+ import io.github.jan.supabase.postgrest.postgrest
+@@ -34,10 +34,10 @@ class AuthViewModel : ViewModel() {
+                     email = emailInput
+                     password = senhaInput
+                 }
+-                Toast.makeText(context, "Cadastro realizado!", Toast.LENGTH_LONG).show()
++                ZenithNotifier.success("Cadastro realizado!")
+                 onSucesso()
+             } catch (e: Exception) {
+-                Toast.makeText(context, "Erro no cadastro: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
++                ZenithNotifier.error("Erro no cadastro: ${e.localizedMessage}")
+             } finally {
+                 _isLoading.value = false
+             }
+@@ -57,10 +57,10 @@ class AuthViewModel : ViewModel() {
+                     email = emailInput
+                     password = senhaInput
+                 }
+-                Toast.makeText(context, "Login realizado com sucesso!", Toast.LENGTH_SHORT).show()
++                ZenithNotifier.success("Login realizado com sucesso!")
+                 onSucesso()
+             } catch (e: Exception) {
+-                Toast.makeText(context, "Erro no login: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
++                ZenithNotifier.error("Erro no login: ${e.localizedMessage}")
+             } finally {
+                 _isLoading.value = false
+             }
+@@ -75,10 +75,10 @@ class AuthViewModel : ViewModel() {
+             _isLoading.value = true
+             try {
+                 SupabaseConfig.getClient().auth.signOut()
+-                Toast.makeText(context, "Você saiu da conta", Toast.LENGTH_SHORT).show()
++                ZenithNotifier.info("Você saiu da conta")
+                 onSucesso()
+             } catch (e: Exception) {
+-                Toast.makeText(context, "Erro ao sair: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
++                ZenithNotifier.error("Erro ao sair: ${e.localizedMessage}")
+             } finally {
+                 _isLoading.value = false
+             }
+@@ -149,7 +149,7 @@ class AuthViewModel : ViewModel() {
+ 
+                 onSucesso()
+             } catch (e: Exception) {
+-                Toast.makeText(context, "Erro ao salvar perfil: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
++                ZenithNotifier.error("Erro ao salvar perfil: ${e.localizedMessage}")
+             } finally {
+                 _isLoading.value = false
+             }
+diff --git a/app/src/main/java/br/com/zenith/viewmodels/challenge/ChallengeViewModel.kt b/app/src/main/java/br/com/zenith/viewmodels/challenge/ChallengeViewModel.kt
+index 862c4f3..75117f9 100644
+--- a/app/src/main/java/br/com/zenith/viewmodels/challenge/ChallengeViewModel.kt
++++ b/app/src/main/java/br/com/zenith/viewmodels/challenge/ChallengeViewModel.kt
+@@ -2,7 +2,6 @@ package br.com.zenith.viewmodels.challenge
+ 
+ import android.content.Context
+ import android.net.Uri
+-import android.widget.Toast
+ import androidx.lifecycle.ViewModel
+ import androidx.lifecycle.viewModelScope
+ import br.com.zenith.data.SupabaseConfig
+@@ -15,6 +14,7 @@ import br.com.zenith.data.models.Atividade as UserActivity
+ import br.com.zenith.data.models.Desafio as Challenge
+ import br.com.zenith.data.models.DesafioParticipacao as ChallengeParticipation
+ import br.com.zenith.data.models.Profile
++import br.com.zenith.ui.notifications.ZenithNotifier
+ import br.com.zenith.utils.ImageUtils
+ import io.github.jan.supabase.auth.auth
+ import io.github.jan.supabase.postgrest.postgrest
+@@ -135,7 +135,7 @@ class ChallengeViewModel : ViewModel() {
+                 loadData(context)
+                 publishState(selectedChallengeId = _uiState.value.selectedChallengeId)
+             } catch (e: Exception) {
+-                Toast.makeText(context, "Erro ao carregar desafios: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
++                ZenithNotifier.error("Erro ao carregar desafios: ${e.localizedMessage}")
+             } finally {
+                 _isLoading.value = false
+             }
+@@ -199,12 +199,12 @@ class ChallengeViewModel : ViewModel() {
+                     }
+                 )
+ 
+-                Toast.makeText(context, "Desafio criado", Toast.LENGTH_SHORT).show()
++                ZenithNotifier.success("Desafio criado")
+                 loadData(context)
+                 publishState(selectedChallengeId = null)
+                 onSuccess()
+             } catch (e: Exception) {
+-                Toast.makeText(context, "Erro ao criar desafio: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
++                ZenithNotifier.error("Erro ao criar desafio: ${e.localizedMessage}")
+             } finally {
+                 _isSaving.value = false
+             }
+@@ -283,12 +283,12 @@ class ChallengeViewModel : ViewModel() {
+                     }
+                 )
+ 
+-                Toast.makeText(context, "Desafio criado", Toast.LENGTH_SHORT).show()
++                ZenithNotifier.success("Desafio criado")
+                 loadData(context)
+                 publishState(selectedChallengeId = challengeId)
+                 onSuccess()
+             } catch (e: Exception) {
+-                Toast.makeText(context, "Erro ao criar desafio: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
++                ZenithNotifier.error("Erro ao criar desafio: ${e.localizedMessage}")
+             } finally {
+                 _isSaving.value = false
+             }
+@@ -323,11 +323,11 @@ class ChallengeViewModel : ViewModel() {
+                     }
+                 )
+ 
+-                Toast.makeText(context, "Voce entrou no desafio", Toast.LENGTH_SHORT).show()
++                ZenithNotifier.success("Você entrou no desafio")
+                 loadData(context)
+                 publishState(selectedChallengeId = challenge.id)
+             } catch (e: Exception) {
+-                Toast.makeText(context, "Erro ao entrar no desafio: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
++                ZenithNotifier.error("Erro ao entrar no desafio: ${e.localizedMessage}")
+             } finally {
+                 _isSaving.value = false
+             }
+@@ -392,11 +392,11 @@ class ChallengeViewModel : ViewModel() {
+                     )
+                 }
+ 
+-                Toast.makeText(context, "Publicação enviada", Toast.LENGTH_SHORT).show()
++                ZenithNotifier.success("Publicação enviada")
+                 loadData(context)
+                 publishState(selectedChallengeId = challengeId)
+             } catch (e: Exception) {
+-                Toast.makeText(context, "Erro ao publicar: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
++                ZenithNotifier.error("Erro ao publicar: ${e.localizedMessage}")
+             } finally {
+                 _isSaving.value = false
+             }
+@@ -435,7 +435,7 @@ class ChallengeViewModel : ViewModel() {
+                 loadData(context)
+                 publishState(selectedChallengeId = challengeId)
+             } catch (e: Exception) {
+-                Toast.makeText(context, "Erro ao comentar: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
++                ZenithNotifier.error("Erro ao comentar: ${e.localizedMessage}")
+             } finally {
+                 _isSaving.value = false
+             }
+diff --git a/app/src/main/java/br/com/zenith/viewmodels/profile/UserViewModel.kt b/app/src/main/java/br/com/zenith/viewmodels/profile/UserViewModel.kt
+index 40d6566..8eef53e 100644
+--- a/app/src/main/java/br/com/zenith/viewmodels/profile/UserViewModel.kt
++++ b/app/src/main/java/br/com/zenith/viewmodels/profile/UserViewModel.kt
+@@ -2,7 +2,6 @@ package br.com.zenith.viewmodels.profile
+ 
+ import android.content.Context
+ import android.net.Uri
+-import android.widget.Toast
+ import androidx.lifecycle.ViewModel
+ import androidx.lifecycle.viewModelScope
+ import br.com.zenith.data.SupabaseConfig
+@@ -10,6 +9,7 @@ import br.com.zenith.data.models.Badge
+ import br.com.zenith.data.models.Profile
+ import br.com.zenith.data.models.Titulo
+ import br.com.zenith.data.models.UsuarioTitulo
++import br.com.zenith.ui.notifications.ZenithNotifier
+ import io.github.jan.supabase.auth.auth
+ import io.github.jan.supabase.postgrest.postgrest
+ import io.github.jan.supabase.postgrest.query.Columns
+@@ -124,7 +124,7 @@ class UserViewModel : ViewModel() {
+ 
+                 onSucesso()
+             } catch (e: Exception) {
+-                Toast.makeText(context, "Erro ao salvar: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
++                ZenithNotifier.error("Erro ao salvar: ${e.localizedMessage}")
+             } finally {
+                 _isSaving.value = false
+             }
+@@ -153,7 +153,7 @@ class UserViewModel : ViewModel() {
+ 
+                 _userState.value = _userState.value?.copy(status = cleanedStatus)
+             } catch (e: Exception) {
+-                Toast.makeText(context, "Erro ao salvar status: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
++                ZenithNotifier.error("Erro ao salvar status: ${e.localizedMessage}")
+             } finally {
+                 _isSaving.value = false
+             }
+@@ -308,7 +308,7 @@ class UserViewModel : ViewModel() {
+                 _userState.value = _userState.value?.copy(tituloId = tituloId)
+                 onSucesso()
+             } catch (e: Exception) {
+-                Toast.makeText(context, "Erro: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
++                ZenithNotifier.error("Erro: ${e.localizedMessage}")
+             } finally {
+                 _isSaving.value = false
+             }
+diff --git a/app/src/main/java/br/com/zenith/viewmodels/progress/ProgressViewModel.kt b/app/src/main/java/br/com/zenith/viewmodels/progress/ProgressViewModel.kt
+index 07ff7c3..25adc90 100644
+--- a/app/src/main/java/br/com/zenith/viewmodels/progress/ProgressViewModel.kt
++++ b/app/src/main/java/br/com/zenith/viewmodels/progress/ProgressViewModel.kt
+@@ -1,7 +1,6 @@
+ package br.com.zenith.viewmodels.progress
+ 
+ import android.content.Context
+-import android.widget.Toast
+ import androidx.lifecycle.ViewModel
+ import androidx.lifecycle.viewModelScope
+ import br.com.zenith.data.SupabaseConfig
+diff --git a/app/src/main/java/br/com/zenith/viewmodels/sleep/SleepRecordViewModel.kt b/app/src/main/java/br/com/zenith/viewmodels/sleep/SleepRecordViewModel.kt
+index 61355c2..77c1627 100644
+--- a/app/src/main/java/br/com/zenith/viewmodels/sleep/SleepRecordViewModel.kt
++++ b/app/src/main/java/br/com/zenith/viewmodels/sleep/SleepRecordViewModel.kt
+@@ -1,10 +1,10 @@
+ package br.com.zenith.viewmodels.sleep
+ 
+ import android.content.Context
+-import android.widget.Toast
+ import androidx.lifecycle.ViewModel
+ import androidx.lifecycle.viewModelScope
+ import br.com.zenith.data.SupabaseConfig
++import br.com.zenith.ui.notifications.ZenithNotifier
+ import io.github.jan.supabase.auth.auth
+ import io.github.jan.supabase.postgrest.postgrest
+ import java.time.LocalDate
+@@ -43,14 +43,10 @@ class SleepRecordViewModel : ViewModel() {
+                     }
+                 )
+ 
+-                Toast.makeText(context, "Sono registrado", Toast.LENGTH_SHORT).show()
++                ZenithNotifier.success("Sono registrado")
+                 onSuccess()
+             } catch (e: Exception) {
+-                Toast.makeText(
+-                    context,
+-                    "Erro ao registrar sono: ${e.localizedMessage}",
+-                    Toast.LENGTH_SHORT
+-                ).show()
++                ZenithNotifier.error("Erro ao registrar sono: ${e.localizedMessage}")
+             }
+         }
+     }
+diff --git a/app/src/main/java/br/com/zenith/viewmodels/social/SocialViewModel.kt b/app/src/main/java/br/com/zenith/viewmodels/social/SocialViewModel.kt
+index 729a547..2ea6d25 100644
+--- a/app/src/main/java/br/com/zenith/viewmodels/social/SocialViewModel.kt
++++ b/app/src/main/java/br/com/zenith/viewmodels/social/SocialViewModel.kt
+@@ -1,7 +1,6 @@
+ package br.com.zenith.viewmodels.social
+ 
+ import android.content.Context
+-import android.widget.Toast
+ import androidx.lifecycle.ViewModel
+ import androidx.lifecycle.viewModelScope
+ import br.com.zenith.data.SupabaseConfig
+@@ -10,6 +9,7 @@ import br.com.zenith.data.models.AmizadeInsert
+ import br.com.zenith.data.models.Atividade
+ import br.com.zenith.data.models.Badge
+ import br.com.zenith.data.models.Profile
++import br.com.zenith.ui.notifications.ZenithNotifier
+ import io.github.jan.supabase.auth.auth
+ import io.github.jan.supabase.postgrest.postgrest
+ import io.github.jan.supabase.postgrest.query.Columns
+@@ -78,7 +78,7 @@ class SocialViewModel : ViewModel() {
+             try {
+                 loadSocial(context)
+             } catch (e: Exception) {
+-                Toast.makeText(context, "Erro ao carregar social: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
++                ZenithNotifier.error("Erro ao carregar social: ${e.localizedMessage}")
+             } finally {
+                 _isLoading.value = false
+             }
+@@ -216,7 +216,7 @@ class SocialViewModel : ViewModel() {
+         try {
+             action()
+         } catch (e: Exception) {
+-            Toast.makeText(context, "Erro: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
++            ZenithNotifier.error("Erro: ${e.localizedMessage}")
+         } finally {
+             _isSaving.value = false
+         }
+@@ -293,7 +293,7 @@ class PublicProfileViewModel : ViewModel() {
+                     atividades = atividades
+                 )
+             } catch (e: Exception) {
+-                Toast.makeText(context, "Erro ao carregar perfil: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
++                ZenithNotifier.error("Erro ao carregar perfil: ${e.localizedMessage}")
+             } finally {
+                 _isLoading.value = false
+             }
+diff --git a/app/src/main/java/br/com/zenith/data/repositories/StreakRepository.kt b/app/src/main/java/br/com/zenith/data/repositories/StreakRepository.kt
+new file mode 100644
+index 0000000..c016b5b
+--- /dev/null
++++ b/app/src/main/java/br/com/zenith/data/repositories/StreakRepository.kt
+@@ -0,0 +1,20 @@
++package br.com.zenith.data.repositories
++
++import br.com.zenith.data.SupabaseConfig
++import io.github.jan.supabase.postgrest.postgrest
++import java.time.LocalDate
++import kotlinx.serialization.json.buildJsonObject
++import kotlinx.serialization.json.put
++
++class StreakRepository {
++    suspend fun recordActivity(activityDate: LocalDate): Int {
++        val result = SupabaseConfig.getClient().postgrest.rpc(
++            function = "record_activity_streak",
++            parameters = buildJsonObject {
++                put("p_activity_date", activityDate.toString())
++            }
++        )
++
++        return result.decodeAs<Int>()
++    }
++}
+diff --git a/app/src/main/java/br/com/zenith/ui/notifications/ZenithNotifier.kt b/app/src/main/java/br/com/zenith/ui/notifications/ZenithNotifier.kt
+new file mode 100644
+index 0000000..6fe8ec8
+--- /dev/null
++++ b/app/src/main/java/br/com/zenith/ui/notifications/ZenithNotifier.kt
+@@ -0,0 +1,43 @@
++package br.com.zenith.ui.notifications
++
++import kotlinx.coroutines.flow.MutableSharedFlow
++import kotlinx.coroutines.flow.asSharedFlow
++
++enum class ZenithNotificationType {
++    Success,
++    Error,
++    Warning,
++    Info
++}
++
++data class ZenithNotification(
++    val message: String,
++    val type: ZenithNotificationType
++)
++
++object ZenithNotifier {
++    private val _notifications = MutableSharedFlow<ZenithNotification>(
++        extraBufferCapacity = 8
++    )
++    val notifications = _notifications.asSharedFlow()
++
++    fun success(message: String) {
++        notify(message, ZenithNotificationType.Success)
++    }
++
++    fun error(message: String) {
++        notify(message, ZenithNotificationType.Error)
++    }
++
++    fun warning(message: String) {
++        notify(message, ZenithNotificationType.Warning)
++    }
++
++    fun info(message: String) {
++        notify(message, ZenithNotificationType.Info)
++    }
++
++    private fun notify(message: String, type: ZenithNotificationType) {
++        _notifications.tryEmit(ZenithNotification(message = message, type = type))
++    }
++}
+diff --git a/app/src/main/java/br/com/zenith/ui/notifications/ZenithTopNotificationHost.kt b/app/src/main/java/br/com/zenith/ui/notifications/ZenithTopNotificationHost.kt
+new file mode 100644
+index 0000000..e57a704
+--- /dev/null
++++ b/app/src/main/java/br/com/zenith/ui/notifications/ZenithTopNotificationHost.kt
+@@ -0,0 +1,172 @@
++package br.com.zenith.ui.notifications
++
++import androidx.compose.animation.AnimatedVisibility
++import androidx.compose.animation.fadeIn
++import androidx.compose.animation.fadeOut
++import androidx.compose.animation.slideInVertically
++import androidx.compose.animation.slideOutVertically
++import androidx.compose.foundation.background
++import androidx.compose.foundation.border
++import androidx.compose.foundation.layout.Arrangement
++import androidx.compose.foundation.layout.Box
++import androidx.compose.foundation.layout.Row
++import androidx.compose.foundation.layout.padding
++import androidx.compose.foundation.layout.size
++import androidx.compose.foundation.layout.statusBarsPadding
++import androidx.compose.foundation.layout.widthIn
++import androidx.compose.foundation.shape.CircleShape
++import androidx.compose.foundation.shape.RoundedCornerShape
++import androidx.compose.material.icons.Icons
++import androidx.compose.material.icons.filled.CheckCircle
++import androidx.compose.material.icons.filled.Error
++import androidx.compose.material.icons.filled.Info
++import androidx.compose.material.icons.filled.Warning
++import androidx.compose.material3.Icon
++import androidx.compose.material3.MaterialTheme
++import androidx.compose.material3.Surface
++import androidx.compose.material3.Text
++import androidx.compose.runtime.Composable
++import androidx.compose.runtime.LaunchedEffect
++import androidx.compose.runtime.getValue
++import androidx.compose.runtime.mutableStateOf
++import androidx.compose.runtime.remember
++import androidx.compose.runtime.setValue
++import androidx.compose.ui.Alignment
++import androidx.compose.ui.Modifier
++import androidx.compose.ui.graphics.Color
++import androidx.compose.ui.graphics.vector.ImageVector
++import androidx.compose.ui.text.font.FontWeight
++import androidx.compose.ui.text.style.TextOverflow
++import androidx.compose.ui.unit.dp
++import androidx.compose.ui.zIndex
++import br.com.zenith.ui.theme.Inter
++import kotlinx.coroutines.delay
++import kotlinx.coroutines.flow.collectLatest
++
++@Composable
++fun ZenithTopNotificationHost(
++    modifier: Modifier = Modifier
++) {
++    var currentNotification by remember { mutableStateOf<ZenithNotification?>(null) }
++    var visible by remember { mutableStateOf(false) }
++
++    LaunchedEffect(Unit) {
++        ZenithNotifier.notifications.collectLatest { notification ->
++            currentNotification = notification
++            visible = true
++            delay(2600)
++            visible = false
++            delay(240)
++            if (currentNotification == notification) {
++                currentNotification = null
++            }
++        }
++    }
++
++    Box(
++        modifier = modifier
++            .zIndex(20f)
++            .statusBarsPadding()
++            .padding(top = 10.dp),
++        contentAlignment = Alignment.TopCenter
++    ) {
++        AnimatedVisibility(
++            visible = visible && currentNotification != null,
++            enter = slideInVertically(initialOffsetY = { -it }) + fadeIn(),
++            exit = slideOutVertically(targetOffsetY = { -it }) + fadeOut()
++        ) {
++            currentNotification?.let { notification ->
++                ZenithTopNotification(notification = notification)
++            }
++        }
++    }
++}
++
++@Composable
++private fun ZenithTopNotification(notification: ZenithNotification) {
++    val colors = notification.type.colors()
++    Surface(
++        color = colors.background,
++        shape = RoundedCornerShape(50),
++        shadowElevation = 10.dp,
++        modifier = Modifier
++            .widthIn(max = 340.dp)
++            .border(1.dp, colors.border, RoundedCornerShape(50))
++    ) {
++        Row(
++            modifier = Modifier.padding(start = 10.dp, top = 8.dp, end = 14.dp, bottom = 8.dp),
++            horizontalArrangement = Arrangement.spacedBy(9.dp),
++            verticalAlignment = Alignment.CenterVertically
++        ) {
++            Box(
++                modifier = Modifier
++                    .size(24.dp)
++                    .background(colors.iconBackground, CircleShape),
++                contentAlignment = Alignment.Center
++            ) {
++                Icon(
++                    imageVector = notification.type.icon(),
++                    contentDescription = null,
++                    tint = colors.icon,
++                    modifier = Modifier.size(16.dp)
++                )
++            }
++            Text(
++                text = notification.message,
++                maxLines = 2,
++                overflow = TextOverflow.Ellipsis,
++                style = MaterialTheme.typography.bodySmall.copy(
++                    fontFamily = Inter,
++                    fontWeight = FontWeight.SemiBold,
++                    color = colors.text
++                )
++            )
++        }
++    }
++}
++
++private data class NotificationColors(
++    val background: Color,
++    val border: Color,
++    val iconBackground: Color,
++    val icon: Color,
++    val text: Color
++)
++
++private fun ZenithNotificationType.colors(): NotificationColors = when (this) {
++    ZenithNotificationType.Success -> NotificationColors(
++        background = Color(0xFFF4FFF5),
++        border = Color(0xFFB8E7BC),
++        iconBackground = Color(0xFF238D25),
++        icon = Color.White,
++        text = Color(0xFF124D17)
++    )
++    ZenithNotificationType.Error -> NotificationColors(
++        background = Color(0xFFFFF5F5),
++        border = Color(0xFFFFC7C7),
++        iconBackground = Color(0xFFD64545),
++        icon = Color.White,
++        text = Color(0xFF7A1F1F)
++    )
++    ZenithNotificationType.Warning -> NotificationColors(
++        background = Color(0xFFFFFBEC),
++        border = Color(0xFFF2D78A),
++        iconBackground = Color(0xFFE0A500),
++        icon = Color.White,
++        text = Color(0xFF6B4B00)
++    )
++    ZenithNotificationType.Info -> NotificationColors(
++        background = Color(0xFFF7FAF8),
++        border = Color(0xFFD8E2DA),
++        iconBackground = Color(0xFF4F6653),
++        icon = Color.White,
++        text = Color(0xFF223126)
++    )
++}
++
++private fun ZenithNotificationType.icon(): ImageVector = when (this) {
++    ZenithNotificationType.Success -> Icons.Default.CheckCircle
++    ZenithNotificationType.Error -> Icons.Default.Error
++    ZenithNotificationType.Warning -> Icons.Default.Warning
++    ZenithNotificationType.Info -> Icons.Default.Info
++}
+diff --git a/app/src/main/java/br/com/zenith/viewmodels/home/HomeNotificationsViewModel.kt b/app/src/main/java/br/com/zenith/viewmodels/home/HomeNotificationsViewModel.kt
+new file mode 100644
+index 0000000..abc53d2
+--- /dev/null
++++ b/app/src/main/java/br/com/zenith/viewmodels/home/HomeNotificationsViewModel.kt
+@@ -0,0 +1,208 @@
++package br.com.zenith.viewmodels.home
++
++import android.content.Context
++import androidx.lifecycle.ViewModel
++import androidx.lifecycle.viewModelScope
++import br.com.zenith.data.SupabaseConfig
++import br.com.zenith.data.models.Amizade
++import br.com.zenith.data.models.Atividade
++import br.com.zenith.data.models.Desafio
++import br.com.zenith.data.models.DesafioParticipacao
++import br.com.zenith.data.models.Profile
++import br.com.zenith.ui.notifications.ZenithNotifier
++import io.github.jan.supabase.auth.auth
++import io.github.jan.supabase.postgrest.postgrest
++import io.github.jan.supabase.postgrest.query.Count
++import java.time.OffsetDateTime
++import kotlinx.coroutines.flow.MutableStateFlow
++import kotlinx.coroutines.flow.StateFlow
++import kotlinx.coroutines.flow.asStateFlow
++import kotlinx.coroutines.launch
++
++enum class HomeNotificationType {
++    FriendRequest,
++    Mention,
++    Ranking,
++    Achievement
++}
++
++data class HomeNotificationItem(
++    val id: String,
++    val type: HomeNotificationType,
++    val title: String,
++    val body: String,
++    val actionLabel: String? = null,
++    val targetRoute: String? = null
++)
++
++data class HomeNotificationsUiState(
++    val isLoading: Boolean = false,
++    val notifications: List<HomeNotificationItem> = emptyList()
++) {
++    val unreadCount: Int get() = notifications.size
++}
++
++class HomeNotificationsViewModel : ViewModel() {
++    private val _uiState = MutableStateFlow(HomeNotificationsUiState())
++    val uiState: StateFlow<HomeNotificationsUiState> = _uiState.asStateFlow()
++
++    fun load(context: Context) {
++        viewModelScope.launch {
++            _uiState.value = _uiState.value.copy(isLoading = true)
++            try {
++                SupabaseConfig.init(context)
++                val client = SupabaseConfig.getClient()
++                val userId = client.auth.currentUserOrNull()?.id
++                    ?: throw Exception("Usuário não autenticado")
++
++                val profiles = client.postgrest.from("profiles")
++                    .select()
++                    .decodeList<Profile>()
++
++                val friendships = client.postgrest.from("amizades")
++                    .select()
++                    .decodeList<Amizade>()
++
++                val friendRequests = buildFriendRequests(
++                    userId = userId,
++                    profiles = profiles,
++                    friendships = friendships
++                )
++
++                val rankingNotifications = buildRankingNotifications(userId = userId)
++                val achievementsNotification = buildAchievementsNotification(userId = userId)
++
++                _uiState.value = HomeNotificationsUiState(
++                    notifications = friendRequests + rankingNotifications + listOfNotNull(achievementsNotification)
++                )
++            } catch (e: Exception) {
++                ZenithNotifier.error("Erro ao carregar notificações: ${e.localizedMessage}")
++                _uiState.value = _uiState.value.copy(isLoading = false)
++            }
++        }
++    }
++
++    private fun buildFriendRequests(
++        userId: String,
++        profiles: List<Profile>,
++        friendships: List<Amizade>
++    ): List<HomeNotificationItem> {
++        return friendships
++            .filter { it.friendId == userId && it.status == "pendente" }
++            .map { request ->
++                val profile = profiles.firstOrNull { it.id == request.userId }
++                val name = profile?.displayName?.takeIf { it.isNotBlank() }
++                    ?: profile?.name
++                    ?: "Alguém"
++                HomeNotificationItem(
++                    id = "friend-${request.userId}",
++                    type = HomeNotificationType.FriendRequest,
++                    title = "Solicitação de amizade",
++                    body = "$name quer se conectar com você.",
++                    actionLabel = "Ver social",
++                    targetRoute = "social"
++                )
++            }
++    }
++
++    private suspend fun buildRankingNotifications(userId: String): List<HomeNotificationItem> {
++        val client = SupabaseConfig.getClient()
++        val now = OffsetDateTime.now()
++        val challenges = client.postgrest.from("desafios")
++            .select()
++            .decodeList<Desafio>()
++        val participations = client.postgrest.from("desafio_participacoes")
++            .select()
++            .decodeList<DesafioParticipacao>()
++        val activities = client.postgrest.from("atividades")
++            .select()
++            .decodeList<Atividade>()
++
++        val challengeIds = participations
++            .filter { it.userId == userId }
++            .map { it.desafioId }
++            .toSet()
++
++        return challenges
++            .filter { it.id in challengeIds }
++            .filter { challenge ->
++                challenge.fimEm
++                    ?.let { runCatching { OffsetDateTime.parse(it) }.getOrNull() }
++                    ?.isBefore(now) == true
++            }
++            .mapNotNull { challenge ->
++                val entries = rankingEntries(challenge, activities)
++                val position = entries.indexOfFirst { it.userId == userId }.takeIf { it >= 0 }?.plus(1)
++                    ?: return@mapNotNull null
++                HomeNotificationItem(
++                    id = "ranking-${challenge.id}",
++                    type = HomeNotificationType.Ranking,
++                    title = "Ranking final publicado",
++                    body = "Você ficou em ${position}º no desafio ${challenge.titulo}.",
++                    actionLabel = "Ver desafio",
++                    targetRoute = "challenge"
++                )
++            }
++            .take(3)
++    }
++
++    private suspend fun buildAchievementsNotification(userId: String): HomeNotificationItem? {
++        val count = SupabaseConfig.getClient().postgrest.from("conquistas")
++            .select {
++                filter { eq("user_id", userId) }
++                count(Count.EXACT)
++            }
++            .countOrNull()
++            ?.toInt() ?: 0
++
++        if (count <= 0) return null
++        return HomeNotificationItem(
++            id = "achievements-summary",
++            type = HomeNotificationType.Achievement,
++            title = "Conquistas",
++            body = "Você já desbloqueou $count conquista${if (count == 1) "" else "s"}.",
++            actionLabel = "Ver perfil",
++            targetRoute = "profile"
++        )
++    }
++
++    private fun rankingEntries(
++        challenge: Desafio,
++        activities: List<Atividade>
++    ): List<RankingEntry> {
++        return activities
++            .filter { it.desafioId == challenge.id }
++            .filter { it.gpsQualidade != "ruim" }
++            .filter { it.verificada || challenge.aceitaRegistroManual }
++            .groupBy { it.userId }
++            .mapNotNull { (userId, userActivities) ->
++                val score = rankingScore(challenge, userActivities) ?: return@mapNotNull null
++                RankingEntry(userId = userId, score = score)
++            }
++            .sortedWith(
++                if (challenge.rankingTipo == "menor_tempo" || challenge.rankingTipo == "menor_pace") {
++                    compareBy<RankingEntry> { it.score }
++                } else {
++                    compareByDescending { it.score }
++                }
++            )
++    }
++
++    private fun rankingScore(challenge: Desafio, activities: List<Atividade>): Double? {
++        return when (challenge.rankingTipo) {
++            "menor_tempo" -> activities.mapNotNull { it.duracaoMin?.toDouble() }.minOrNull()
++            "menor_pace" -> activities.mapNotNull { activity ->
++                val duration = activity.duracaoMin ?: return@mapNotNull null
++                duration / activity.valor.coerceAtLeast(0.01)
++            }.minOrNull()
++            "maior_distancia" -> activities.maxOfOrNull { it.valor }
++            "tempo_total" -> activities.sumOf { it.duracaoMin ?: 0 }.toDouble().takeIf { it > 0.0 }
++            else -> activities.sumOf { it.valor }.takeIf { it > 0.0 }
++        }
++    }
++
++    private data class RankingEntry(
++        val userId: String,
++        val score: Double
++    )
++}
+diff --git a/supabase/migrations/20260609120000_add_activity_streaks.sql b/supabase/migrations/20260609120000_add_activity_streaks.sql
+new file mode 100644
+index 0000000..8310379
+--- /dev/null
++++ b/supabase/migrations/20260609120000_add_activity_streaks.sql
+@@ -0,0 +1,50 @@
++alter table public.profiles
++    add column if not exists last_streak_activity_date date;
++
++create or replace function public.record_activity_streak(p_activity_date date)
++returns integer
++language plpgsql
++set search_path = public
++as $$
++declare
++    current_user_id uuid := auth.uid();
++    previous_date date;
++    next_streak integer;
++begin
++    if current_user_id is null then
++        raise exception 'Usuário não autenticado';
++    end if;
++
++    if p_activity_date is null then
++        raise exception 'Data da atividade inválida';
++    end if;
++
++    select last_streak_activity_date
++    into previous_date
++    from public.profiles
++    where id = current_user_id
++    for update;
++
++    if previous_date is not null and p_activity_date <= previous_date then
++        select streak
++        into next_streak
++        from public.profiles
++        where id = current_user_id;
++
++        return coalesce(next_streak, 0);
++    end if;
++
++    update public.profiles
++    set streak = case
++            when previous_date is not null and p_activity_date = previous_date + 1 then coalesce(streak, 0) + 1
++            else 1
++        end,
++        last_streak_activity_date = p_activity_date
++    where id = current_user_id
++    returning streak into next_streak;
++
++    return coalesce(next_streak, 0);
++end;
++$$;
++
++grant execute on function public.record_activity_streak(date) to authenticated;
+diff --git a/supabase/reset_activity_progress.sql b/supabase/reset_activity_progress.sql
+new file mode 100644
+index 0000000..15b9ca2
+--- /dev/null
++++ b/supabase/reset_activity_progress.sql
+@@ -0,0 +1,24 @@
++-- Manual reset for activity/progress data.
++-- Run intentionally in SQL Editor/psql only when you want to clear progress data.
++
++begin;
++
++delete from public.feed_comments
++where entry_id in (
++    select id
++    from public.feed_entries
++    where activity_id is not null
++);
++
++delete from public.feed_entries
++where activity_id is not null;
++
++delete from public.desafio_participacoes;
++delete from public.atividades;
++delete from public.sleep_records;
++
++update public.profiles
++set streak = 0,
++    last_streak_activity_date = null;
++
++commit;

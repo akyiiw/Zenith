@@ -17,6 +17,7 @@ data class Profile(
     @SerialName("accountStatus") val accountStatus: Boolean = true,
     val email: String,
     val streak: Int = 0,
+    @SerialName("last_streak_activity_date") val lastStreakActivityDate: String? = null,
     val status: String? = null,
     @SerialName("titulo_id") val tituloId: String? = null,
     @SerialName("titulos") val titulo: Titulo? = null,

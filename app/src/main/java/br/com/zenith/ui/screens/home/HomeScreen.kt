@@ -1,6 +1,12 @@
 package br.com.zenith.ui.screens.home
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -16,6 +22,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -25,69 +34,111 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import br.com.zenith.ui.components.home.ActivitySection
 import br.com.zenith.ui.components.home.Header
+import br.com.zenith.ui.components.home.NotificationsDrawer
 import br.com.zenith.ui.components.home.WelcomeCard
 import br.com.zenith.ui.theme.Green
 import br.com.zenith.ui.theme.ZenithTheme
+import br.com.zenith.viewmodels.home.HomeNotificationsViewModel
 import br.com.zenith.viewmodels.profile.UserViewModel
 
 @Composable
 fun HomeScreen(navController: NavController) {
     val context = LocalContext.current
     val userViewModel: UserViewModel = viewModel()
+    val notificationsViewModel: HomeNotificationsViewModel = viewModel()
     val user by userViewModel.userState.collectAsState()
     val isLoading by userViewModel.isLoading.collectAsState()
+    val notificationsState by notificationsViewModel.uiState.collectAsState()
+    var showNotifications by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         userViewModel.fetchUserProfile(context)
+        notificationsViewModel.load(context)
     }
 
     ZenithTheme {
         Scaffold(
             containerColor = Color.White
         ) { padding ->
-            LazyColumn(
+            Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues = padding)
-                    .padding(horizontal = 20.dp),
-                verticalArrangement = Arrangement.spacedBy(24.dp),
-                contentPadding = PaddingValues(top = 19.dp, bottom = 24.dp)
             ) {
-                item {
-                    if (isLoading || user == null) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(40.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            CircularProgressIndicator(color = Green, strokeWidth = 3.dp)
-                        }
-                    } else {
-                        Header(
-                            pictureHash = user?.pictureHash,
-                            onProfileClick = {
-                                navController.navigate("profile")
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 20.dp),
+                    verticalArrangement = Arrangement.spacedBy(24.dp),
+                    contentPadding = PaddingValues(top = 19.dp, bottom = 24.dp)
+                ) {
+                    item {
+                        if (isLoading || user == null) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(40.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                CircularProgressIndicator(color = Green, strokeWidth = 3.dp)
                             }
-                        )
+                        } else {
+                            Header(
+                                pictureHash = user?.pictureHash,
+                                notificationCount = notificationsState.unreadCount,
+                                onNotificationsClick = { showNotifications = true },
+                                onProfileClick = {
+                                    navController.navigate("profile")
+                                }
+                            )
+                        }
+                    }
+
+                    item {
+                        if (isLoading || user == null) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(49.dp)
+                                    .background(Color.LightGray.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
+                            )
+                        } else {
+                            WelcomeCard(user = user)
+                        }
+                    }
+
+                    item {
+                        ActivitySection()
                     }
                 }
 
-                item {
-                    if (isLoading || user == null) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(49.dp)
-                                .background(Color.LightGray.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
-                        )
-                    } else {
-                        WelcomeCard(user = user)
-                    }
+                AnimatedVisibility(
+                    visible = showNotifications,
+                    enter = fadeIn(),
+                    exit = fadeOut()
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.Black.copy(alpha = 0.18f))
+                            .clickable { showNotifications = false }
+                    )
                 }
 
-                item {
-                    ActivitySection()
+                AnimatedVisibility(
+                    visible = showNotifications,
+                    enter = slideInHorizontally(initialOffsetX = { -it }),
+                    exit = slideOutHorizontally(targetOffsetX = { -it }),
+                    modifier = Modifier.align(Alignment.CenterStart)
+                ) {
+                    NotificationsDrawer(
+                        notifications = notificationsState.notifications,
+                        isLoading = notificationsState.isLoading,
+                        onNotificationClick = { notification ->
+                            showNotifications = false
+                            notification.targetRoute?.let { navController.navigate(it) }
+                        }
+                    )
                 }
             }
         }

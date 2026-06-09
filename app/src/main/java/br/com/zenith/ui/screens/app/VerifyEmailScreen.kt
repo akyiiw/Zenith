@@ -19,7 +19,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -31,19 +30,18 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import android.widget.Toast
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import br.com.zenith.data.SupabaseConfig
 import br.com.zenith.ui.animations.ZenithLoading
+import br.com.zenith.ui.notifications.ZenithNotifier
 import io.github.jan.supabase.auth.auth
 
 @Composable
 fun VerifyEmailScreen(navController: NavController) {
     ZenithTheme {
-        val context = LocalContext.current
         var isChecking by remember { mutableStateOf(false) }
 
         Box(
@@ -109,21 +107,15 @@ fun VerifyEmailScreen(navController: NavController) {
                                             }
                                         } else {
                                             isChecking = false
-                                            Toast.makeText(
-                                                context,
-                                                "Email ainda não confirmado. Verifique sua caixa de entrada.",
-                                                Toast.LENGTH_SHORT
-                                            ).show()
+                                            ZenithNotifier.warning(
+                                                "Email ainda não confirmado. Verifique sua caixa de entrada."
+                                            )
                                         }
                                     }
                                 } catch (e: Exception) {
                                     withContext(Dispatchers.Main) {
                                         isChecking = false
-                                        Toast.makeText(
-                                            context,
-                                            "Erro ao verificar: ${e.localizedMessage}",
-                                            Toast.LENGTH_SHORT
-                                        ).show()
+                                        ZenithNotifier.error("Erro ao verificar: ${e.localizedMessage}")
                                     }
                                 }
                             }

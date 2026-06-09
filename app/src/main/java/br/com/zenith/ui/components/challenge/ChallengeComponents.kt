@@ -73,6 +73,7 @@ import br.com.zenith.data.models.Desafio as Challenge
 import br.com.zenith.data.models.Profile
 import br.com.zenith.ui.animations.CenteredZenithLoading
 import br.com.zenith.ui.animations.ZenithLoading
+import br.com.zenith.ui.components.common.ScreenHeader
 import br.com.zenith.ui.theme.Green
 import br.com.zenith.ui.theme.Inter
 import br.com.zenith.ui.theme.TextFieldGreen
@@ -99,7 +100,7 @@ fun ChallengeContent(
     onCreateForumComment: (String, String, String) -> Unit,
     onOpenProfile: (Profile) -> Unit
 ) {
-    var selectedTab by remember { mutableStateOf(ChallengeTab.Explorar) }
+    var selectedTab by remember { mutableStateOf(ChallengeTab.Ativos) }
     val selectedChallengeDetails = uiState.selectedChallengeDetails
     var selectedDetailTab by remember(selectedChallengeDetails?.challenge?.id) {
         mutableStateOf(ChallengeDetailTab.Participantes)
@@ -123,11 +124,17 @@ fun ChallengeContent(
                 .padding(padding)
                 .statusBarsPadding()
                 .padding(horizontal = 20.dp),
-            contentPadding = PaddingValues(bottom = 112.dp),
+            contentPadding = PaddingValues(top = 19.dp, bottom = 104.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             if (selectedChallengeDetails == null) {
-                item { ChallengesHeader(onCreateClick = onCreateClick) }
+                item {
+                    ScreenHeader(
+                        title = "Desafios",
+                        icon = Icons.Default.EmojiEvents
+                    )
+                }
+                item { CreateChallengeAction(onCreateClick = onCreateClick) }
                 item {
                     ChallengeTabs(
                         selectedTab = selectedTab,
@@ -249,8 +256,8 @@ fun ChallengeContent(
 }
 
 private enum class ChallengeTab(val label: String) {
-    Explorar("Explorar"),
-    Ativos("Ativos")
+    Ativos("Ativos"),
+    Explorar("Explorar")
 }
 
 private enum class ChallengeDetailTab(val label: String) {
@@ -327,28 +334,12 @@ private fun ChallengeDetailTabs(
 }
 
 @Composable
-private fun ChallengesHeader(onCreateClick: () -> Unit) {
+private fun CreateChallengeAction(onCreateClick: () -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
+        horizontalArrangement = Arrangement.End,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Column {
-            Text(
-                text = "Desafios",
-                style = MaterialTheme.typography.titleLarge.copy(
-                    fontFamily = Inter,
-                    fontWeight = FontWeight.Bold
-                )
-            )
-            Text(
-                text = "Abra um desafio para ver participantes e progresso",
-                style = MaterialTheme.typography.bodyMedium.copy(
-                    fontFamily = Inter,
-                    color = Color(0xFF6F6C6C)
-                )
-            )
-        }
         Button(
             onClick = onCreateClick,
             colors = ButtonDefaults.buttonColors(containerColor = Green),
@@ -359,6 +350,14 @@ private fun ChallengesHeader(onCreateClick: () -> Unit) {
                 Icons.Default.Add,
                 contentDescription = "Criar desafio",
                 modifier = Modifier.size(20.dp)
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                text = "Criar desafio",
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    fontFamily = Inter,
+                    fontWeight = FontWeight.Bold
+                )
             )
         }
     }

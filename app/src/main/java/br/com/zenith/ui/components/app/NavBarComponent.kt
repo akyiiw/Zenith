@@ -1,6 +1,9 @@
 package br.com.zenith.ui.components.app
 
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -38,51 +41,59 @@ fun CustomBottomNavigationBar(navController: NavController) {
     val currentRoute = navBackStackEntry?.destination?.route
     val selectedRoute = items.firstOrNull { it.route == currentRoute }?.route
 
-    NavigationBar(
-        modifier = Modifier,
-        containerColor = Color.White,
-        tonalElevation = 8.dp
-    ) {
-        items.forEach { item ->
-            val isSelected = selectedRoute == item.route
-            val isHomeAndSelected = item.route == "home" && isSelected
+    Column(modifier = Modifier.fillMaxWidth()) {
+        HorizontalDivider(
+            modifier = Modifier.fillMaxWidth(),
+            thickness = 1.dp,
+            color = Color.LightGray
+        )
+        NavigationBar(
+            modifier = Modifier.fillMaxWidth(),
+            containerColor = Color.White,
+            tonalElevation = 8.dp
+        ) {
+            items.forEach { item ->
+                val isSelected = selectedRoute == item.route
+                val isHomeAndSelected = item.route == "home" && isSelected
 
-            NavigationBarItem(
-                selected = isSelected,
-                onClick = {
-                    if (isHomeAndSelected) {
-                        navController.navigate("new_activity")
-                    } else {
-                        navController.navigate(item.route) {
-                            popUpTo("home") { inclusive = false }
-                            launchSingleTop = true
-                        }
-                    }
-                },
-                icon = {
-                    Icon(
-                        painter = painterResource(
-                            id = if (isHomeAndSelected) {
-                                R.drawable.nav_add_activity
-                            } else {
-                                item.iconRes
-                            }
-                        ),
-                        contentDescription = if (isHomeAndSelected) {
-                            "Nova Atividade"
+                NavigationBarItem(
+                    selected = isSelected,
+                    onClick = {
+                        if (isHomeAndSelected) {
+                            navController.navigate("new_activity")
                         } else {
-                            item.contentDescription
-                        },
-                        modifier = Modifier.size(if (isSelected) 26.dp else 22.dp)
-                    )
-                },
-                colors = NavigationBarItemDefaults.colors(
-                    selectedIconColor = Green,
-                    unselectedIconColor = Color.Gray,
-                    indicatorColor = SecondaryGreen.copy(alpha = 0.3f)
-                ),
-                alwaysShowLabel = false
-            )
+                            val shouldReloadSelectedTab = isSelected && item.route != "home"
+                            navController.navigate(item.route) {
+                                popUpTo("home") { inclusive = item.route == "home" }
+                                launchSingleTop = !shouldReloadSelectedTab
+                            }
+                        }
+                    },
+                    icon = {
+                        Icon(
+                            painter = painterResource(
+                                id = if (isHomeAndSelected) {
+                                    R.drawable.nav_add_activity
+                                } else {
+                                    item.iconRes
+                                }
+                            ),
+                            contentDescription = if (isHomeAndSelected) {
+                                "Nova Atividade"
+                            } else {
+                                item.contentDescription
+                            },
+                            modifier = Modifier.size(if (isSelected) 26.dp else 22.dp)
+                        )
+                    },
+                    colors = NavigationBarItemDefaults.colors(
+                        selectedIconColor = Green,
+                        unselectedIconColor = Color.Gray,
+                        indicatorColor = SecondaryGreen.copy(alpha = 0.3f)
+                    ),
+                    alwaysShowLabel = false
+                )
+            }
         }
     }
 }

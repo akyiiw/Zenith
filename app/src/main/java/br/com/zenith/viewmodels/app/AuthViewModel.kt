@@ -2,10 +2,10 @@ package br.com.zenith.viewmodels.app
 
 import android.content.Context
 import android.net.Uri
-import android.widget.Toast
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import br.com.zenith.data.SupabaseConfig
+import br.com.zenith.ui.notifications.ZenithNotifier
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.providers.builtin.Email
 import io.github.jan.supabase.postgrest.postgrest
@@ -34,10 +34,10 @@ class AuthViewModel : ViewModel() {
                     email = emailInput
                     password = senhaInput
                 }
-                Toast.makeText(context, "Cadastro realizado!", Toast.LENGTH_LONG).show()
+                ZenithNotifier.success("Cadastro realizado!")
                 onSucesso()
             } catch (e: Exception) {
-                Toast.makeText(context, "Erro no cadastro: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+                ZenithNotifier.error("Erro no cadastro: ${e.localizedMessage}")
             } finally {
                 _isLoading.value = false
             }
@@ -57,10 +57,10 @@ class AuthViewModel : ViewModel() {
                     email = emailInput
                     password = senhaInput
                 }
-                Toast.makeText(context, "Login realizado com sucesso!", Toast.LENGTH_SHORT).show()
+                ZenithNotifier.success("Login realizado com sucesso!")
                 onSucesso()
             } catch (e: Exception) {
-                Toast.makeText(context, "Erro no login: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+                ZenithNotifier.error("Erro no login: ${e.localizedMessage}")
             } finally {
                 _isLoading.value = false
             }
@@ -75,10 +75,10 @@ class AuthViewModel : ViewModel() {
             _isLoading.value = true
             try {
                 SupabaseConfig.getClient().auth.signOut()
-                Toast.makeText(context, "Você saiu da conta", Toast.LENGTH_SHORT).show()
+                ZenithNotifier.info("Você saiu da conta")
                 onSucesso()
             } catch (e: Exception) {
-                Toast.makeText(context, "Erro ao sair: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+                ZenithNotifier.error("Erro ao sair: ${e.localizedMessage}")
             } finally {
                 _isLoading.value = false
             }
@@ -149,7 +149,7 @@ class AuthViewModel : ViewModel() {
 
                 onSucesso()
             } catch (e: Exception) {
-                Toast.makeText(context, "Erro ao salvar perfil: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+                ZenithNotifier.error("Erro ao salvar perfil: ${e.localizedMessage}")
             } finally {
                 _isLoading.value = false
             }

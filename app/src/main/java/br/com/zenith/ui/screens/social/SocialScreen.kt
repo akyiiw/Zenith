@@ -1,20 +1,28 @@
 package br.com.zenith.ui.screens.social
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -29,8 +37,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import br.com.zenith.data.models.ActivityMention
 import br.com.zenith.data.models.Profile
 import br.com.zenith.ui.animations.CenteredZenithLoading
+import br.com.zenith.ui.components.common.ScreenHeader
 import br.com.zenith.ui.components.social.SocialEmptyState
 import br.com.zenith.ui.components.social.SocialSectionTitle
 import br.com.zenith.ui.components.social.SocialUserRow
@@ -62,6 +72,10 @@ fun SocialScreen(navController: NavController) {
             onAccept = { viewModel.aceitarConvite(it.id, context) },
             onReject = { viewModel.recusarConvite(it.id, context) },
             onRemove = { viewModel.removerAmizade(it.id, context) },
+            onAcceptMention = { mention, showOnProfile ->
+                viewModel.aceitarMencao(mention.id, showOnProfile, context)
+            },
+            onRejectMention = { viewModel.recusarMencao(it.id, context) },
             onOpenProfile = { navController.navigate("user_profile/${it.id}") },
             navController = navController
         )
@@ -79,6 +93,8 @@ private fun SocialContent(
     onAccept: (Profile) -> Unit,
     onReject: (Profile) -> Unit,
     onRemove: (Profile) -> Unit,
+    onAcceptMention: (ActivityMention, Boolean) -> Unit,
+    onRejectMention: (ActivityMention) -> Unit,
     onOpenProfile: (Profile) -> Unit,
     navController: NavController
 ) {
@@ -117,16 +133,13 @@ private fun SocialContent(
                 .padding(padding)
                 .statusBarsPadding()
                 .padding(horizontal = 20.dp),
-            contentPadding = PaddingValues(top = 19.dp, bottom = 24.dp),
+            contentPadding = PaddingValues(top = 19.dp, bottom = 104.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             item {
-                Text(
-                    text = "Social",
-                    style = MaterialTheme.typography.titleLarge.copy(
-                        fontFamily = Inter,
-                        fontWeight = FontWeight.Bold
-                    )
+                ScreenHeader(
+                    title = "Social",
+                    icon = Icons.Default.Groups
                 )
             }
 
@@ -164,6 +177,19 @@ private fun SocialContent(
                             onRemove = { onRemove(profile) }
                         )
                     }
+                }
+            }
+
+            if (uiState.pendingMentions.isNotEmpty()) {
+                item { SocialSectionTitle("Menções em atividades") }
+                items(uiState.pendingMentions, key = { "mention-${it.id}" }) { mention ->
+                    ActivityMentionRequestCard(
+                        mention = mention,
+                        isSaving = isSaving,
+                        onAcceptVisible = { onAcceptMention(mention, true) },
+                        onAcceptHidden = { onAcceptMention(mention, false) },
+                        onReject = { onRejectMention(mention) }
+                    )
                 }
             }
 
@@ -220,6 +246,75 @@ private fun SocialContent(
                         onRemove = { onRemove(profile) }
                     )
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ActivityMentionRequestCard(
+    mention: ActivityMention,
+    isSaving: Boolean,
+    onAcceptVisible: () -> Unit,
+    onAcceptHidden: () -> Unit,
+    onReject: () -> Unit
+) {
+    val publisherName = mention.publisher?.displayName?.takeIf { it.isNotBlank() }
+        ?: mention.publisher?.name
+        ?: "Um amigo"
+    val activityName = mention.activity?.titulo?.takeIf { it.isNotBlank() }
+        ?: mention.activity?.exercicio?.nome
+        ?: "uma atividade"
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color(0xFFF8FAF8), RoundedCornerShape(8.dp))
+            .border(1.dp, Color(0xFFE3EAE3), RoundedCornerShape(8.dp))
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text(
+            text = "$publisherName mencionou você",
+            style = MaterialTheme.typography.bodyMedium.copy(
+                fontFamily = Inter,
+                fontWeight = FontWeight.Bold,
+                color = Color.Black
+            )
+        )
+        Text(
+            text = "Atividade: $activityName",
+            style = MaterialTheme.typography.bodySmall.copy(
+                fontFamily = Inter,
+                color = Color(0xFF536057)
+            )
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Button(
+                onClick = onAcceptVisible,
+                enabled = !isSaving,
+                modifier = Modifier.weight(1f),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF238D25)),
+                shape = RoundedCornerShape(8.dp),
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
+            ) {
+                Text("Mostrar", color = Color.White, fontFamily = Inter)
+            }
+            TextButton(
+                onClick = onAcceptHidden,
+                enabled = !isSaving,
+                modifier = Modifier.weight(1f)
+            ) {
+                Text("Ocultar", color = Color(0xFF238D25), fontFamily = Inter)
+            }
+            TextButton(
+                onClick = onReject,
+                enabled = !isSaving
+            ) {
+                Text("Recusar", color = Color(0xFFD32F2F), fontFamily = Inter)
             }
         }
     }

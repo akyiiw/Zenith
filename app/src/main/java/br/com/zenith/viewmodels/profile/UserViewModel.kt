@@ -2,7 +2,6 @@ package br.com.zenith.viewmodels.profile
 
 import android.content.Context
 import android.net.Uri
-import android.widget.Toast
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import br.com.zenith.data.SupabaseConfig
@@ -10,6 +9,7 @@ import br.com.zenith.data.models.Badge
 import br.com.zenith.data.models.Profile
 import br.com.zenith.data.models.Titulo
 import br.com.zenith.data.models.UsuarioTitulo
+import br.com.zenith.ui.notifications.ZenithNotifier
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Columns
@@ -124,7 +124,7 @@ class UserViewModel : ViewModel() {
 
                 onSucesso()
             } catch (e: Exception) {
-                Toast.makeText(context, "Erro ao salvar: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+                ZenithNotifier.error("Erro ao salvar: ${e.localizedMessage}")
             } finally {
                 _isSaving.value = false
             }
@@ -153,7 +153,7 @@ class UserViewModel : ViewModel() {
 
                 _userState.value = _userState.value?.copy(status = cleanedStatus)
             } catch (e: Exception) {
-                Toast.makeText(context, "Erro ao salvar status: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+                ZenithNotifier.error("Erro ao salvar status: ${e.localizedMessage}")
             } finally {
                 _isSaving.value = false
             }
@@ -308,7 +308,7 @@ class UserViewModel : ViewModel() {
                 _userState.value = _userState.value?.copy(tituloId = tituloId)
                 onSucesso()
             } catch (e: Exception) {
-                Toast.makeText(context, "Erro: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+                ZenithNotifier.error("Erro: ${e.localizedMessage}")
             } finally {
                 _isSaving.value = false
             }

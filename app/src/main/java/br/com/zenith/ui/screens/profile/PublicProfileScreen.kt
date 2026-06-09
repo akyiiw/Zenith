@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import br.com.zenith.ui.animations.CenteredZenithLoading
+import br.com.zenith.ui.components.profile.AboutSection
 import br.com.zenith.ui.components.profile.ProfileHeader
 import br.com.zenith.ui.components.profile.RecentActivitySection
 import br.com.zenith.ui.components.profile.RecentHeader
@@ -85,6 +86,11 @@ fun PublicProfileScreen(
                             stats = uiState.stats,
                             badge = uiState.badge,
                             onBack = { navController.popBackStack() }
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        AboutSection(
+                            aboutMe = uiState.profile?.aboutMe,
+                            isOwnProfile = false
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         RecentHeader()

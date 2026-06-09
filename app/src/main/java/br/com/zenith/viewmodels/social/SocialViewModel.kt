@@ -1,15 +1,16 @@
 package br.com.zenith.viewmodels.social
 
 import android.content.Context
-import android.widget.Toast
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import br.com.zenith.data.SupabaseConfig
+import br.com.zenith.data.models.ActivityMention
 import br.com.zenith.data.models.Amizade
 import br.com.zenith.data.models.AmizadeInsert
 import br.com.zenith.data.models.Atividade
 import br.com.zenith.data.models.Badge
 import br.com.zenith.data.models.Profile
+import br.com.zenith.ui.notifications.ZenithNotifier
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Columns
@@ -23,7 +24,8 @@ import kotlinx.serialization.json.put
 data class SocialUiState(
     val currentUserId: String = "",
     val profiles: List<Profile> = emptyList(),
-    val friendships: List<Amizade> = emptyList()
+    val friendships: List<Amizade> = emptyList(),
+    val pendingMentions: List<ActivityMention> = emptyList()
 ) {
     fun friendshipWith(profileId: String): Amizade? {
         return friendships.firstOrNull {
@@ -78,7 +80,7 @@ class SocialViewModel : ViewModel() {
             try {
                 loadSocial(context)
             } catch (e: Exception) {
-                Toast.makeText(context, "Erro ao carregar social: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+                ZenithNotifier.error("Erro ao carregar social: ${e.localizedMessage}")
             } finally {
                 _isLoading.value = false
             }
@@ -157,6 +159,39 @@ class SocialViewModel : ViewModel() {
         }
     }
 
+    fun aceitarMencao(mentionId: String, showOnMyProfile: Boolean, context: Context) {
+        viewModelScope.launch {
+            runSaving(context) {
+                SupabaseConfig.getClient().postgrest.from("activity_mentions").update(
+                    buildJsonObject {
+                        put("status", ActivityMention.STATUS_ACCEPTED)
+                        put("show_on_mentioned_profile", showOnMyProfile)
+                        put("responded_at", java.time.OffsetDateTime.now().toString())
+                    }
+                ) {
+                    filter { eq("id", mentionId) }
+                }
+                loadSocial(context)
+            }
+        }
+    }
+
+    fun recusarMencao(mentionId: String, context: Context) {
+        viewModelScope.launch {
+            runSaving(context) {
+                SupabaseConfig.getClient().postgrest.from("activity_mentions").update(
+                    buildJsonObject {
+                        put("status", ActivityMention.STATUS_DECLINED)
+                        put("responded_at", java.time.OffsetDateTime.now().toString())
+                    }
+                ) {
+                    filter { eq("id", mentionId) }
+                }
+                loadSocial(context)
+            }
+        }
+    }
+
     private suspend fun loadSocial(context: Context) {
         SupabaseConfig.init(context)
         val client = SupabaseConfig.getClient()
@@ -173,10 +208,22 @@ class SocialViewModel : ViewModel() {
             .decodeList<Amizade>()
             .filter { it.userId == currentUserId || it.friendId == currentUserId }
 
+        val pendingMentions = runCatching {
+            client.postgrest.from("activity_mentions")
+                .select(columns = Columns.raw("*, atividades(*, exercicios(*)), publisher:profiles!activity_mentions_publisher_id_fkey(*)")) {
+                    filter {
+                        eq("mentioned_user_id", currentUserId)
+                        eq("status", ActivityMention.STATUS_PENDING)
+                    }
+                }
+                .decodeList<ActivityMention>()
+        }.getOrDefault(emptyList())
+
         _uiState.value = SocialUiState(
             currentUserId = currentUserId,
             profiles = profiles,
-            friendships = friendships
+            friendships = friendships,
+            pendingMentions = pendingMentions
         )
     }
 
@@ -216,7 +263,7 @@ class SocialViewModel : ViewModel() {
         try {
             action()
         } catch (e: Exception) {
-            Toast.makeText(context, "Erro: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+            ZenithNotifier.error("Erro: ${e.localizedMessage}")
         } finally {
             _isSaving.value = false
         }
@@ -259,11 +306,22 @@ class PublicProfileViewModel : ViewModel() {
                 }
 
                 val atividades = runCatching {
-                    client.postgrest.from("atividades")
+                    val ownActivities = client.postgrest.from("atividades")
                         .select(columns = Columns.raw("*, exercicios(*)")) {
                             filter { eq("user_id", userId) }
                         }
                         .decodeList<Atividade>()
+                    val mentionedActivities = client.postgrest.from("activity_mentions")
+                        .select(columns = Columns.raw("*, atividades(*, exercicios(*))")) {
+                            filter {
+                                eq("mentioned_user_id", userId)
+                                eq("status", ActivityMention.STATUS_ACCEPTED)
+                                eq("show_on_mentioned_profile", true)
+                            }
+                        }
+                        .decodeList<ActivityMention>()
+                        .mapNotNull { it.activity }
+                    (ownActivities + mentionedActivities).distinctBy { it.id }
                 }.getOrDefault(emptyList())
 
                 val friendships = runCatching {
@@ -293,7 +351,7 @@ class PublicProfileViewModel : ViewModel() {
                     atividades = atividades
                 )
             } catch (e: Exception) {
-                Toast.makeText(context, "Erro ao carregar perfil: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+                ZenithNotifier.error("Erro ao carregar perfil: ${e.localizedMessage}")
             } finally {
                 _isLoading.value = false
             }

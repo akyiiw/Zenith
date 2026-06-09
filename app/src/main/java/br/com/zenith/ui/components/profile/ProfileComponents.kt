@@ -240,6 +240,47 @@ fun RecentHeader() {
     }
 }
 
+@Composable
+fun AboutSection(
+    aboutMe: String?,
+    isOwnProfile: Boolean,
+    onEdit: () -> Unit = {}
+) {
+    val text = aboutMe?.trim().orEmpty()
+    if (text.isBlank() && !isOwnProfile) return
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 32.dp, vertical = 6.dp)
+            .background(color = Color(0xFFF5F5F5), shape = RoundedCornerShape(size = 5.dp))
+            .border(width = 1.dp, color = Color(0xFFE0E0E0), shape = RoundedCornerShape(size = 5.dp))
+            .then(
+                if (text.isBlank()) {
+                    Modifier.clickable { onEdit() }
+                } else {
+                    Modifier
+                }
+            )
+            .padding(horizontal = 14.dp, vertical = 12.dp)
+    ) {
+        Text(
+            text = "Sobre",
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.W600,
+            color = Color(0xFF000000)
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = text.ifBlank { "Adicione uma bio ao seu perfil" },
+            style = MaterialTheme.typography.bodyMedium.copy(
+                fontFamily = Inter,
+                color = if (text.isBlank()) Color(0xFF6F6C6C) else Color(0xFF2A2A2A)
+            )
+        )
+    }
+}
+
 fun tempoRelativo(dataIso: String?): String {
     return try {
         val atividadeTime = java.time.OffsetDateTime.parse(dataIso)

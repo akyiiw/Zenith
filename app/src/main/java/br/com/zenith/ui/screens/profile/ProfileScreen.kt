@@ -29,6 +29,7 @@ import androidx.navigation.NavController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import br.com.zenith.ui.animations.CenteredZenithLoading
 import br.com.zenith.ui.theme.ZenithTheme
+import br.com.zenith.ui.components.profile.AboutSection
 import br.com.zenith.ui.components.profile.ProfileHeader
 import br.com.zenith.ui.components.profile.RecentActivitySection
 import br.com.zenith.ui.components.profile.RecentHeader
@@ -100,6 +101,12 @@ fun ProfileScreen(
                                 statusText = user?.status.orEmpty()
                                 showStatusDialog = true
                             }
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        AboutSection(
+                            aboutMe = user?.aboutMe,
+                            isOwnProfile = true,
+                            onEdit = { navController.navigate("edit_profile") }
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         RecentHeader()

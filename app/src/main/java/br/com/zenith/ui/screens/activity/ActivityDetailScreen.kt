@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import br.com.zenith.data.SupabaseConfig
 import br.com.zenith.data.models.Atividade
 import br.com.zenith.data.models.Exercicio
 import br.com.zenith.ui.animations.CenteredZenithLoading
@@ -45,6 +46,7 @@ import com.google.maps.android.compose.GoogleMap
 import com.google.maps.android.compose.MapUiSettings
 import com.google.maps.android.compose.Polyline
 import com.google.maps.android.compose.rememberCameraPositionState
+import io.github.jan.supabase.auth.auth
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -73,13 +75,17 @@ fun ActivityDetailScreen(navController: NavController, atividadeId: String?) {
 
     var editando by remember(atividade.id) { mutableStateOf(false) }
     val desafio = atividade.desafioId?.let { desafios[it] }
+    val currentUserId = SupabaseConfig.getClient().auth.currentUserOrNull()?.id
+    val canEditActivity = atividade.userId == currentUserId &&
+        !atividade.verificada &&
+        atividade.desafioId == null
 
     LaunchedEffect(editando) {
         if (editando && exercicios.isEmpty()) viewModel.fetchExercicios(context)
     }
 
     ZenithTheme {
-        if (editando && !atividade.verificada && atividade.desafioId == null) {
+        if (editando && canEditActivity) {
             EditActivityScreenContent(
                 atividade = atividade,
                 exercicios = exercicios,
@@ -138,7 +144,7 @@ fun ActivityDetailScreen(navController: NavController, atividadeId: String?) {
                                     .weight(1f)
                                     .padding(start = 8.dp)
                             )
-                            if (!atividade.verificada && atividade.desafioId == null) {
+                            if (canEditActivity) {
                                 IconButton(onClick = { editando = true }) {
                                     Icon(
                                         Icons.Default.Edit,

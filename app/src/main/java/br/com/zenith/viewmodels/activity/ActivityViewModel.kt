@@ -2,16 +2,24 @@ package br.com.zenith.viewmodels.activity
 
 import android.content.Context
 import android.net.Uri
-import android.widget.Toast
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import br.com.zenith.data.SupabaseConfig
+import br.com.zenith.data.models.ActivityMention
+import br.com.zenith.data.models.ActivityMentionInsert
+import br.com.zenith.data.models.Amizade
 import br.com.zenith.data.models.Atividade
 import br.com.zenith.data.models.Desafio
 import br.com.zenith.data.models.Exercicio
+import br.com.zenith.data.models.Profile
+import br.com.zenith.data.repositories.StreakRepository
+import br.com.zenith.ui.notifications.ZenithNotifier
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Columns
+import java.time.LocalDateTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -26,12 +34,15 @@ class ActivityViewModel : ViewModel() {
     val desafios: StateFlow<Map<String, Desafio>> = _desafios
     private val _exercicios = MutableStateFlow<List<Exercicio>>(emptyList())
     val exercicios: StateFlow<List<Exercicio>> = _exercicios
+    private val _mentionFriends = MutableStateFlow<List<Profile>>(emptyList())
+    val mentionFriends: StateFlow<List<Profile>> = _mentionFriends
 
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading
 
     private val _isSaving = MutableStateFlow(false)
     val isSaving: StateFlow<Boolean> = _isSaving
+    private val streakRepository = StreakRepository()
 
     fun fetchExercicios(context: Context) {
         viewModelScope.launch {
@@ -44,9 +55,40 @@ class ActivityViewModel : ViewModel() {
                     .select()
                     .decodeList<Exercicio>()
             } catch (e: Exception) {
-                Toast.makeText(context, "Erro ao carregar exercícios", Toast.LENGTH_SHORT).show()
+                ZenithNotifier.error("Erro ao carregar exercícios")
             } finally {
                 _isLoading.value = false
+            }
+        }
+    }
+
+    fun fetchMentionFriends(context: Context) {
+        viewModelScope.launch {
+            try {
+                SupabaseConfig.init(context)
+                val client = SupabaseConfig.getClient()
+                val currentUserId = client.auth.currentUserOrNull()?.id ?: return@launch
+                val friendships = client.postgrest.from("amizades")
+                    .select()
+                    .decodeList<Amizade>()
+                    .filter {
+                        it.status == "aceito" &&
+                            (it.userId == currentUserId || it.friendId == currentUserId)
+                    }
+                val friendIds = friendships
+                    .map { if (it.userId == currentUserId) it.friendId else it.userId }
+                    .toSet()
+                _mentionFriends.value = if (friendIds.isEmpty()) {
+                    emptyList()
+                } else {
+                    client.postgrest.from("profiles")
+                        .select()
+                        .decodeList<Profile>()
+                        .filter { it.id in friendIds }
+                        .sortedBy { it.displayName.lowercase() }
+                }
+            } catch (_: Exception) {
+                _mentionFriends.value = emptyList()
             }
         }
     }
@@ -65,9 +107,23 @@ class ActivityViewModel : ViewModel() {
                         }
                     }
                     .decodeList<Atividade>()
-                _atividades.value = atividades
+                val mentionedActivities = runCatching {
+                    client.postgrest.from("activity_mentions")
+                        .select(columns = Columns.raw("*, atividades(*, exercicios(*))")) {
+                            filter {
+                                eq("mentioned_user_id", client.auth.currentUserOrNull()?.id ?: "")
+                                eq("status", ActivityMention.STATUS_ACCEPTED)
+                                eq("show_on_mentioned_profile", true)
+                            }
+                        }
+                        .decodeList<ActivityMention>()
+                        .mapNotNull { it.activity }
+                }.getOrDefault(emptyList())
+                val allActivities = (atividades + mentionedActivities)
+                    .distinctBy { it.id }
+                _atividades.value = allActivities
 
-                val linkedChallengeIds = atividades.mapNotNull { it.desafioId }.toSet()
+                val linkedChallengeIds = allActivities.mapNotNull { it.desafioId }.toSet()
                 _desafios.value = if (linkedChallengeIds.isEmpty()) {
                     emptyMap()
                 } else {
@@ -81,7 +137,7 @@ class ActivityViewModel : ViewModel() {
                     }.getOrDefault(emptyMap())
                 }
             } catch (e: Exception) {
-                Toast.makeText(context, "Erro ao carregar atividades", Toast.LENGTH_SHORT).show()
+                ZenithNotifier.error("Erro ao carregar atividades")
             } finally {
                 _isLoading.value = false
             }
@@ -107,6 +163,7 @@ class ActivityViewModel : ViewModel() {
         gpsPontosAceitos: Int? = null,
         gpsPontosRejeitados: Int? = null,
         gpsQualidade: String? = null,
+        mentionedFriendIds: List<String> = emptyList(),
         context: Context,
         onSucesso: () -> Unit
     ) {
@@ -117,14 +174,13 @@ class ActivityViewModel : ViewModel() {
                 val userId = client.auth.currentUserOrNull()?.id
                     ?: throw Exception("Usuário não autenticado")
 
-                // Parse da data
-                val formatter = java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")
-                val localDateTime = java.time.LocalDateTime.parse(data, formatter)
+                val localDateTime = parseActivityDate(data)
                 val realizadaEm = localDateTime
-                    .atOffset(java.time.ZoneOffset.systemDefault().rules.getOffset(localDateTime))
+                    .atZone(ZoneId.systemDefault())
+                    .toOffsetDateTime()
                     .toString()
 
-                client.postgrest.from("atividades").insert(
+                val atividade = client.postgrest.from("atividades").insert(
                     buildJsonObject {
                         put("user_id", userId)
                         put("exercicio_id", exercicioId)
@@ -145,12 +201,32 @@ class ActivityViewModel : ViewModel() {
                         gpsPontosRejeitados?.let { put("gps_pontos_rejeitados", it) }
                         gpsQualidade?.let { put("gps_qualidade", it) }
                     }
-                )
+                ) {
+                    select()
+                }.decodeSingle<Atividade>()
 
-                Toast.makeText(context, "Atividade registrada!", Toast.LENGTH_SHORT).show()
+                mentionedFriendIds.distinct().filter { it != userId }.forEach { friendId ->
+                    client.postgrest.from("activity_mentions").insert(
+                        ActivityMentionInsert(
+                            activityId = atividade.id,
+                            publisherId = userId,
+                            mentionedUserId = friendId
+                        )
+                    )
+                }
+
+                val streakUpdated = runCatching {
+                    streakRepository.recordActivity(localDateTime.toLocalDate())
+                }.isSuccess
+
+                if (streakUpdated) {
+                    ZenithNotifier.success("Atividade registrada!")
+                } else {
+                    ZenithNotifier.warning("Atividade registrada, mas o streak não foi atualizado")
+                }
                 onSucesso()
             } catch (e: Exception) {
-                Toast.makeText(context, "Erro: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+                ZenithNotifier.error("Erro: ${e.localizedMessage}")
             } finally {
                 _isSaving.value = false
             }
@@ -173,10 +249,10 @@ class ActivityViewModel : ViewModel() {
         viewModelScope.launch {
             _isSaving.value = true
             try {
-                val formatter = java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")
-                val localDateTime = java.time.LocalDateTime.parse(data, formatter)
+                val localDateTime = parseActivityDate(data)
                 val realizadaEm = localDateTime
-                    .atOffset(java.time.ZoneOffset.systemDefault().rules.getOffset(localDateTime))
+                    .atZone(ZoneId.systemDefault())
+                    .toOffsetDateTime()
                     .toString()
 
                 SupabaseConfig.getClient().postgrest.from("atividades").update(
@@ -197,14 +273,23 @@ class ActivityViewModel : ViewModel() {
                     }
                 }
 
-                Toast.makeText(context, "Atividade atualizada!", Toast.LENGTH_SHORT).show()
+                ZenithNotifier.success("Atividade atualizada!")
                 fetchAtividades(context)
                 onSucesso()
             } catch (e: Exception) {
-                Toast.makeText(context, "Erro: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+                ZenithNotifier.error("Erro: ${e.localizedMessage}")
             } finally {
                 _isSaving.value = false
             }
         }
+    }
+
+    private fun parseActivityDate(data: String): LocalDateTime {
+        return LocalDateTime.parse(data, ACTIVITY_DATE_FORMATTER)
+    }
+
+    companion object {
+        private val ACTIVITY_DATE_FORMATTER: DateTimeFormatter =
+            DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")
     }
 }

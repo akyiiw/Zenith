@@ -1,10 +1,10 @@
 package br.com.zenith.viewmodels.sleep
 
 import android.content.Context
-import android.widget.Toast
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import br.com.zenith.data.SupabaseConfig
+import br.com.zenith.ui.notifications.ZenithNotifier
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.postgrest.postgrest
 import java.time.LocalDate
@@ -43,14 +43,10 @@ class SleepRecordViewModel : ViewModel() {
                     }
                 )
 
-                Toast.makeText(context, "Sono registrado", Toast.LENGTH_SHORT).show()
+                ZenithNotifier.success("Sono registrado")
                 onSuccess()
             } catch (e: Exception) {
-                Toast.makeText(
-                    context,
-                    "Erro ao registrar sono: ${e.localizedMessage}",
-                    Toast.LENGTH_SHORT
-                ).show()
+                ZenithNotifier.error("Erro ao registrar sono: ${e.localizedMessage}")
             }
         }
     }

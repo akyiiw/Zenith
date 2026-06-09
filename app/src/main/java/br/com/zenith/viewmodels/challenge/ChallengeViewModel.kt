@@ -2,7 +2,6 @@ package br.com.zenith.viewmodels.challenge
 
 import android.content.Context
 import android.net.Uri
-import android.widget.Toast
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import br.com.zenith.data.SupabaseConfig
@@ -15,6 +14,7 @@ import br.com.zenith.data.models.Atividade as UserActivity
 import br.com.zenith.data.models.Desafio as Challenge
 import br.com.zenith.data.models.DesafioParticipacao as ChallengeParticipation
 import br.com.zenith.data.models.Profile
+import br.com.zenith.ui.notifications.ZenithNotifier
 import br.com.zenith.utils.ImageUtils
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.postgrest.postgrest
@@ -135,7 +135,7 @@ class ChallengeViewModel : ViewModel() {
                 loadData(context)
                 publishState(selectedChallengeId = _uiState.value.selectedChallengeId)
             } catch (e: Exception) {
-                Toast.makeText(context, "Erro ao carregar desafios: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+                ZenithNotifier.error("Erro ao carregar desafios: ${e.localizedMessage}")
             } finally {
                 _isLoading.value = false
             }
@@ -199,12 +199,12 @@ class ChallengeViewModel : ViewModel() {
                     }
                 )
 
-                Toast.makeText(context, "Desafio criado", Toast.LENGTH_SHORT).show()
+                ZenithNotifier.success("Desafio criado")
                 loadData(context)
                 publishState(selectedChallengeId = null)
                 onSuccess()
             } catch (e: Exception) {
-                Toast.makeText(context, "Erro ao criar desafio: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+                ZenithNotifier.error("Erro ao criar desafio: ${e.localizedMessage}")
             } finally {
                 _isSaving.value = false
             }
@@ -283,12 +283,12 @@ class ChallengeViewModel : ViewModel() {
                     }
                 )
 
-                Toast.makeText(context, "Desafio criado", Toast.LENGTH_SHORT).show()
+                ZenithNotifier.success("Desafio criado")
                 loadData(context)
                 publishState(selectedChallengeId = challengeId)
                 onSuccess()
             } catch (e: Exception) {
-                Toast.makeText(context, "Erro ao criar desafio: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+                ZenithNotifier.error("Erro ao criar desafio: ${e.localizedMessage}")
             } finally {
                 _isSaving.value = false
             }
@@ -323,11 +323,11 @@ class ChallengeViewModel : ViewModel() {
                     }
                 )
 
-                Toast.makeText(context, "Voce entrou no desafio", Toast.LENGTH_SHORT).show()
+                ZenithNotifier.success("Você entrou no desafio")
                 loadData(context)
                 publishState(selectedChallengeId = challenge.id)
             } catch (e: Exception) {
-                Toast.makeText(context, "Erro ao entrar no desafio: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+                ZenithNotifier.error("Erro ao entrar no desafio: ${e.localizedMessage}")
             } finally {
                 _isSaving.value = false
             }
@@ -392,11 +392,11 @@ class ChallengeViewModel : ViewModel() {
                     )
                 }
 
-                Toast.makeText(context, "Publicação enviada", Toast.LENGTH_SHORT).show()
+                ZenithNotifier.success("Publicação enviada")
                 loadData(context)
                 publishState(selectedChallengeId = challengeId)
             } catch (e: Exception) {
-                Toast.makeText(context, "Erro ao publicar: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+                ZenithNotifier.error("Erro ao publicar: ${e.localizedMessage}")
             } finally {
                 _isSaving.value = false
             }
@@ -435,7 +435,7 @@ class ChallengeViewModel : ViewModel() {
                 loadData(context)
                 publishState(selectedChallengeId = challengeId)
             } catch (e: Exception) {
-                Toast.makeText(context, "Erro ao comentar: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+                ZenithNotifier.error("Erro ao comentar: ${e.localizedMessage}")
             } finally {
                 _isSaving.value = false
             }

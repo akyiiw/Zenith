@@ -22,6 +22,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -34,6 +35,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import br.com.zenith.data.TrackingResultHolder
 import br.com.zenith.data.models.Exercicio
+import br.com.zenith.data.models.Profile
 import br.com.zenith.ui.animations.CenteredZenithLoading
 import br.com.zenith.ui.animations.ZenithLoading
 import br.com.zenith.ui.theme.Inter
@@ -57,13 +59,18 @@ fun RegisterActivityScreen(
         val viewModel: ActivityViewModel = viewModel()
         val context = LocalContext.current
         val exercicios by viewModel.exercicios.collectAsState()
+        val mentionFriends by viewModel.mentionFriends.collectAsState()
         val isLoading by viewModel.isLoading.collectAsState()
         val isSaving by viewModel.isSaving.collectAsState()
 
-        LaunchedEffect(Unit) { viewModel.fetchExercicios(context) }
+        LaunchedEffect(Unit) {
+            viewModel.fetchExercicios(context)
+            viewModel.fetchMentionFriends(context)
+        }
 
         RegisterActivityContent(
             exercicios = exercicios,
+            mentionFriends = mentionFriends,
             isLoading = isLoading,
             isSaving = isSaving,
             exercicioPreSelecionadoId = exercicioId,
@@ -72,7 +79,7 @@ fun RegisterActivityScreen(
             duracaoPreenchida = duracaoMin,
             verificada = verificada,
             desafioId = desafioId,
-            onSave = { eid, nome, unidade, valor, dur, titulo, data, nota, intensidade, humor, fotoUri, submitDesafioId ->
+            onSave = { eid, nome, unidade, valor, dur, titulo, data, nota, intensidade, humor, fotoUri, submitDesafioId, mentionedFriendIds ->
                 viewModel.registrarAtividade(
                     exercicioId = eid,
                     valor = valor,
@@ -92,6 +99,7 @@ fun RegisterActivityScreen(
                     gpsPontosAceitos = TrackingResultHolder.result?.acceptedGpsPoints,
                     gpsPontosRejeitados = TrackingResultHolder.result?.rejectedGpsPoints,
                     gpsQualidade = TrackingResultHolder.result?.gpsQuality,
+                    mentionedFriendIds = mentionedFriendIds,
                     context = context
                 ) {
                     TrackingResultHolder.result = null
@@ -120,14 +128,16 @@ private fun StartedActivityReviewContent(
     trackingResult: br.com.zenith.viewmodels.activity.ActiveActivityViewModel.TrackingResult,
     duracaoMin: Int,
     desafioId: String?,
+    mentionFriends: List<Profile>,
     isSaving: Boolean,
     onBack: () -> Unit,
-    onSave: (String, String, String, Double, Int?, String?, String, Int?, String?, String?, Uri?, String?) -> Unit
+    onSave: (String, String, String, Double, Int?, String?, String, Int?, String?, String?, Uri?, String?, List<String>) -> Unit
 ) {
     var titulo by remember { mutableStateOf("") }
     var nota by remember { mutableStateOf<Float?>(null) }
     var intensidade by remember { mutableStateOf<String?>(null) }
     var humor by remember { mutableStateOf<String?>(null) }
+    var mentionedFriendIds by remember { mutableStateOf<Set<String>>(emptySet()) }
     var showSubmitDialog by remember { mutableStateOf(false) }
 
     val valor = remember(exercicioUnidade, trackingResult) {
@@ -155,7 +165,8 @@ private fun StartedActivityReviewContent(
             intensidade,
             humor,
             null,
-            submitDesafioId
+            submitDesafioId,
+            mentionedFriendIds.toList()
         )
     }
 
@@ -290,6 +301,20 @@ private fun StartedActivityReviewContent(
                         onSelected = { humor = it }
                     )
                 }
+
+                item {
+                    FriendMentionSelector(
+                        friends = mentionFriends,
+                        selectedIds = mentionedFriendIds,
+                        onToggle = { friendId ->
+                            mentionedFriendIds = if (friendId in mentionedFriendIds) {
+                                mentionedFriendIds - friendId
+                            } else {
+                                mentionedFriendIds + friendId
+                            }
+                        }
+                    )
+                }
             }
         }
 
@@ -397,6 +422,7 @@ private fun LockedReviewRow(label: String, value: String) {
 @Composable
 fun RegisterActivityContent(
     exercicios: List<Exercicio>,
+    mentionFriends: List<Profile> = emptyList(),
     isLoading: Boolean,
     isSaving: Boolean,
     exercicioPreSelecionadoId: String = "",
@@ -405,7 +431,7 @@ fun RegisterActivityContent(
     duracaoPreenchida: Int = 0,
     verificada: Boolean = false,
     desafioId: String? = null,
-    onSave: (String, String, String, Double, Int?, String?, String, Int?, String?, String?, Uri?, String?) -> Unit,
+    onSave: (String, String, String, Double, Int?, String?, String, Int?, String?, String?, Uri?, String?, List<String>) -> Unit,
     onBack: () -> Unit
 ) {
     val temPreSelecionado = exercicioPreSelecionadoId.isNotBlank()
@@ -461,6 +487,7 @@ fun RegisterActivityContent(
     var nota by remember { mutableStateOf<Float?>(null) }
     var intensidade by remember { mutableStateOf<String?>(null) }
     var humor by remember { mutableStateOf<String?>(null) }
+    var mentionedFriendIds by remember { mutableStateOf<Set<String>>(emptySet()) }
     var pendingSave by remember { mutableStateOf<(() -> Unit)?>(null) }
 
     val filtrados = remember(query, exercicios) {
@@ -476,6 +503,7 @@ fun RegisterActivityContent(
             trackingResult = trackingResult,
             duracaoMin = duracaoPreenchida.coerceAtLeast(1),
             desafioId = desafioId,
+            mentionFriends = mentionFriends,
             isSaving = isSaving,
             onBack = onBack,
             onSave = onSave
@@ -783,6 +811,20 @@ fun RegisterActivityContent(
                         )
                     }
 
+                    item {
+                        FriendMentionSelector(
+                            friends = mentionFriends,
+                            selectedIds = mentionedFriendIds,
+                            onToggle = { friendId ->
+                                mentionedFriendIds = if (friendId in mentionedFriendIds) {
+                                    mentionedFriendIds - friendId
+                                } else {
+                                    mentionedFriendIds + friendId
+                                }
+                            }
+                        )
+                    }
+
                     item { Spacer(modifier = Modifier.height(80.dp)) }
                 }
             }
@@ -826,7 +868,8 @@ fun RegisterActivityContent(
                                     intensidade,
                                     humor,
                                     null,
-                                    submitDesafioId
+                                    submitDesafioId,
+                                    mentionedFriendIds.toList()
                                 )
                             }
                             if (desafioId.isNullOrBlank()) {
@@ -898,7 +941,8 @@ fun RegisterActivityContent(
                                     intensidade,
                                     humor,
                                     null,
-                                    null
+                                    null,
+                                    mentionedFriendIds.toList()
                                 )
                             },
                             modifier = Modifier.weight(1f)
@@ -907,9 +951,9 @@ fun RegisterActivityContent(
                         }
                         Button(
                             onClick = {
-                                val action = pendingSave
-                                pendingSave = null
-                                action?.invoke()
+                            val action = pendingSave
+                            pendingSave = null
+                            action?.invoke()
                             },
                             modifier = Modifier.weight(1f),
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF238D25))
@@ -918,6 +962,73 @@ fun RegisterActivityContent(
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun FriendMentionSelector(
+    friends: List<Profile>,
+    selectedIds: Set<String>,
+    onToggle: (String) -> Unit
+) {
+    if (friends.isEmpty()) return
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            text = "Mencionar amigo (opcional)",
+            style = MaterialTheme.typography.bodyMedium.copy(
+                fontFamily = Inter,
+                color = Color.Gray
+            )
+        )
+        Text(
+            text = "O amigo precisará aceitar antes da atividade aparecer no perfil dele.",
+            style = MaterialTheme.typography.bodySmall.copy(
+                fontFamily = Inter,
+                color = Color(0xFF6F6C6C)
+            )
+        )
+        friends.forEach { friend ->
+            val selected = friend.id in selectedIds
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(if (selected) Color(0xFFEAF3DE) else Color(0xFFF7F7F7))
+                    .border(
+                        width = 1.dp,
+                        color = if (selected) Color(0xFF238D25) else Color(0xFFE0E0E0),
+                        shape = RoundedCornerShape(10.dp)
+                    )
+                    .clickable { onToggle(friend.id) }
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column {
+                    Text(
+                        text = friend.displayName,
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            fontFamily = Inter,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.Black
+                        )
+                    )
+                    Text(
+                        text = "@${friend.name}",
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontFamily = Inter,
+                            color = Color(0xFF6F6C6C)
+                        )
+                    )
+                }
+                Checkbox(
+                    checked = selected,
+                    onCheckedChange = { onToggle(friend.id) },
+                    colors = CheckboxDefaults.colors(checkedColor = Color(0xFF238D25))
+                )
             }
         }
     }
