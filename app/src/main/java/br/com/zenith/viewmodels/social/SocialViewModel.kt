@@ -9,6 +9,7 @@ import br.com.zenith.data.models.Amizade
 import br.com.zenith.data.models.AmizadeInsert
 import br.com.zenith.data.models.Atividade
 import br.com.zenith.data.models.Badge
+import br.com.zenith.data.models.ChallengeForumEntry
 import br.com.zenith.data.models.Profile
 import br.com.zenith.ui.notifications.ZenithNotifier
 import io.github.jan.supabase.auth.auth
@@ -274,7 +275,8 @@ data class PublicProfileUiState(
     val profile: Profile? = null,
     val badge: Badge? = null,
     val stats: br.com.zenith.viewmodels.profile.UserStats = br.com.zenith.viewmodels.profile.UserStats(),
-    val atividades: List<Atividade> = emptyList()
+    val atividades: List<Atividade> = emptyList(),
+    val canViewActivities: Boolean = true
 )
 
 class PublicProfileViewModel : ViewModel() {
@@ -330,6 +332,31 @@ class PublicProfileViewModel : ViewModel() {
                         .decodeList<Amizade>()
                 }.getOrDefault(emptyList())
 
+                val currentUserId = client.auth.currentUserOrNull()?.id.orEmpty()
+                val isFriend = friendships.any {
+                    it.status == SocialUiState.STATUS_ACEITO &&
+                        ((it.userId == currentUserId && it.friendId == userId) ||
+                            (it.friendId == currentUserId && it.userId == userId))
+                }
+                val canViewActivities = profile.profileVisibility != "privado" || isFriend || currentUserId == userId
+                val publishedActivityIds = if (profile.profileVisibility == "privado" && isFriend) {
+                    runCatching {
+                        client.postgrest.from("feed_entries")
+                            .select()
+                            .decodeList<ChallengeForumEntry>()
+                            .filter { it.authorId == userId && it.entryType == "activity" }
+                            .mapNotNull { it.activityId }
+                            .toSet()
+                    }.getOrDefault(emptySet())
+                } else {
+                    emptySet()
+                }
+                val visibleActivities = when {
+                    !canViewActivities -> emptyList()
+                    profile.profileVisibility == "privado" && isFriend -> atividades.filter { it.id in publishedActivityIds }
+                    else -> atividades
+                }
+
                 val amigos = friendships
                     .filter {
                         it.status == SocialUiState.STATUS_ACEITO &&
@@ -348,7 +375,8 @@ class PublicProfileViewModel : ViewModel() {
                         desafios = 0,
                         medalhas = 0
                     ),
-                    atividades = atividades
+                    atividades = visibleActivities,
+                    canViewActivities = canViewActivities
                 )
             } catch (e: Exception) {
                 ZenithNotifier.error("Erro ao carregar perfil: ${e.localizedMessage}")

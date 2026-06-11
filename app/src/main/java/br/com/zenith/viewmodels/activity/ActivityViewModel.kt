@@ -2,6 +2,7 @@ package br.com.zenith.viewmodels.activity
 
 import android.content.Context
 import android.net.Uri
+import android.widget.Toast
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import br.com.zenith.data.SupabaseConfig
@@ -25,6 +26,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import java.util.UUID
 
 class ActivityViewModel : ViewModel() {
 
@@ -144,6 +146,28 @@ class ActivityViewModel : ViewModel() {
         }
     }
 
+    fun fetchAtividadePorId(atividadeId: String, context: Context) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            try {
+                SupabaseConfig.init(context)
+                val client = SupabaseConfig.getClient()
+                val atividade = client.postgrest
+                    .from(table = "atividades")
+                    .select(columns = Columns.raw("*, exercicios(*)")) {
+                        filter { eq("id", atividadeId) }
+                    }
+                    .decodeSingle<Atividade>()
+
+                _atividades.value = _atividades.value.filterNot { it.id == atividade.id } + atividade
+            } catch (e: Exception) {
+                Toast.makeText(context, "Erro ao carregar atividade", Toast.LENGTH_SHORT).show()
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
     fun registrarAtividade(
         exercicioId: String,
         valor: Double,
@@ -164,8 +188,9 @@ class ActivityViewModel : ViewModel() {
         gpsPontosRejeitados: Int? = null,
         gpsQualidade: String? = null,
         mentionedFriendIds: List<String> = emptyList(),
+        publicarNoFeed: Boolean = false,
         context: Context,
-        onSucesso: () -> Unit
+        onSucesso: (String) -> Unit
     ) {
         viewModelScope.launch {
             _isSaving.value = true
@@ -174,6 +199,7 @@ class ActivityViewModel : ViewModel() {
                 val userId = client.auth.currentUserOrNull()?.id
                     ?: throw Exception("Usuário não autenticado")
 
+                val atividadeId = UUID.randomUUID().toString()
                 val localDateTime = parseActivityDate(data)
                 val realizadaEm = localDateTime
                     .atZone(ZoneId.systemDefault())
@@ -182,6 +208,7 @@ class ActivityViewModel : ViewModel() {
 
                 val atividade = client.postgrest.from("atividades").insert(
                     buildJsonObject {
+                        put("id", atividadeId)
                         put("user_id", userId)
                         put("exercicio_id", exercicioId)
                         put("valor", valor)
@@ -215,6 +242,10 @@ class ActivityViewModel : ViewModel() {
                     )
                 }
 
+                if (publicarNoFeed) {
+                    publicarAtividadeNoFeed(atividade.id, userId)
+                }
+
                 val streakUpdated = runCatching {
                     streakRepository.recordActivity(localDateTime.toLocalDate())
                 }.isSuccess
@@ -224,7 +255,7 @@ class ActivityViewModel : ViewModel() {
                 } else {
                     ZenithNotifier.warning("Atividade registrada, mas o streak não foi atualizado")
                 }
-                onSucesso()
+                onSucesso(atividade.id)
             } catch (e: Exception) {
                 ZenithNotifier.error("Erro: ${e.localizedMessage}")
             } finally {
@@ -286,6 +317,17 @@ class ActivityViewModel : ViewModel() {
 
     private fun parseActivityDate(data: String): LocalDateTime {
         return LocalDateTime.parse(data, ACTIVITY_DATE_FORMATTER)
+    }
+
+    private suspend fun publicarAtividadeNoFeed(atividadeId: String, userId: String) {
+        SupabaseConfig.getClient().postgrest.from("feed_entries").insert(
+            buildJsonObject {
+                put("id", UUID.randomUUID().toString())
+                put("author_id", userId)
+                put("entry_type", "activity")
+                put("activity_id", atividadeId)
+            }
+        )
     }
 
     companion object {

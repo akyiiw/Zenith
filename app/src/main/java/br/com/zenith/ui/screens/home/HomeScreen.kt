@@ -33,27 +33,44 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import br.com.zenith.ui.components.home.ActivitySection
+import br.com.zenith.ui.components.home.FeedSection
+import br.com.zenith.ui.components.home.HomeGoalItem
 import br.com.zenith.ui.components.home.Header
 import br.com.zenith.ui.components.home.NotificationsDrawer
+import br.com.zenith.ui.components.home.PublishActivitySheet
 import br.com.zenith.ui.components.home.WelcomeCard
 import br.com.zenith.ui.theme.Green
 import br.com.zenith.ui.theme.ZenithTheme
+import br.com.zenith.viewmodels.home.HomeFeedViewModel
 import br.com.zenith.viewmodels.home.HomeNotificationsViewModel
 import br.com.zenith.viewmodels.profile.UserViewModel
+import br.com.zenith.viewmodels.progress.ProgressViewModel
 
 @Composable
 fun HomeScreen(navController: NavController) {
     val context = LocalContext.current
     val userViewModel: UserViewModel = viewModel()
     val notificationsViewModel: HomeNotificationsViewModel = viewModel()
+    val progressViewModel: ProgressViewModel = viewModel()
+    val homeFeedViewModel: HomeFeedViewModel = viewModel()
     val user by userViewModel.userState.collectAsState()
     val isLoading by userViewModel.isLoading.collectAsState()
     val notificationsState by notificationsViewModel.uiState.collectAsState()
+    val progressState by progressViewModel.uiState.collectAsState()
+    val feedState by homeFeedViewModel.uiState.collectAsState()
     var showNotifications by remember { mutableStateOf(false) }
+    var showPublishSheet by remember { mutableStateOf(false) }
+    val homeGoals = progressState.weeklyGoals.map { goal ->
+        HomeGoalItem(periodLabel = "Meta semanal", goal = goal)
+    } + progressState.monthlyGoals.map { goal ->
+        HomeGoalItem(periodLabel = "Meta mensal", goal = goal)
+    }
 
     LaunchedEffect(Unit) {
         userViewModel.fetchUserProfile(context)
         notificationsViewModel.load(context)
+        progressViewModel.load(context)
+        homeFeedViewModel.load(context)
     }
 
     ZenithTheme {
@@ -108,7 +125,21 @@ fun HomeScreen(navController: NavController) {
                     }
 
                     item {
-                        ActivitySection()
+                        ActivitySection(
+                            goals = homeGoals,
+                            isLoading = progressState.isLoading,
+                            onManageGoals = { navController.navigate("goals") }
+                        )
+                    }
+
+                    item {
+                        FeedSection(
+                            items = feedState.items,
+                            isLoading = feedState.isLoading,
+                            onPublishClick = { showPublishSheet = true },
+                            onOpenProfile = { profile -> navController.navigate("user_profile/${profile.id}") },
+                            onOpenActivity = { activity -> navController.navigate("activity_detail/${activity.id}") }
+                        )
                     }
                 }
 
@@ -141,6 +172,18 @@ fun HomeScreen(navController: NavController) {
                     )
                 }
             }
+        }
+
+        if (showPublishSheet) {
+            PublishActivitySheet(
+                activities = feedState.publishableActivities,
+                isPublishing = feedState.isPublishing,
+                onDismiss = { showPublishSheet = false },
+                onPublish = { activity ->
+                    homeFeedViewModel.publishActivity(activity.id, context)
+                    showPublishSheet = false
+                }
+            )
         }
     }
 }

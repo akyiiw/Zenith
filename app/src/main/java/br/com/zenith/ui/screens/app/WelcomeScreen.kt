@@ -99,7 +99,7 @@ fun WelcomeContent(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(52.dp),
-                shape = RoundedCornerShape(10.dp),
+                shape = RoundedCornerShape(14.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF238D25))
             ) {
                 Text(
@@ -108,7 +108,7 @@ fun WelcomeContent(
                     style = MaterialTheme.typography.titleLarge.copy(
                         fontFamily = Inter,
                         fontWeight = FontWeight.W600,
-                        fontSize = 20.sp
+                        fontSize = 17.sp
                     )
                 )
             }
@@ -118,7 +118,7 @@ fun WelcomeContent(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(52.dp),
-                shape = RoundedCornerShape(10.dp),
+                shape = RoundedCornerShape(14.dp),
                 border = BorderStroke(2.dp, Color(0xFF2E7D32)),
             ) {
                 Text(
@@ -127,7 +127,7 @@ fun WelcomeContent(
                     style = MaterialTheme.typography.titleLarge.copy(
                         fontFamily = Inter,
                         fontWeight = FontWeight.W600,
-                        fontSize = 20.sp
+                        fontSize = 17.sp
                     )
                 )
             }

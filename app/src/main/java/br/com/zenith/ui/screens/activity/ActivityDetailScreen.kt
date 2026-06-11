@@ -62,8 +62,12 @@ fun ActivityDetailScreen(navController: NavController, atividadeId: String?) {
     val exercicios by viewModel.exercicios.collectAsState()
     val isSaving by viewModel.isSaving.collectAsState()
 
-    LaunchedEffect(Unit) {
-        if (atividades.isEmpty()) viewModel.fetchAtividades(context)
+    LaunchedEffect(atividadeId) {
+        if (atividadeId != null) {
+            viewModel.fetchAtividadePorId(atividadeId, context)
+        } else if (atividades.isEmpty()) {
+            viewModel.fetchAtividades(context)
+        }
     }
 
     val atividade = atividades.find { it.id == atividadeId }

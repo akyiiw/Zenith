@@ -95,7 +95,17 @@ fun PublicProfileScreen(
                         Spacer(modifier = Modifier.height(8.dp))
                         RecentHeader()
                         Spacer(modifier = Modifier.height(8.dp))
-                        if (uiState.atividades.isEmpty()) {
+                        if (!uiState.canViewActivities) {
+                            Text(
+                                text = "Perfil privado",
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    fontFamily = Inter,
+                                    fontWeight = FontWeight.Medium,
+                                    color = Color(0xFF6F6C6C)
+                                ),
+                                modifier = Modifier.padding(horizontal = 32.dp, vertical = 8.dp)
+                            )
+                        } else if (uiState.atividades.isEmpty()) {
                             Text(
                                 text = "Nenhuma atividade recente",
                                 style = MaterialTheme.typography.bodyMedium.copy(

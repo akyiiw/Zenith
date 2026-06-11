@@ -2,6 +2,7 @@ package br.com.zenith.viewmodels.profile
 
 import android.content.Context
 import android.net.Uri
+import android.widget.Toast
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import br.com.zenith.data.SupabaseConfig
@@ -154,6 +155,34 @@ class UserViewModel : ViewModel() {
                 _userState.value = _userState.value?.copy(status = cleanedStatus)
             } catch (e: Exception) {
                 ZenithNotifier.error("Erro ao salvar status: ${e.localizedMessage}")
+            } finally {
+                _isSaving.value = false
+            }
+        }
+    }
+
+    fun atualizarVisibilidadePerfil(
+        privado: Boolean,
+        context: Context
+    ) {
+        viewModelScope.launch {
+            _isSaving.value = true
+            try {
+                SupabaseConfig.init(context)
+                val client = SupabaseConfig.getClient()
+                val userId = client.auth.currentUserOrNull()?.id
+                    ?: throw Exception("UsuÃ¡rio nÃ£o autenticado")
+                val visibility = if (privado) "privado" else "publico"
+
+                client.postgrest.from("profiles").update(
+                    buildJsonObject {
+                        put("visibilidade_perfil", visibility)
+                    }
+                ) { filter { eq("id", userId) } }
+
+                _userState.value = _userState.value?.copy(profileVisibility = visibility)
+            } catch (e: Exception) {
+                Toast.makeText(context, "Erro ao salvar privacidade: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
             } finally {
                 _isSaving.value = false
             }

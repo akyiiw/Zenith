@@ -79,7 +79,7 @@ fun RegisterActivityScreen(
             duracaoPreenchida = duracaoMin,
             verificada = verificada,
             desafioId = desafioId,
-            onSave = { eid, nome, unidade, valor, dur, titulo, data, nota, intensidade, humor, fotoUri, submitDesafioId, mentionedFriendIds ->
+            onSave = { eid, nome, unidade, valor, dur, titulo, data, nota, intensidade, humor, fotoUri, publicarNoFeed, submitDesafioId, mentionedFriendIds ->
                 viewModel.registrarAtividade(
                     exercicioId = eid,
                     valor = valor,
@@ -100,8 +100,9 @@ fun RegisterActivityScreen(
                     gpsPontosRejeitados = TrackingResultHolder.result?.rejectedGpsPoints,
                     gpsQualidade = TrackingResultHolder.result?.gpsQuality,
                     mentionedFriendIds = mentionedFriendIds,
+                    publicarNoFeed = publicarNoFeed,
                     context = context
-                ) {
+                ) { _ ->
                     TrackingResultHolder.result = null
                     val nomeEncoded = URLEncoder.encode(nome, "UTF-8")
                     val unidadeEncoded = URLEncoder.encode(unidade, "UTF-8")
@@ -131,13 +132,14 @@ private fun StartedActivityReviewContent(
     mentionFriends: List<Profile>,
     isSaving: Boolean,
     onBack: () -> Unit,
-    onSave: (String, String, String, Double, Int?, String?, String, Int?, String?, String?, Uri?, String?, List<String>) -> Unit
+    onSave: (String, String, String, Double, Int?, String?, String, Int?, String?, String?, Uri?, Boolean, String?, List<String>) -> Unit
 ) {
     var titulo by remember { mutableStateOf("") }
     var nota by remember { mutableStateOf<Float?>(null) }
     var intensidade by remember { mutableStateOf<String?>(null) }
     var humor by remember { mutableStateOf<String?>(null) }
     var mentionedFriendIds by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var publicarNoFeed by remember { mutableStateOf(false) }
     var showSubmitDialog by remember { mutableStateOf(false) }
 
     val valor = remember(exercicioUnidade, trackingResult) {
@@ -165,6 +167,7 @@ private fun StartedActivityReviewContent(
             intensidade,
             humor,
             null,
+            publicarNoFeed,
             submitDesafioId,
             mentionedFriendIds.toList()
         )
@@ -300,6 +303,27 @@ private fun StartedActivityReviewContent(
                         ),
                         onSelected = { humor = it }
                     )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Publicar no feed", fontFamily = Inter, fontWeight = FontWeight.SemiBold)
+                            Text(
+                                "Amigos poderÃ£o ver essa atividade na Home.",
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    fontFamily = Inter,
+                                    color = Color.Gray
+                                )
+                            )
+                        }
+                        Switch(
+                            checked = publicarNoFeed,
+                            onCheckedChange = { publicarNoFeed = it },
+                            enabled = !isSaving
+                        )
+                    }
                 }
 
                 item {
@@ -431,7 +455,7 @@ fun RegisterActivityContent(
     duracaoPreenchida: Int = 0,
     verificada: Boolean = false,
     desafioId: String? = null,
-    onSave: (String, String, String, Double, Int?, String?, String, Int?, String?, String?, Uri?, String?, List<String>) -> Unit,
+    onSave: (String, String, String, Double, Int?, String?, String, Int?, String?, String?, Uri?, Boolean, String?, List<String>) -> Unit,
     onBack: () -> Unit
 ) {
     val temPreSelecionado = exercicioPreSelecionadoId.isNotBlank()
@@ -488,6 +512,7 @@ fun RegisterActivityContent(
     var intensidade by remember { mutableStateOf<String?>(null) }
     var humor by remember { mutableStateOf<String?>(null) }
     var mentionedFriendIds by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var publicarNoFeed by remember { mutableStateOf(false) }
     var pendingSave by remember { mutableStateOf<(() -> Unit)?>(null) }
 
     val filtrados = remember(query, exercicios) {
@@ -812,17 +837,40 @@ fun RegisterActivityContent(
                     }
 
                     item {
-                        FriendMentionSelector(
-                            friends = mentionFriends,
-                            selectedIds = mentionedFriendIds,
-                            onToggle = { friendId ->
-                                mentionedFriendIds = if (friendId in mentionedFriendIds) {
-                                    mentionedFriendIds - friendId
-                                } else {
-                                    mentionedFriendIds + friendId
+                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("Publicar no feed", fontFamily = Inter, fontWeight = FontWeight.SemiBold)
+                                    Text(
+                                        "Amigos poderão ver essa atividade na Home.",
+                                        style = MaterialTheme.typography.bodySmall.copy(
+                                            fontFamily = Inter,
+                                            color = Color.Gray
+                                        )
+                                    )
                                 }
+                                Switch(
+                                    checked = publicarNoFeed,
+                                    onCheckedChange = { publicarNoFeed = it },
+                                    enabled = !isSaving
+                                )
                             }
-                        )
+                            FriendMentionSelector(
+                                friends = mentionFriends,
+                                selectedIds = mentionedFriendIds,
+                                onToggle = { friendId ->
+                                    mentionedFriendIds = if (friendId in mentionedFriendIds) {
+                                        mentionedFriendIds - friendId
+                                    } else {
+                                        mentionedFriendIds + friendId
+                                    }
+                                }
+                            )
+                        }
                     }
 
                     item { Spacer(modifier = Modifier.height(80.dp)) }
@@ -868,6 +916,7 @@ fun RegisterActivityContent(
                                     intensidade,
                                     humor,
                                     null,
+                                    publicarNoFeed,
                                     submitDesafioId,
                                     mentionedFriendIds.toList()
                                 )
@@ -941,6 +990,7 @@ fun RegisterActivityContent(
                                     intensidade,
                                     humor,
                                     null,
+                                    publicarNoFeed,
                                     null,
                                     mentionedFriendIds.toList()
                                 )

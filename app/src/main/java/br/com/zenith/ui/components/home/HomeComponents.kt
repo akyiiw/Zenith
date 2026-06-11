@@ -13,15 +13,23 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.DirectionsRun
 import androidx.compose.material.icons.filled.EmojiEvents
+import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.MilitaryTech
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsNone
 import androidx.compose.material.icons.filled.Tag
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -35,14 +43,26 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import br.com.zenith.R
 import br.com.zenith.data.SupabaseConfig
+import br.com.zenith.data.models.Atividade
+import br.com.zenith.data.models.ProgressGoal
 import br.com.zenith.data.models.Profile
+import br.com.zenith.ui.components.profile.formattedActivityValue
+import br.com.zenith.ui.components.profile.formattedDuration
+import br.com.zenith.ui.components.profile.tempoRelativo
 import br.com.zenith.ui.theme.Green
 import br.com.zenith.ui.theme.Inter
 import br.com.zenith.ui.theme.SecondaryGreen
+import br.com.zenith.viewmodels.home.HomeFeedItem
 import br.com.zenith.viewmodels.home.HomeNotificationItem
 import br.com.zenith.viewmodels.home.HomeNotificationType
 import coil.compose.AsyncImage
 import io.github.jan.supabase.storage.storage
+import java.util.Locale
+
+data class HomeGoalItem(
+    val periodLabel: String,
+    val goal: ProgressGoal
+)
 
 @Composable
 fun Header(
@@ -343,7 +363,8 @@ fun WelcomeCard(user: Profile?) {
 }
 
 @Composable
-fun ActivityCard(title: String, activityName: String, progress: String, goal: String) {
+fun GoalCard(item: HomeGoalItem, onManageGoals: () -> Unit) {
+    val goal = item.goal
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -358,15 +379,17 @@ fun ActivityCard(title: String, activityName: String, progress: String, goal: St
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = title,
+                    text = item.periodLabel,
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.W600,
                     color = Color.Black
                 )
-                Icon(
-                    painter = painterResource(R.drawable.greendot),
-                    contentDescription = "Ativo",
-                    tint = Color(0xFF15FD00)
+                Text(
+                    text = "Gerenciar",
+                    modifier = Modifier.clickable { onManageGoals() },
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = Green
                 )
             }
             Spacer(modifier = Modifier.height(16.dp))
@@ -381,31 +404,45 @@ fun ActivityCard(title: String, activityName: String, progress: String, goal: St
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = Icons.AutoMirrored.Filled.DirectionsRun,
-                        contentDescription = "Activity Icon",
+                        imageVector = Icons.Default.Flag,
+                        contentDescription = "Meta",
                         tint = Green,
                         modifier = Modifier.size(28.dp)
                     )
                 }
                 Spacer(modifier = Modifier.width(12.dp))
-                Column {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = activityName,
+                        text = goal.title,
                         style = MaterialTheme.typography.bodyLarge,
                         fontWeight = FontWeight.Bold,
                         color = Color.Black
                     )
                     Row {
                         Text(
-                            text = "$progress / ",
+                            text = "${formatGoalValue(goal.currentValue)} / ",
                             style = MaterialTheme.typography.bodyLarge,
                             color = Color.Gray
                         )
                         Text(
-                            text = goal,
+                            text = "${formatGoalValue(goal.targetValue)} ${goal.unit}",
                             style = MaterialTheme.typography.bodyLarge,
                             fontWeight = FontWeight.Bold,
                             color = Green
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(8.dp)
+                            .background(Color(0xFFE9F8E9), CircleShape)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth(goal.progressPercent)
+                                .fillMaxHeight()
+                                .background(if (goal.isComplete) Color(0xFF15A000) else Green, CircleShape)
                         )
                     }
                 }
@@ -414,44 +451,83 @@ fun ActivityCard(title: String, activityName: String, progress: String, goal: St
     }
 }
 
-
+@Composable
+fun EmptyGoalsCard(onManageGoals: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(1.dp, Green, RoundedCornerShape(5.dp))
+            .clip(RoundedCornerShape(5.dp))
+            .clickable { onManageGoals() }
+            .padding(20.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                text = "Crie sua primeira meta",
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Bold,
+                color = Color.Black
+            )
+            Text(
+                text = "Acompanhe objetivos semanais e mensais na Home.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color.Gray
+            )
+        }
+    }
+}
 
 @Composable
-fun ActivitySection() {
+fun ActivitySection(
+    goals: List<HomeGoalItem>,
+    isLoading: Boolean,
+    onManageGoals: () -> Unit
+) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        val pagerState = rememberPagerState(pageCount = { 2 })
+        if (isLoading) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(144.dp)
+                    .border(1.dp, Green, RoundedCornerShape(5.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator(color = Green, strokeWidth = 3.dp)
+            }
+            return@Column
+        }
+
+        if (goals.isEmpty()) {
+            EmptyGoalsCard(onManageGoals = onManageGoals)
+            return@Column
+        }
+
+        val pagerState = rememberPagerState(pageCount = { goals.size })
         HorizontalPager(
             state = pagerState,
             pageSpacing = 6.dp,
             modifier = Modifier.fillMaxWidth()
         ) { page ->
-            if (page == 0) {
-                ActivityCard(
-                    title = "Atividades de Hoje",
-                    activityName = "Corrida matinal",
-                    progress = "2,5km",
-                    goal = "5km"
-                )
-            } else {
-                ActivityCard(
-                    title = "Atividades de Hoje",
-                    activityName = "Caminhada leve",
-                    progress = "1,2km",
-                    goal = "3km"
-                )
-            }
+            GoalCard(
+                item = goals[page],
+                onManageGoals = onManageGoals
+            )
         }
         Spacer(modifier = Modifier.height(8.dp))
 
-        Row (
+        Row(
             modifier = Modifier
                 .padding(0.dp)
-                .width(23.dp)
+                .width((goals.size * 14).dp)
                 .height(9.dp)
                 .fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            repeat(2) { index ->
+            repeat(goals.size) { index ->
                 Box(
                     modifier = Modifier
                         .width(9.dp)
@@ -459,6 +535,255 @@ fun ActivitySection() {
                         .clip(CircleShape)
                         .background(if (pagerState.currentPage == index) Color.Black else Color.LightGray)
                 )
+            }
+        }
+    }
+}
+
+private fun formatGoalValue(value: Double): String {
+    val locale = Locale.forLanguageTag("pt-BR")
+    return if (value >= 10) {
+        "%,.0f".format(locale, value)
+    } else {
+        "%.1f".format(locale, value)
+    }
+}
+
+@Composable
+fun FeedSection(
+    items: List<HomeFeedItem>,
+    isLoading: Boolean,
+    onPublishClick: () -> Unit,
+    onOpenProfile: (Profile) -> Unit,
+    onOpenActivity: (Atividade) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Feed",
+                style = MaterialTheme.typography.titleMedium.copy(
+                    fontFamily = Inter,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.Black
+                )
+            )
+            Button(
+                onClick = onPublishClick,
+                colors = ButtonDefaults.buttonColors(containerColor = Green),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Text("Publicar", color = Color.White, fontFamily = Inter)
+            }
+        }
+
+        when {
+            isLoading -> {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(96.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(color = Green, strokeWidth = 3.dp)
+                }
+            }
+
+            items.isEmpty() -> {
+                Text(
+                    text = "Nenhum amigo publicou atividades ainda.",
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color(0xFFF5F5F5), RoundedCornerShape(8.dp))
+                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontFamily = Inter,
+                        color = Color(0xFF6F6C6C)
+                    )
+                )
+            }
+
+            else -> {
+                items.forEach { item ->
+                    FeedActivityCard(
+                        item = item,
+                        onOpenProfile = { onOpenProfile(item.author) },
+                        onOpenActivity = { onOpenActivity(item.activity) }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun FeedActivityCard(
+    item: HomeFeedItem,
+    onOpenProfile: () -> Unit,
+    onOpenActivity: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color(0xFFF8F8F8), RoundedCornerShape(8.dp))
+            .border(1.dp, Color(0xFFE6E6E6), RoundedCornerShape(8.dp))
+            .clickable { onOpenActivity() }
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            FeedAvatar(item.author.pictureHash, Modifier.clickable { onOpenProfile() })
+            Spacer(modifier = Modifier.width(10.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = item.author.displayName,
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontFamily = Inter,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.Black
+                    )
+                )
+                Text(
+                    text = tempoRelativo(item.activity.realizadaEm ?: item.activity.criadaEm),
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        fontFamily = Inter,
+                        color = Color(0xFF6F6C6C)
+                    )
+                )
+            }
+        }
+
+        Text(
+            text = item.activity.titulo ?: item.activity.exercicio?.nome ?: "Atividade registrada",
+            style = MaterialTheme.typography.bodyLarge.copy(
+                fontFamily = Inter,
+                fontWeight = FontWeight.SemiBold,
+                color = Color.Black
+            )
+        )
+        Text(
+            text = formattedActivityValue(item.activity),
+            style = MaterialTheme.typography.titleLarge.copy(
+                fontFamily = Inter,
+                fontWeight = FontWeight.Bold,
+                color = Green
+            )
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(
+                text = "Duracao: ${formattedDuration(item.activity.duracaoMin)}",
+                style = MaterialTheme.typography.bodySmall.copy(fontFamily = Inter, color = Color(0xFF6F6C6C))
+            )
+            Text(
+                text = if (item.activity.verificada) "Verificada" else "Manual",
+                style = MaterialTheme.typography.bodySmall.copy(fontFamily = Inter, color = Color(0xFF6F6C6C))
+            )
+        }
+    }
+}
+
+@Composable
+private fun FeedAvatar(pictureHash: String?, modifier: Modifier = Modifier) {
+    val baseModifier = modifier
+        .size(42.dp)
+        .clip(CircleShape)
+        .border(2.dp, Color(0xFF2B792C), CircleShape)
+
+    if (pictureHash != null) {
+        val url = SupabaseConfig.getClient().storage.from("profiles").publicUrl(pictureHash)
+        AsyncImage(
+            model = url,
+            contentDescription = "Foto de perfil",
+            contentScale = ContentScale.Crop,
+            modifier = baseModifier
+        )
+    } else {
+        Image(
+            painter = painterResource(id = R.drawable.profile_picture),
+            contentDescription = "Foto de perfil",
+            contentScale = ContentScale.Crop,
+            modifier = baseModifier
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun PublishActivitySheet(
+    activities: List<Atividade>,
+    isPublishing: Boolean,
+    onDismiss: () -> Unit,
+    onPublish: (Atividade) -> Unit
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = Color.White,
+        scrimColor = Color.Transparent
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp, vertical = 12.dp)
+                .padding(bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Text(
+                text = "Publicar atividade",
+                style = MaterialTheme.typography.titleMedium.copy(
+                    fontFamily = Inter,
+                    fontWeight = FontWeight.Bold
+                )
+            )
+
+            if (activities.isEmpty()) {
+                Text(
+                    text = "Nenhuma atividade disponivel para publicar.",
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontFamily = Inter,
+                        color = Color(0xFF6F6C6C)
+                    )
+                )
+            } else {
+                LazyColumn(
+                    modifier = Modifier.heightIn(max = 360.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    items(activities, key = { it.id }) { activity ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(Color(0xFFF8F8F8), RoundedCornerShape(8.dp))
+                                .border(1.dp, Color(0xFFE6E6E6), RoundedCornerShape(8.dp))
+                                .clickable(enabled = !isPublishing) { onPublish(activity) }
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = activity.titulo ?: activity.exercicio?.nome ?: "Atividade",
+                                    fontFamily = Inter,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Text(
+                                    text = formattedActivityValue(activity),
+                                    style = MaterialTheme.typography.bodyMedium.copy(
+                                        fontFamily = Inter,
+                                        color = Green
+                                    )
+                                )
+                            }
+                            Text(
+                                text = "Publicar",
+                                fontFamily = Inter,
+                                fontWeight = FontWeight.Bold,
+                                color = Green
+                            )
+                        }
+                    }
+                }
             }
         }
     }
