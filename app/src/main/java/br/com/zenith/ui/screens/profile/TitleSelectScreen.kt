@@ -22,6 +22,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import br.com.zenith.data.models.Titulo
 import br.com.zenith.ui.animations.CenteredZenithLoading
+import br.com.zenith.ui.components.common.BottomNavListPadding
 import br.com.zenith.ui.theme.Inter
 import br.com.zenith.ui.theme.ZenithTheme
 import br.com.zenith.viewmodels.profile.UserViewModel
@@ -98,7 +99,7 @@ fun TitleSelectContent(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(top = 72.dp),
-                contentPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp),
+                contentPadding = PaddingValues(start = 24.dp, top = 16.dp, end = 24.dp, bottom = BottomNavListPadding),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 if (titulos.isEmpty()) {

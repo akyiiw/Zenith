@@ -17,6 +17,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AddAPhoto
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -33,6 +34,7 @@ import br.com.zenith.data.SupabaseConfig
 import br.com.zenith.data.models.Profile
 import br.com.zenith.ui.animations.CenteredZenithLoading
 import br.com.zenith.ui.animations.ZenithLoading
+import br.com.zenith.ui.components.common.BottomNavListPadding
 import br.com.zenith.ui.theme.Inter
 import br.com.zenith.ui.theme.ZenithTheme
 import br.com.zenith.ui.theme.items.ZenithTextField
@@ -58,13 +60,18 @@ fun EditProfileScreen(navController: NavController) {
             user = user,
             isLoading = isLoading,
             isSaving = isSaving,
-            onSave = { name, displayName, aboutMe, pictureUri, bannerUri ->
+            onSave = { name, displayName, aboutMe, pictureUri, bannerUri, bannerBlurRadius, pictureFocusX, pictureFocusY, bannerFocusX, bannerFocusY ->
                 userViewModel.atualizarPerfil(
                     name = name,
                     displayName = displayName,
                     aboutMe = aboutMe,
                     pictureUri = pictureUri,
                     bannerUri = bannerUri,
+                    bannerBlurRadius = bannerBlurRadius,
+                    pictureFocusX = pictureFocusX,
+                    pictureFocusY = pictureFocusY,
+                    bannerFocusX = bannerFocusX,
+                    bannerFocusY = bannerFocusY,
                     context = context
                 ) { navController.popBackStack() }
             },
@@ -227,14 +234,37 @@ fun EditProfileContent(
     user: Profile?,
     isLoading: Boolean,
     isSaving: Boolean,
-    onSave: (String, String, String?, Uri?, Uri?) -> Unit,
+    onSave: (String, String, String?, Uri?, Uri?, Int, Float, Float, Float, Float) -> Unit,
     onBack: () -> Unit
 ) {
-    var name by remember(user) { mutableStateOf(user?.name ?: "") }
-    var displayName by remember(user) { mutableStateOf(user?.displayName ?: "") }
-    var aboutMe by remember(user) { mutableStateOf(user?.aboutMe ?: "") }
-    var pictureUri by remember(user) { mutableStateOf<Uri?>(null) }
-    var bannerUri by remember(user) { mutableStateOf<Uri?>(null) }
+    var initializedUserId by rememberSaveable { mutableStateOf<String?>(null) }
+    var name by rememberSaveable { mutableStateOf("") }
+    var displayName by rememberSaveable { mutableStateOf("") }
+    var aboutMe by rememberSaveable { mutableStateOf("") }
+    var pictureUri by rememberSaveable { mutableStateOf<Uri?>(null) }
+    var bannerUri by rememberSaveable { mutableStateOf<Uri?>(null) }
+    var pictureFocusX by rememberSaveable { mutableFloatStateOf(0f) }
+    var pictureFocusY by rememberSaveable { mutableFloatStateOf(0f) }
+    var bannerFocusX by rememberSaveable { mutableFloatStateOf(0f) }
+    var bannerFocusY by rememberSaveable { mutableFloatStateOf(0f) }
+    var bannerBlurRadius by rememberSaveable { mutableIntStateOf(10) }
+
+    LaunchedEffect(user?.id) {
+        val loadedUser = user ?: return@LaunchedEffect
+        if (initializedUserId != loadedUser.id) {
+            initializedUserId = loadedUser.id
+            name = loadedUser.name
+            displayName = loadedUser.displayName
+            aboutMe = loadedUser.aboutMe.orEmpty()
+            pictureUri = null
+            bannerUri = null
+            pictureFocusX = 0f
+            pictureFocusY = 0f
+            bannerFocusX = 0f
+            bannerFocusY = 0f
+            bannerBlurRadius = loadedUser.bannerBlurRadius
+        }
+    }
 
     val pictureLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
@@ -287,7 +317,7 @@ fun EditProfileContent(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(top = 72.dp),
-                contentPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp),
+                contentPadding = PaddingValues(start = 24.dp, top = 16.dp, end = 24.dp, bottom = BottomNavListPadding),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 item {
@@ -354,7 +384,18 @@ fun EditProfileContent(
                 Button(
                     onClick = {
                         if (name.isBlank() || displayName.isBlank()) return@Button
-                        onSave(name, displayName, aboutMe.ifBlank { null }, pictureUri, bannerUri)
+                        onSave(
+                            name,
+                            displayName,
+                            aboutMe.ifBlank { null },
+                            pictureUri,
+                            bannerUri,
+                            bannerBlurRadius,
+                            pictureFocusX,
+                            pictureFocusY,
+                            bannerFocusX,
+                            bannerFocusY
+                        )
                     },
                     enabled = name.isNotBlank() && displayName.isNotBlank() && usernameEnabled,
                     modifier = Modifier.fillMaxWidth().height(52.dp),

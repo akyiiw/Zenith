@@ -9,6 +9,7 @@ data class Atividade(
     @SerialName("user_id") val userId: String,
     @SerialName("exercicio_id") val exercicioId: String,
     val titulo: String? = null,
+    val descricao: String? = null,
     val valor: Double,
     @SerialName("duracao_min") val duracaoMin: Int? = null,
     val nota: Int? = null,

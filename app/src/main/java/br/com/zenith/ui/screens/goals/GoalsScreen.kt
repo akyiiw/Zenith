@@ -9,13 +9,16 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
@@ -23,28 +26,44 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import br.com.zenith.data.SupabaseConfig
 import br.com.zenith.data.models.PersonalGoal
 import br.com.zenith.data.repositories.GoalsRepository
+import br.com.zenith.ui.components.common.zenithSwitchColors
+import br.com.zenith.ui.notifications.ZenithNotifier
 import br.com.zenith.ui.theme.*
 import br.com.zenith.ui.theme.items.ZenithTextField
 import kotlinx.coroutines.launch
 
 @Composable
 fun GoalsScreen(navController: NavController) {
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val goalsRepository = remember { GoalsRepository() }
     var goals by remember { mutableStateOf<List<PersonalGoal>>(emptyList()) }
+    var isLoading by remember { mutableStateOf(true) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
     var showForm by remember { mutableStateOf(false) }
     var editingGoal by remember { mutableStateOf<PersonalGoal?>(null) }
 
-    LaunchedEffect(Unit) {
-        goals = goalsRepository.getAllGoals()
+    fun refreshGoals(showLoading: Boolean = false) {
+        scope.launch {
+            if (showLoading) isLoading = true
+            errorMessage = null
+            try {
+                SupabaseConfig.init(context)
+                goals = goalsRepository.getAllGoals()
+            } catch (e: Exception) {
+                errorMessage = e.localizedMessage ?: "Erro ao carregar metas"
+                ZenithNotifier.error(errorMessage ?: "Erro ao carregar metas")
+            } finally {
+                isLoading = false
+            }
+        }
     }
 
-    fun refreshGoals() {
-        scope.launch {
-            goals = goalsRepository.getAllGoals()
-        }
+    LaunchedEffect(Unit) {
+        refreshGoals(showLoading = true)
     }
 
     Box(modifier = Modifier.fillMaxSize().background(Color.White)) {
@@ -55,39 +74,98 @@ fun GoalsScreen(navController: NavController) {
                 .statusBarsPadding()
         ) {
             Spacer(modifier = Modifier.height(24.dp))
-            Text(
-                text = "Minhas Metas",
-                style = MaterialTheme.typography.headlineMedium.copy(
-                    fontFamily = Poppins,
-                    fontWeight = FontWeight.Bold
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = { navController.popBackStack() }) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Voltar",
+                        tint = Green
+                    )
+                }
+                Text(
+                    text = "Minhas Metas",
+                    style = MaterialTheme.typography.headlineMedium.copy(
+                        fontFamily = Poppins,
+                        fontWeight = FontWeight.Bold
+                    )
                 )
-            )
+            }
             Spacer(modifier = Modifier.height(24.dp))
 
-            LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.weight(1f)
-            ) {
-                items(goals) { goal ->
-                    GoalItem(
-                        goal = goal,
-                        onToggleActive = { isActive ->
-                            scope.launch {
-                                goalsRepository.toggleGoalActive(goal.id!!, isActive)
-                                refreshGoals()
-                            }
-                        },
-                        onDelete = {
-                            scope.launch {
-                                goalsRepository.deleteGoal(goal.id!!)
-                                refreshGoals()
-                            }
-                        },
-                        onEdit = {
-                            editingGoal = goal
-                            showForm = true
-                        }
+            when {
+                isLoading -> {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(color = Green)
+                    }
+                }
+                errorMessage != null -> {
+                    GoalMessageState(
+                        title = "Não foi possível carregar suas metas",
+                        message = errorMessage.orEmpty(),
+                        actionLabel = "Tentar novamente",
+                        onAction = { refreshGoals(showLoading = true) },
+                        modifier = Modifier.weight(1f)
                     )
+                }
+                goals.isEmpty() -> {
+                    GoalMessageState(
+                        title = "Nenhuma meta criada",
+                        message = "Crie uma meta semanal ou mensal para acompanhar seu progresso.",
+                        actionLabel = "Criar meta",
+                        onAction = {
+                            editingGoal = null
+                            showForm = true
+                        },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                else -> {
+                    LazyColumn(
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(bottom = 96.dp)
+                    ) {
+                        items(goals, key = { it.id ?: it.title }) { goal ->
+                            GoalItem(
+                                goal = goal,
+                                onToggleActive = { isActive ->
+                                    val goalId = goal.id ?: return@GoalItem
+                                    scope.launch {
+                                        try {
+                                            goalsRepository.toggleGoalActive(goalId, isActive)
+                                            refreshGoals()
+                                        } catch (e: Exception) {
+                                            ZenithNotifier.error("Erro ao atualizar meta: ${e.localizedMessage}")
+                                        }
+                                    }
+                                },
+                                onDelete = {
+                                    val goalId = goal.id ?: return@GoalItem
+                                    scope.launch {
+                                        try {
+                                            goalsRepository.deleteGoal(goalId)
+                                            ZenithNotifier.success("Meta excluída.")
+                                            refreshGoals()
+                                        } catch (e: Exception) {
+                                            ZenithNotifier.error("Erro ao excluir meta: ${e.localizedMessage}")
+                                        }
+                                    }
+                                },
+                                onEdit = {
+                                    editingGoal = goal
+                                    showForm = true
+                                }
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -115,12 +193,82 @@ fun GoalsScreen(navController: NavController) {
                 },
                 onSave = { newGoal ->
                     scope.launch {
-                        goalsRepository.saveGoal(newGoal)
-                        refreshGoals()
-                        showForm = false
-                        editingGoal = null
+                        try {
+                            goalsRepository.saveGoal(newGoal)
+                            ZenithNotifier.success("Meta salva.")
+                            refreshGoals()
+                            showForm = false
+                            editingGoal = null
+                        } catch (e: Exception) {
+                            ZenithNotifier.error("Erro ao salvar meta: ${e.localizedMessage}")
+                        }
                     }
                 }
+            )
+        }
+    }
+}
+
+@Composable
+fun GoalMessageState(
+    title: String,
+    message: String,
+    actionLabel: String,
+    onAction: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 18.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .size(56.dp)
+                .background(Color(0xFFE7F4E8), CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Default.Add,
+                contentDescription = null,
+                tint = Green
+            )
+        }
+        Spacer(modifier = Modifier.height(14.dp))
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleMedium.copy(
+                fontFamily = Poppins,
+                fontWeight = FontWeight.Bold,
+                color = Black
+            ),
+            textAlign = TextAlign.Center
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+            text = message,
+            style = MaterialTheme.typography.bodyMedium.copy(
+                fontFamily = Inter,
+                color = Color(0xFF606060),
+                lineHeight = 20.sp
+            ),
+            textAlign = TextAlign.Center
+        )
+        Spacer(modifier = Modifier.height(18.dp))
+        Button(
+            onClick = onAction,
+            shape = RoundedCornerShape(8.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = Green)
+        ) {
+            Text(
+                text = actionLabel,
+                style = MaterialTheme.typography.labelLarge.copy(
+                    fontFamily = Inter,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
             )
         }
     }
@@ -167,7 +315,7 @@ fun GoalItem(
                 Switch(
                     checked = goal.isActive,
                     onCheckedChange = onToggleActive,
-                    colors = SwitchDefaults.colors(checkedThumbColor = Green)
+                    colors = zenithSwitchColors()
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 IconButton(onClick = onDelete) {
@@ -188,10 +336,14 @@ fun GoalFormBottomSheet(
     onDismiss: () -> Unit,
     onSave: (PersonalGoal) -> Unit
 ) {
-    var title by remember { mutableStateOf(goal?.title ?: "") }
-    var metric by remember { mutableStateOf(goal?.metric ?: "distance_km") }
-    var period by remember { mutableStateOf(goal?.period ?: "weekly") }
-    var targetValue by remember { mutableStateOf(goal?.targetValue?.toString() ?: "") }
+    val formKey = goal?.id ?: "new"
+    var title by rememberSaveable(formKey) { mutableStateOf(goal?.title ?: "") }
+    var metric by rememberSaveable(formKey) { mutableStateOf(goal?.metric ?: "distance_km") }
+    var period by rememberSaveable(formKey) { mutableStateOf(goal?.period ?: "weekly") }
+    var targetValue by rememberSaveable(formKey) { mutableStateOf(goal?.targetValue?.toString() ?: "") }
+    val cleanedTitle = title.trim()
+    val targetVal = targetValue.toDoubleOrNull()
+    val canSave = cleanedTitle.isNotBlank() && targetVal != null && targetVal > 0.0
 
     Box(
         modifier = Modifier
@@ -225,7 +377,13 @@ fun GoalFormBottomSheet(
                     value = title,
                     onValueChange = { title = it },
                     label = "Título da Meta",
-                    placeholder = "Ex: Caminhada Matinal"
+                    placeholder = "Ex: Caminhada Matinal",
+                    isError = title.isNotBlank() && cleanedTitle.isBlank(),
+                    supportingText = {
+                        if (title.isNotBlank() && cleanedTitle.isBlank()) {
+                            Text("Informe um título válido")
+                        }
+                    }
                 )
 
                 Text(
@@ -248,29 +406,40 @@ fun GoalFormBottomSheet(
 
                 ZenithTextField(
                     value = targetValue,
-                    onValueChange = { targetValue = it },
+                    onValueChange = { value ->
+                        targetValue = value
+                            .replace(',', '.')
+                            .filter { it.isDigit() || it == '.' }
+                    },
                     label = "Valor Alvo",
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    placeholder = "Ex: 10.5"
+                    placeholder = "Ex: 10.5",
+                    isError = targetValue.isNotBlank() && (targetVal == null || targetVal <= 0.0),
+                    supportingText = {
+                        if (targetValue.isNotBlank() && (targetVal == null || targetVal <= 0.0)) {
+                            Text("Informe um valor maior que zero")
+                        }
+                    }
                 )
 
                 Button(
                     onClick = {
-                        val targetVal = targetValue.toDoubleOrNull() ?: 0.0
-                        if (title.isNotBlank() && targetVal > 0) {
+                        val validTarget = targetValue.toDoubleOrNull() ?: return@Button
+                        if (cleanedTitle.isNotBlank() && validTarget > 0.0) {
                             onSave(
                                 PersonalGoal(
                                     id = goal?.id,
                                     userId = "",
-                                    title = title,
+                                    title = cleanedTitle,
                                     metric = metric,
                                     period = period,
-                                    targetValue = targetVal,
+                                    targetValue = validTarget,
                                     isActive = goal?.isActive ?: true
                                 )
                             )
                         }
                     },
+                    enabled = canSave,
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(8.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = Green)

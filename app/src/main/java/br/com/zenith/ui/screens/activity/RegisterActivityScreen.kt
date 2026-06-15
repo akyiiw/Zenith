@@ -1,6 +1,7 @@
 ﻿package br.com.zenith.ui.screens.activity
 
 import android.net.Uri
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -17,9 +18,11 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.CreateNewFolder
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -34,16 +37,22 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import br.com.zenith.data.TrackingResultHolder
+import br.com.zenith.data.models.ActivityGroup
 import br.com.zenith.data.models.Exercicio
 import br.com.zenith.data.models.Profile
 import br.com.zenith.ui.animations.CenteredZenithLoading
 import br.com.zenith.ui.animations.ZenithLoading
+import br.com.zenith.ui.components.common.zenithSwitchColors
 import br.com.zenith.ui.theme.Inter
 import br.com.zenith.ui.theme.ZenithTheme
 import br.com.zenith.ui.theme.items.ZenithDateTimeField
+import br.com.zenith.ui.theme.items.ZenithDurationField
+import br.com.zenith.ui.theme.items.ZenithOptionField
 import br.com.zenith.ui.theme.items.ZenithTextField
 import br.com.zenith.viewmodels.activity.ActivityViewModel
 import java.net.URLEncoder
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 
 @Composable
 fun RegisterActivityScreen(
@@ -60,17 +69,20 @@ fun RegisterActivityScreen(
         val context = LocalContext.current
         val exercicios by viewModel.exercicios.collectAsState()
         val mentionFriends by viewModel.mentionFriends.collectAsState()
+        val activityGroups by viewModel.activityGroups.collectAsState()
         val isLoading by viewModel.isLoading.collectAsState()
         val isSaving by viewModel.isSaving.collectAsState()
 
         LaunchedEffect(Unit) {
             viewModel.fetchExercicios(context)
             viewModel.fetchMentionFriends(context)
+            viewModel.fetchActivityGroups(context)
         }
 
         RegisterActivityContent(
             exercicios = exercicios,
             mentionFriends = mentionFriends,
+            activityGroups = activityGroups,
             isLoading = isLoading,
             isSaving = isSaving,
             exercicioPreSelecionadoId = exercicioId,
@@ -79,13 +91,14 @@ fun RegisterActivityScreen(
             duracaoPreenchida = duracaoMin,
             verificada = verificada,
             desafioId = desafioId,
-            onSave = { eid, nome, unidade, valor, dur, titulo, data, nota, intensidade, humor, fotoUri, publicarNoFeed, submitDesafioId, mentionedFriendIds ->
+            onSave = { eid, nome, unidade, valor, dur, titulo, descricao, data, nota, intensidade, humor, fotoUri, publicarNoFeed, submitDesafioId, mentionedFriendIds, activityGroupId, newActivityGroupName ->
                 viewModel.registrarAtividade(
                     exercicioId = eid,
                     valor = valor,
                     verificada = verificada,
                     duracaoMin = dur,
                     titulo = titulo,
+                    descricao = descricao,
                     data = data,
                     nota = nota,
                     intensidade = intensidade,
@@ -100,6 +113,8 @@ fun RegisterActivityScreen(
                     gpsPontosRejeitados = TrackingResultHolder.result?.rejectedGpsPoints,
                     gpsQualidade = TrackingResultHolder.result?.gpsQuality,
                     mentionedFriendIds = mentionedFriendIds,
+                    activityGroupId = activityGroupId,
+                    newActivityGroupName = newActivityGroupName,
                     publicarNoFeed = publicarNoFeed,
                     context = context
                 ) { _ ->
@@ -115,7 +130,14 @@ fun RegisterActivityScreen(
                     }
                 }
             },
-            onBack = { navController.popBackStack() }
+            onBack = {
+                if (!navController.popBackStack()) {
+                    navController.navigate("home") {
+                        popUpTo("home") { inclusive = false }
+                        launchSingleTop = true
+                    }
+                }
+            }
         )
     }
 }
@@ -130,17 +152,29 @@ private fun StartedActivityReviewContent(
     duracaoMin: Int,
     desafioId: String?,
     mentionFriends: List<Profile>,
+    activityGroups: List<ActivityGroup>,
     isSaving: Boolean,
     onBack: () -> Unit,
-    onSave: (String, String, String, Double, Int?, String?, String, Int?, String?, String?, Uri?, Boolean, String?, List<String>) -> Unit
+    onSave: (String, String, String, Double, Int?, String?, String?, String, Int?, String?, String?, Uri?, Boolean, String?, List<String>, String?, String?) -> Unit
 ) {
-    var titulo by remember { mutableStateOf("") }
-    var nota by remember { mutableStateOf<Float?>(null) }
-    var intensidade by remember { mutableStateOf<String?>(null) }
-    var humor by remember { mutableStateOf<String?>(null) }
-    var mentionedFriendIds by remember { mutableStateOf<Set<String>>(emptySet()) }
-    var publicarNoFeed by remember { mutableStateOf(false) }
-    var showSubmitDialog by remember { mutableStateOf(false) }
+    var titulo by rememberSaveable { mutableStateOf("") }
+    var descricao by rememberSaveable { mutableStateOf("") }
+    var nota by rememberSaveable { mutableStateOf<Float?>(null) }
+    var intensidade by rememberSaveable { mutableStateOf<String?>(null) }
+    var humor by rememberSaveable { mutableStateOf<String?>(null) }
+    var mentionedFriendIds by rememberSaveable { mutableStateOf(emptyList<String>()) }
+    var selectedActivityGroupId by rememberSaveable { mutableStateOf<String?>(null) }
+    var newActivityGroupName by rememberSaveable { mutableStateOf("") }
+    var publicarNoFeed by rememberSaveable { mutableStateOf(false) }
+    var showSubmitDialog by rememberSaveable { mutableStateOf(false) }
+    var showDiscardDialog by rememberSaveable { mutableStateOf(false) }
+    val hasChanges = titulo.isNotBlank() ||
+        descricao.isNotBlank() ||
+        nota != null ||
+        intensidade != null ||
+        humor != null ||
+        mentionedFriendIds.isNotEmpty() ||
+        publicarNoFeed
 
     val valor = remember(exercicioUnidade, trackingResult) {
         if (exercicioUnidade.lowercase().contains("pass")) {
@@ -149,7 +183,7 @@ private fun StartedActivityReviewContent(
             trackingResult.distanceMeters / 1000.0
         }
     }
-    val data = remember {
+    val data = rememberSaveable {
         java.time.LocalDateTime.now()
             .format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"))
     }
@@ -162,6 +196,7 @@ private fun StartedActivityReviewContent(
             valor,
             duracaoMin,
             titulo.ifBlank { null },
+            descricao.ifBlank { null },
             data,
             nota?.toInt(),
             intensidade,
@@ -169,8 +204,21 @@ private fun StartedActivityReviewContent(
             null,
             publicarNoFeed,
             submitDesafioId,
-            mentionedFriendIds.toList()
+            mentionedFriendIds,
+            selectedActivityGroupId,
+            newActivityGroupName
         )
+    }
+    fun requestBack() {
+        if (hasChanges && !isSaving) {
+            showDiscardDialog = true
+        } else if (!isSaving) {
+            onBack()
+        }
+    }
+
+    BackHandler(enabled = !isSaving) {
+        requestBack()
     }
 
     Box(
@@ -187,7 +235,7 @@ private fun StartedActivityReviewContent(
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onBack, enabled = !isSaving) {
+                IconButton(onClick = { requestBack() }, enabled = !isSaving) {
                     Icon(
                         Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = "Voltar",
@@ -242,6 +290,18 @@ private fun StartedActivityReviewContent(
                 }
 
                 item {
+                    ZenithTextField(
+                        value = descricao,
+                        onValueChange = { descricao = it },
+                        label = "Descrição (opcional)",
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 3,
+                        maxLines = 5,
+                        singleLine = false
+                    )
+                }
+
+                item {
                     val notaAtual = nota ?: 5f
                     Column {
                         Row(
@@ -278,7 +338,7 @@ private fun StartedActivityReviewContent(
                 item {
                     Text("Intensidade (opcional)", style = MaterialTheme.typography.bodyMedium.copy(color = Color.Gray))
                     Spacer(modifier = Modifier.height(8.dp))
-                    OptionalSelectionDropdown(
+                    ZenithOptionField(
                         selectedValue = intensidade,
                         placeholder = "Selecionar intensidade",
                         options = listOf(
@@ -293,7 +353,7 @@ private fun StartedActivityReviewContent(
                 item {
                     Text("Humor (opcional)", style = MaterialTheme.typography.bodyMedium.copy(color = Color.Gray))
                     Spacer(modifier = Modifier.height(8.dp))
-                    OptionalSelectionDropdown(
+                    ZenithOptionField(
                         selectedValue = humor,
                         placeholder = "Selecionar humor",
                         options = listOf(
@@ -311,7 +371,7 @@ private fun StartedActivityReviewContent(
                         Column(modifier = Modifier.weight(1f)) {
                             Text("Publicar no feed", fontFamily = Inter, fontWeight = FontWeight.SemiBold)
                             Text(
-                                "Amigos poderÃ£o ver essa atividade na Home.",
+                                "Amigos poderão ver essa atividade na Home.",
                                 style = MaterialTheme.typography.bodySmall.copy(
                                     fontFamily = Inter,
                                     color = Color.Gray
@@ -321,15 +381,32 @@ private fun StartedActivityReviewContent(
                         Switch(
                             checked = publicarNoFeed,
                             onCheckedChange = { publicarNoFeed = it },
-                            enabled = !isSaving
+                            enabled = !isSaving,
+                            colors = zenithSwitchColors()
                         )
                     }
                 }
 
                 item {
+                    ActivityGroupSelector(
+                        groups = activityGroups,
+                        selectedGroupId = selectedActivityGroupId,
+                        newGroupName = newActivityGroupName,
+                        onSelectedGroupChange = {
+                            selectedActivityGroupId = it
+                            if (it != null) newActivityGroupName = ""
+                        },
+                        onNewGroupNameChange = {
+                            newActivityGroupName = it
+                            if (it.isNotBlank()) selectedActivityGroupId = null
+                        }
+                    )
+                }
+
+                item {
                     FriendMentionSelector(
                         friends = mentionFriends,
-                        selectedIds = mentionedFriendIds,
+                        selectedIds = mentionedFriendIds.toSet(),
                         onToggle = { friendId ->
                             mentionedFriendIds = if (friendId in mentionedFriendIds) {
                                 mentionedFriendIds - friendId
@@ -422,6 +499,43 @@ private fun StartedActivityReviewContent(
                 }
             }
         }
+
+        if (showDiscardDialog) {
+            AlertDialog(
+                onDismissRequest = { showDiscardDialog = false },
+                containerColor = Color.White,
+                title = {
+                    Text(
+                        text = "Descartar alterações?",
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            fontFamily = Inter,
+                            fontWeight = FontWeight.Bold
+                        )
+                    )
+                },
+                text = {
+                    Text(
+                        text = "As informações adicionadas nessa revisão serão perdidas.",
+                        fontFamily = Inter
+                    )
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            showDiscardDialog = false
+                            onBack()
+                        }
+                    ) {
+                        Text("Descartar", color = Color(0xFF238D25), fontFamily = Inter)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showDiscardDialog = false }) {
+                        Text("Continuar editando", color = Color.Gray, fontFamily = Inter)
+                    }
+                }
+            )
+        }
     }
 }
 
@@ -447,6 +561,7 @@ private fun LockedReviewRow(label: String, value: String) {
 fun RegisterActivityContent(
     exercicios: List<Exercicio>,
     mentionFriends: List<Profile> = emptyList(),
+    activityGroups: List<ActivityGroup> = emptyList(),
     isLoading: Boolean,
     isSaving: Boolean,
     exercicioPreSelecionadoId: String = "",
@@ -455,7 +570,7 @@ fun RegisterActivityContent(
     duracaoPreenchida: Int = 0,
     verificada: Boolean = false,
     desafioId: String? = null,
-    onSave: (String, String, String, Double, Int?, String?, String, Int?, String?, String?, Uri?, Boolean, String?, List<String>) -> Unit,
+    onSave: (String, String, String, Double, Int?, String?, String?, String, Int?, String?, String?, Uri?, Boolean, String?, List<String>, String?, String?) -> Unit,
     onBack: () -> Unit
 ) {
     val temPreSelecionado = exercicioPreSelecionadoId.isNotBlank()
@@ -463,25 +578,35 @@ fun RegisterActivityContent(
     val veioDeTracking = trackingResult != null && temPreSelecionado
     val challengeSubmissionLocked = veioDeTracking && !desafioId.isNullOrBlank()
 
-    var step by remember { mutableIntStateOf(if (temPreSelecionado) 1 else 0) }
-
-    var exercicioSelecionado by remember {
-        mutableStateOf(
-            if (temPreSelecionado) Exercicio(
+    var step by rememberSaveable { mutableIntStateOf(if (temPreSelecionado) 1 else 0) }
+    var exercicioSelecionadoId by rememberSaveable {
+        mutableStateOf(exercicioPreSelecionadoId.takeIf { it.isNotBlank() })
+    }
+    val exercicioSelecionado = remember(
+        exercicioSelecionadoId,
+        exercicios,
+        exercicioPreSelecionadoId,
+        exercicioPreSelecionadoNome,
+        exercicioPreSelecionadoUnidade
+    ) {
+        when {
+            temPreSelecionado && exercicioSelecionadoId == exercicioPreSelecionadoId -> Exercicio(
                 id = exercicioPreSelecionadoId,
                 nome = exercicioPreSelecionadoNome,
                 unidade = exercicioPreSelecionadoUnidade,
                 slug = "",
                 icone = ""
-            ) else null
-        )
+            )
+            exercicioSelecionadoId != null -> exercicios.firstOrNull { it.id == exercicioSelecionadoId }
+            else -> null
+        }
     }
 
-    var query by remember { mutableStateOf("") }
+    var query by rememberSaveable { mutableStateOf("") }
     val keyboardController = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
 
-    var valor by remember {
+    var valor by rememberSaveable {
         val unidadeInicial = exercicioPreSelecionadoUnidade.lowercase()
         mutableStateOf(
             when {
@@ -491,29 +616,33 @@ fun RegisterActivityContent(
             }
         )
     }
-    var passos by remember {
+    var passos by rememberSaveable {
         mutableStateOf(if (veioDeTracking) trackingResult.steps.toString() else "")
     }
 
-    var duracaoHoras by remember {
+    var duracaoHoras by rememberSaveable {
         mutableIntStateOf(if (duracaoPreenchida >= 60) duracaoPreenchida / 60 else 0)
     }
-    var duracaoMinutos by remember {
+    var duracaoMinutos by rememberSaveable {
         mutableIntStateOf(if (duracaoPreenchida > 0) duracaoPreenchida % 60 else 0)
     }
-    var titulo by remember { mutableStateOf("") }
-    var data by remember {
+    var titulo by rememberSaveable { mutableStateOf("") }
+    var descricao by rememberSaveable { mutableStateOf("") }
+    var data by rememberSaveable {
         mutableStateOf(
             java.time.LocalDateTime.now()
                 .format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"))
         )
     }
-    var nota by remember { mutableStateOf<Float?>(null) }
-    var intensidade by remember { mutableStateOf<String?>(null) }
-    var humor by remember { mutableStateOf<String?>(null) }
-    var mentionedFriendIds by remember { mutableStateOf<Set<String>>(emptySet()) }
-    var publicarNoFeed by remember { mutableStateOf(false) }
+    var nota by rememberSaveable { mutableStateOf<Float?>(null) }
+    var intensidade by rememberSaveable { mutableStateOf<String?>(null) }
+    var humor by rememberSaveable { mutableStateOf<String?>(null) }
+    var mentionedFriendIds by rememberSaveable { mutableStateOf(emptyList<String>()) }
+    var selectedActivityGroupId by rememberSaveable { mutableStateOf<String?>(null) }
+    var newActivityGroupName by rememberSaveable { mutableStateOf("") }
+    var publicarNoFeed by rememberSaveable { mutableStateOf(false) }
     var pendingSave by remember { mutableStateOf<(() -> Unit)?>(null) }
+    var validationError by rememberSaveable { mutableStateOf<String?>(null) }
 
     val filtrados = remember(query, exercicios) {
         if (query.isBlank()) exercicios
@@ -529,6 +658,7 @@ fun RegisterActivityContent(
             duracaoMin = duracaoPreenchida.coerceAtLeast(1),
             desafioId = desafioId,
             mentionFriends = mentionFriends,
+            activityGroups = activityGroups,
             isSaving = isSaving,
             onBack = onBack,
             onSave = onSave
@@ -557,7 +687,7 @@ fun RegisterActivityContent(
                 IconButton(onClick = {
                     if (step == 1 && !temPreSelecionado) {
                         step = 0
-                        exercicioSelecionado = null
+                        exercicioSelecionadoId = null
                     } else {
                         onBack()
                     }
@@ -636,7 +766,7 @@ fun RegisterActivityContent(
                             ExercicioItem(exercicio = exercicio, onClick = {
                                 focusManager.clearFocus()
                                 keyboardController?.hide()
-                                exercicioSelecionado = exercicio
+                                exercicioSelecionadoId = exercicio.id
                                 step = 1
                             })
                         }
@@ -645,7 +775,18 @@ fun RegisterActivityContent(
             }
 
             step == 1 -> {
-                val ex = exercicioSelecionado!!
+                val ex = exercicioSelecionado
+                if (ex == null) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(top = 100.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CenteredZenithLoading()
+                    }
+                    return@Box
+                }
                 val unidadeEhDuracao = remember(ex.unidade) {
                     val unidade = ex.unidade.lowercase()
                     unidade.contains("min") || unidade.contains("dura")
@@ -696,6 +837,18 @@ fun RegisterActivityContent(
                             placeholder = "Ex: Pedalada confortável"
                         )
                     }
+
+                    item {
+                        ZenithTextField(
+                            value = descricao,
+                            onValueChange = { descricao = it },
+                            label = "Descrição (opcional)",
+                            modifier = Modifier.fillMaxWidth(),
+                            minLines = 3,
+                            maxLines = 5,
+                            singleLine = false
+                        )
+                    }
                     if (!unidadeEhDuracao) {
                         item {
                             ZenithTextField(
@@ -738,17 +891,17 @@ fun RegisterActivityContent(
                                 modifier = Modifier.fillMaxWidth()
                             )
                         } else {
-                            ZenithTextField(
-                                value = ((duracaoHoras * 60) + duracaoMinutos).takeIf { it > 0 }?.toString().orEmpty(),
-                                onValueChange = { input ->
-                                    val total = input.filter(Char::isDigit).toIntOrNull() ?: 0
+                            ZenithDurationField(
+                                minutes = duracaoHoras * 60 + duracaoMinutos,
+                                onMinutesChange = { total ->
+                                    validationError = null
                                     duracaoHoras = total / 60
                                     duracaoMinutos = total % 60
                                 },
-                                label = "Duração em minutos",
+                                label = "Duração",
                                 modifier = Modifier.fillMaxWidth(),
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                singleLine = true
+                                isError = validationError != null,
+                                supportingText = validationError?.let { { Text(it, color = MaterialTheme.colorScheme.error) } }
                             )
                         }
                     }
@@ -756,10 +909,28 @@ fun RegisterActivityContent(
                     item {
                         ZenithDateTimeField(
                             value = data,
-                            onValueChange = { data = it },
+                            onValueChange = {
+                                validationError = null
+                                data = it
+                            },
                             label = "Data e horário *",
                             modifier = Modifier.fillMaxWidth(),
-                            enabled = !challengeSubmissionLocked
+                            enabled = !challengeSubmissionLocked,
+                            isError = validationError != null,
+                            supportingText = if (challengeSubmissionLocked) null else validationError?.let {
+                                { Text(it, color = MaterialTheme.colorScheme.error) }
+                            },
+                            validateSelection = { selected ->
+                                val duration = (duracaoHoras * 60 + duracaoMinutos).takeIf { it > 0 }
+                                val now = LocalDateTime.now()
+                                when {
+                                    selected.toLocalDate().isAfter(now.toLocalDate()) -> "A data da atividade não pode ser futura."
+                                    selected.isAfter(now) -> "O horário da atividade não pode ser futuro."
+                                    duration != null && selected.plusMinutes(duration.toLong()).isAfter(now) ->
+                                        "A duração informada termina depois do horário atual."
+                                    else -> null
+                                }
+                            }
                         )
                     }
 
@@ -805,7 +976,7 @@ fun RegisterActivityContent(
                             style = MaterialTheme.typography.bodyMedium.copy(color = Color.Gray)
                         )
                         Spacer(modifier = Modifier.height(8.dp))
-                        OptionalSelectionDropdown(
+                        ZenithOptionField(
                             selectedValue = intensidade,
                             placeholder = "Selecionar intensidade",
                             options = listOf(
@@ -824,7 +995,7 @@ fun RegisterActivityContent(
                             style = MaterialTheme.typography.bodyMedium.copy(color = Color.Gray)
                         )
                         Spacer(modifier = Modifier.height(8.dp))
-                        OptionalSelectionDropdown(
+                        ZenithOptionField(
                             selectedValue = humor,
                             placeholder = "Selecionar humor",
                             options = listOf(
@@ -856,18 +1027,32 @@ fun RegisterActivityContent(
                                 Switch(
                                     checked = publicarNoFeed,
                                     onCheckedChange = { publicarNoFeed = it },
-                                    enabled = !isSaving
+                                    enabled = !isSaving,
+                                    colors = zenithSwitchColors()
                                 )
                             }
                             FriendMentionSelector(
                                 friends = mentionFriends,
-                                selectedIds = mentionedFriendIds,
+                                selectedIds = mentionedFriendIds.toSet(),
                                 onToggle = { friendId ->
                                     mentionedFriendIds = if (friendId in mentionedFriendIds) {
                                         mentionedFriendIds - friendId
                                     } else {
                                         mentionedFriendIds + friendId
                                     }
+                                }
+                            )
+                            ActivityGroupSelector(
+                                groups = activityGroups,
+                                selectedGroupId = selectedActivityGroupId,
+                                newGroupName = newActivityGroupName,
+                                onSelectedGroupChange = {
+                                    selectedActivityGroupId = it
+                                    if (it != null) newActivityGroupName = ""
+                                },
+                                onNewGroupNameChange = {
+                                    newActivityGroupName = it
+                                    if (it.isNotBlank()) selectedActivityGroupId = null
                                 }
                             )
                         }
@@ -894,8 +1079,20 @@ fun RegisterActivityContent(
                 } else {
                     Button(
                         onClick = {
+                            val selectedExercise = exercicioSelecionado ?: return@Button
                             val duracaoTotal = (duracaoHoras * 60 + duracaoMinutos).takeIf { it > 0 }
-                            val unidadeEhDuracaoAtual = exercicioSelecionado!!.unidade
+                            val realizedAt = parseRegisterDateTime(data)
+                            val now = LocalDateTime.now()
+                            validationError = when {
+                                realizedAt == null -> "Escolha uma data e horário válidos."
+                                realizedAt.toLocalDate().isAfter(now.toLocalDate()) -> "A data da atividade não pode ser futura."
+                                realizedAt.isAfter(now) -> "O horário da atividade não pode ser futuro."
+                                duracaoTotal != null && realizedAt.plusMinutes(duracaoTotal.toLong()).isAfter(now) ->
+                                    "A duração informada termina depois do horário atual."
+                                else -> null
+                            }
+                            if (validationError != null) return@Button
+                            val unidadeEhDuracaoAtual = selectedExercise.unidade
                                 .lowercase()
                                 .let { it.contains("min") || it.contains("dura") }
                             val v = if (unidadeEhDuracaoAtual) {
@@ -905,12 +1102,13 @@ fun RegisterActivityContent(
                             }
                             val saveWithChallenge: (String?) -> Unit = { submitDesafioId ->
                                 onSave(
-                                    exercicioSelecionado!!.id,
-                                    exercicioSelecionado!!.nome,
-                                    exercicioSelecionado!!.unidade,
+                                    selectedExercise.id,
+                                    selectedExercise.nome,
+                                    selectedExercise.unidade,
                                     v,
                                     duracaoTotal,
                                     titulo.ifBlank { null },
+                                    descricao.ifBlank { null },
                                     data,
                                     nota?.toInt(),
                                     intensidade,
@@ -918,7 +1116,9 @@ fun RegisterActivityContent(
                                     null,
                                     publicarNoFeed,
                                     submitDesafioId,
-                                    mentionedFriendIds.toList()
+                                    mentionedFriendIds,
+                                    selectedActivityGroupId,
+                                    newActivityGroupName
                                 )
                             }
                             if (desafioId.isNullOrBlank()) {
@@ -977,14 +1177,16 @@ fun RegisterActivityContent(
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         TextButton(
                             onClick = {
+                                val selectedExercise = exercicioSelecionado ?: return@TextButton
                                 pendingSave = null
                                 onSave(
-                                    exercicioSelecionado!!.id,
-                                    exercicioSelecionado!!.nome,
-                                    exercicioSelecionado!!.unidade,
+                                    selectedExercise.id,
+                                    selectedExercise.nome,
+                                    selectedExercise.unidade,
                                     valor.replace(",", ".").toDoubleOrNull() ?: 0.0,
                                     (duracaoHoras * 60 + duracaoMinutos).takeIf { it > 0 },
                                     titulo.ifBlank { null },
+                                    descricao.ifBlank { null },
                                     data,
                                     nota?.toInt(),
                                     intensidade,
@@ -992,7 +1194,9 @@ fun RegisterActivityContent(
                                     null,
                                     publicarNoFeed,
                                     null,
-                                    mentionedFriendIds.toList()
+                                    mentionedFriendIds,
+                                    selectedActivityGroupId,
+                                    newActivityGroupName
                                 )
                             },
                             modifier = Modifier.weight(1f)
@@ -1018,6 +1222,79 @@ fun RegisterActivityContent(
 }
 
 @Composable
+private fun ActivityGroupSelector(
+    groups: List<ActivityGroup>,
+    selectedGroupId: String?,
+    newGroupName: String,
+    onSelectedGroupChange: (String?) -> Unit,
+    onNewGroupNameChange: (String) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            text = "Grupo de atividade (opcional)",
+            style = MaterialTheme.typography.bodyMedium.copy(
+                fontFamily = Inter,
+                color = Color.Gray
+            )
+        )
+        ZenithTextField(
+            value = newGroupName,
+            onValueChange = { value -> onNewGroupNameChange(value.take(48)) },
+            label = "Criar novo grupo",
+            placeholder = "Ex: Corridas de junho",
+            leadingIcon = {
+                Icon(Icons.Default.CreateNewFolder, contentDescription = null, tint = Color(0xFF238D25))
+            },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true
+        )
+        groups.takeIf { it.isNotEmpty() }?.forEach { group ->
+            val selected = group.id == selectedGroupId
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(if (selected) Color(0xFFEAF3DE) else Color(0xFFF7F7F7))
+                    .border(
+                        width = 1.dp,
+                        color = if (selected) Color(0xFF238D25) else Color(0xFFE0E0E0),
+                        shape = RoundedCornerShape(10.dp)
+                    )
+                    .clickable { onSelectedGroupChange(if (selected) null else group.id) }
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = group.name,
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            fontFamily = Inter,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.Black
+                        )
+                    )
+                    group.description?.takeIf { it.isNotBlank() }?.let {
+                        Text(
+                            text = it,
+                            style = MaterialTheme.typography.bodySmall.copy(
+                                fontFamily = Inter,
+                                color = Color(0xFF6F6C6C)
+                            )
+                        )
+                    }
+                }
+                Checkbox(
+                    checked = selected,
+                    onCheckedChange = { onSelectedGroupChange(if (selected) null else group.id) },
+                    colors = CheckboxDefaults.colors(checkedColor = Color(0xFF238D25))
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun FriendMentionSelector(
     friends: List<Profile>,
     selectedIds: Set<String>,
@@ -1027,14 +1304,14 @@ private fun FriendMentionSelector(
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
-            text = "Mencionar amigo (opcional)",
+            text = "Convidar participantes (opcional)",
             style = MaterialTheme.typography.bodyMedium.copy(
                 fontFamily = Inter,
                 color = Color.Gray
             )
         )
         Text(
-            text = "O amigo precisará aceitar antes da atividade aparecer no perfil dele.",
+            text = "O amigo precisará aceitar para a atividade aparecer no perfil dele como participação.",
             style = MaterialTheme.typography.bodySmall.copy(
                 fontFamily = Inter,
                 color = Color(0xFF6F6C6C)
@@ -1078,47 +1355,6 @@ private fun FriendMentionSelector(
                     checked = selected,
                     onCheckedChange = { onToggle(friend.id) },
                     colors = CheckboxDefaults.colors(checkedColor = Color(0xFF238D25))
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun OptionalSelectionDropdown(
-    selectedValue: String?,
-    placeholder: String,
-    options: List<Pair<String, String>>,
-    onSelected: (String?) -> Unit
-) {
-    var expanded by remember { mutableStateOf(false) }
-    val selectedLabel = options.firstOrNull { it.first == selectedValue }?.second ?: placeholder
-
-    Box {
-        OutlinedButton(
-            onClick = { expanded = true },
-            shape = RoundedCornerShape(8.dp)
-        ) {
-            Text(selectedLabel, fontFamily = Inter, color = Color(0xFF238D25))
-        }
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false }
-        ) {
-            DropdownMenuItem(
-                text = { Text("Não definido", fontFamily = Inter) },
-                onClick = {
-                    onSelected(null)
-                    expanded = false
-                }
-            )
-            options.forEach { (value, label) ->
-                DropdownMenuItem(
-                    text = { Text(label, fontFamily = Inter) },
-                    onClick = {
-                        onSelected(value)
-                        expanded = false
-                    }
                 )
             }
         }
@@ -1198,4 +1434,11 @@ fun ExercicioItem(exercicio: Exercicio, onClick: () -> Unit) {
             style = MaterialTheme.typography.bodySmall.copy(color = Color.Gray)
         )
     }
+}
+
+private val registerDateTimeFormatter: DateTimeFormatter =
+    DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")
+
+private fun parseRegisterDateTime(value: String): LocalDateTime? {
+    return runCatching { LocalDateTime.parse(value, registerDateTimeFormatter) }.getOrNull()
 }

@@ -68,14 +68,15 @@ import br.com.zenith.ui.theme.Inter
 import br.com.zenith.ui.theme.Poppins
 import br.com.zenith.ui.theme.SecondaryGreen
 import br.com.zenith.ui.theme.ZenithTheme
+import br.com.zenith.ui.components.common.BottomNavListPadding
 import br.com.zenith.ui.components.common.ScreenHeader
 import br.com.zenith.viewmodels.progress.ProgressDay
 import br.com.zenith.viewmodels.progress.ProgressPeriod
 import br.com.zenith.viewmodels.progress.ProgressSummary
 import br.com.zenith.data.models.ProgressGoal
+import br.com.zenith.utils.UnitFormatters
 import br.com.zenith.viewmodels.progress.ProgressViewModel
 import kotlin.math.max
-import kotlin.math.roundToInt
 
 @Composable
 fun ProgressScreen(navController: NavController) {
@@ -101,7 +102,7 @@ fun ProgressScreen(navController: NavController) {
                     .padding(padding)
                     .statusBarsPadding()
                     .padding(horizontal = 20.dp),
-                contentPadding = PaddingValues(top = 19.dp, bottom = 104.dp),
+                contentPadding = PaddingValues(top = 19.dp, bottom = BottomNavListPadding),
                 verticalArrangement = Arrangement.spacedBy(18.dp)
             ) {
                 item {
@@ -374,7 +375,7 @@ private fun SummaryGrid(summary: ProgressSummary) {
                 modifier = Modifier.weight(1f),
                 icon = Icons.AutoMirrored.Filled.DirectionsRun,
                 label = "Passos",
-                value = formatInt(summary.steps)
+                value = UnitFormatters.steps(summary.steps)
             )
             MetricCard(
                 modifier = Modifier.weight(1f),
@@ -487,7 +488,7 @@ private fun ReportCharts(days: List<ProgressDay>, period: ProgressPeriod) {
                 title = "Passos",
                 values = days.map { it.steps.toFloat() },
                 labels = chartLabels(days),
-                valueLabel = { formatInt(it.toInt()) },
+                valueLabel = { UnitFormatters.steps(it.toInt()) },
                 lineColor = Color(0xFF197233)
             )
 
@@ -495,7 +496,7 @@ private fun ReportCharts(days: List<ProgressDay>, period: ProgressPeriod) {
                 title = "Atividades",
                 values = days.map { it.distanceKm.toFloat() },
                 labels = chartLabels(days),
-                valueLabel = { "${formatOneDecimal(it.toDouble())}km" },
+                valueLabel = { UnitFormatters.kilometers(it.toDouble()) },
                 lineColor = Green
             )
         }
@@ -630,7 +631,7 @@ private fun InsightCard(
             }
             Text(
                 text = if (hasData) {
-                    "Você acumulou ${formatDistance(summary.distanceKm)} km, ${formatInt(summary.steps)} passos e ${summary.durationMin} minutos ativos."
+                    "Você acumulou ${UnitFormatters.kilometersWithSpace(summary.distanceKm)}, ${UnitFormatters.steps(summary.steps)} passos e ${UnitFormatters.minutes(summary.durationMin)} ativos."
                 } else {
                     "Registre sua primeira atividade para o Zenith montar seus gráficos de evolução."
                 },
@@ -726,14 +727,6 @@ private fun chartLabels(days: List<ProgressDay>): List<String> {
     return indexes.map { days[it].label }
 }
 
-private fun formatDistance(value: Double): String {
-    return if (value >= 10) value.roundToInt().toString() else formatOneDecimal(value)
-}
-
 private fun formatOneDecimal(value: Double): String {
     return String.format(java.util.Locale.forLanguageTag("pt-BR"), "%.1f", value)
-}
-
-private fun formatInt(value: Int): String {
-    return "%,d".format(java.util.Locale.forLanguageTag("pt-BR"), value)
 }

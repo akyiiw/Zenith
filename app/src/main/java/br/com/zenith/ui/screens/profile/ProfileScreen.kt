@@ -28,6 +28,7 @@ import androidx.compose.runtime.setValue
 import androidx.navigation.NavController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import br.com.zenith.ui.animations.CenteredZenithLoading
+import br.com.zenith.ui.components.common.BottomNavListPadding
 import br.com.zenith.ui.theme.ZenithTheme
 import br.com.zenith.ui.components.profile.AboutSection
 import br.com.zenith.ui.components.profile.ProfileHeader
@@ -87,7 +88,7 @@ fun ProfileScreen(
                         .fillMaxSize()
                         .padding(paddingValues = padding),
                     verticalArrangement = Arrangement.spacedBy(11.dp),
-                    contentPadding = PaddingValues(top = 2.dp, bottom = 24.dp)
+                    contentPadding = PaddingValues(top = 2.dp, bottom = BottomNavListPadding)
                 ) {
                     item {
                         ProfileHeader(
@@ -97,9 +98,17 @@ fun ProfileScreen(
                             onBack = { navController.popBackStack() },
                             onEdit = { navController.navigate("edit_profile") },
                             onTitleClick = { navController.navigate("title_select") },
+                            onBadgeClick = { navController.navigate("badge_select") },
                             onStatusClick = {
                                 statusText = user?.status.orEmpty()
                                 showStatusDialog = true
+                            },
+                            onStatClick = { stat ->
+                                when (stat) {
+                                    "Amigos" -> navController.navigate("social")
+                                    "Desafios" -> user?.id?.let { navController.navigate("challenge_awards/$it") }
+                                    "Conquistas" -> user?.id?.let { navController.navigate("achievements/$it") }
+                                }
                             }
                         )
                         Spacer(modifier = Modifier.height(8.dp))
@@ -109,7 +118,11 @@ fun ProfileScreen(
                             onEdit = { navController.navigate("edit_profile") }
                         )
                         Spacer(modifier = Modifier.height(8.dp))
-                        RecentHeader()
+                        RecentHeader(
+                            onViewAll = {
+                                user?.id?.let { navController.navigate("profile_activities/$it") }
+                            }
+                        )
                         Spacer(modifier = Modifier.height(8.dp))
                         RecentActivitySection(
                             navController = navController,

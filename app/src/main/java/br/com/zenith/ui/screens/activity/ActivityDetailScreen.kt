@@ -7,6 +7,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -36,6 +37,8 @@ import br.com.zenith.ui.components.profile.tempoRelativo
 import br.com.zenith.ui.theme.Inter
 import br.com.zenith.ui.theme.ZenithTheme
 import br.com.zenith.ui.theme.items.ZenithDateTimeField
+import br.com.zenith.ui.theme.items.ZenithDurationField
+import br.com.zenith.ui.theme.items.ZenithOptionField
 import br.com.zenith.ui.theme.items.ZenithTextField
 import br.com.zenith.viewmodels.activity.ActivityViewModel
 import com.google.android.gms.maps.CameraUpdateFactory
@@ -52,6 +55,7 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.doubleOrNull
+import kotlin.math.ceil
 
 @Composable
 fun ActivityDetailScreen(navController: NavController, atividadeId: String?) {
@@ -60,6 +64,7 @@ fun ActivityDetailScreen(navController: NavController, atividadeId: String?) {
     val atividades by viewModel.atividades.collectAsState()
     val desafios by viewModel.desafios.collectAsState()
     val exercicios by viewModel.exercicios.collectAsState()
+    val detailState by viewModel.detailState.collectAsState()
     val isSaving by viewModel.isSaving.collectAsState()
 
     LaunchedEffect(atividadeId) {
@@ -70,22 +75,35 @@ fun ActivityDetailScreen(navController: NavController, atividadeId: String?) {
         }
     }
 
-    val atividade = atividades.find { it.id == atividadeId }
+    val atividade = detailState.activity ?: atividades.find { it.id == atividadeId }
 
     if (atividade == null) {
-        CenteredZenithLoading()
+        if (detailState.errorMessage != null || atividadeId == null) {
+            ActivityDetailError(
+                message = detailState.errorMessage ?: "Atividade inválida.",
+                onBack = { navController.popBackStack() },
+                onRetry = atividadeId?.let { id ->
+                    { viewModel.fetchAtividadePorId(id, context) }
+                }
+            )
+        } else {
+            CenteredZenithLoading()
+        }
         return
     }
 
     var editando by remember(atividade.id) { mutableStateOf(false) }
+    var confirmarDelete by remember(atividade.id) { mutableStateOf(false) }
     val desafio = atividade.desafioId?.let { desafios[it] }
     val currentUserId = SupabaseConfig.getClient().auth.currentUserOrNull()?.id
-    val canEditActivity = atividade.userId == currentUserId &&
+    val ownsActivity = atividade.userId == currentUserId
+    val canEditMetrics = ownsActivity &&
         !atividade.verificada &&
         atividade.desafioId == null
+    val canEditActivity = ownsActivity
 
     LaunchedEffect(editando) {
-        if (editando && exercicios.isEmpty()) viewModel.fetchExercicios(context)
+        if (editando && canEditMetrics && exercicios.isEmpty()) viewModel.fetchExercicios(context)
     }
 
     ZenithTheme {
@@ -94,21 +112,37 @@ fun ActivityDetailScreen(navController: NavController, atividadeId: String?) {
                 atividade = atividade,
                 exercicios = exercicios,
                 isSaving = isSaving,
+                canEditMetrics = canEditMetrics,
                 onBack = { editando = false },
-                onSave = { exercicioId, valor, duracaoMin, titulo, data, nota, intensidade, humor ->
-                    viewModel.editarAtividade(
-                        atividadeId = atividade.id,
-                        exercicioId = exercicioId,
-                        valor = valor,
-                        duracaoMin = duracaoMin,
-                        titulo = titulo,
-                        data = data,
-                        nota = nota,
-                        intensidade = intensidade,
-                        humor = humor,
-                        context = context
-                    ) {
-                        editando = false
+                onSave = { exercicioId, valor, duracaoMin, titulo, descricao, data, nota, intensidade, humor ->
+                    if (canEditMetrics) {
+                        viewModel.editarAtividade(
+                            atividadeId = atividade.id,
+                            exercicioId = exercicioId,
+                            valor = valor,
+                            duracaoMin = duracaoMin,
+                            titulo = titulo,
+                            descricao = descricao,
+                            data = data,
+                            nota = nota,
+                            intensidade = intensidade,
+                            humor = humor,
+                            context = context
+                        ) {
+                            editando = false
+                        }
+                    } else {
+                        viewModel.editarMetadadosAtividade(
+                            atividadeId = atividade.id,
+                            titulo = titulo,
+                            descricao = descricao,
+                            nota = nota,
+                            intensidade = intensidade,
+                            humor = humor,
+                            context = context
+                        ) {
+                            editando = false
+                        }
                     }
                 }
             )
@@ -116,7 +150,7 @@ fun ActivityDetailScreen(navController: NavController, atividadeId: String?) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.White)
+                    .background(Color(0xFFF8FAF8))
                     .statusBarsPadding()
             ) {
                 LazyColumn(
@@ -148,7 +182,7 @@ fun ActivityDetailScreen(navController: NavController, atividadeId: String?) {
                                     .weight(1f)
                                     .padding(start = 8.dp)
                             )
-                            if (canEditActivity) {
+                            if (ownsActivity) {
                                 IconButton(onClick = { editando = true }) {
                                     Icon(
                                         Icons.Default.Edit,
@@ -156,7 +190,25 @@ fun ActivityDetailScreen(navController: NavController, atividadeId: String?) {
                                         tint = Color(0xFF238D25)
                                     )
                                 }
+                                IconButton(onClick = { confirmarDelete = true }, enabled = !isSaving) {
+                                    Icon(
+                                        Icons.Default.Delete,
+                                        contentDescription = "Apagar",
+                                        tint = Color(0xFF9B2D20)
+                                    )
+                                }
                             }
+                        }
+                        detailState.authorUsername?.takeIf { it.isNotBlank() }?.let { username ->
+                            Text(
+                                text = "Completada por @$username",
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    fontFamily = Inter,
+                                    fontWeight = FontWeight.Medium,
+                                    color = Color(0xFF536057)
+                                ),
+                                modifier = Modifier.padding(horizontal = 72.dp)
+                            )
                         }
                     }
 
@@ -191,6 +243,16 @@ fun ActivityDetailScreen(navController: NavController, atividadeId: String?) {
                                 text = activityGroup(atividade),
                                 style = MaterialTheme.typography.bodySmall.copy(color = Color.Gray)
                             )
+                            detailState.groupNames.takeIf { it.isNotEmpty() }?.let { groups ->
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = groups.joinToString(prefix = "Grupo: "),
+                                    style = MaterialTheme.typography.bodySmall.copy(
+                                        color = Color(0xFF238D25),
+                                        fontWeight = FontWeight.W600
+                                    )
+                                )
+                            }
 
                             Spacer(modifier = Modifier.height(10.dp))
 
@@ -224,12 +286,21 @@ fun ActivityDetailScreen(navController: NavController, atividadeId: String?) {
 
                             Spacer(modifier = Modifier.height(8.dp))
 
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
+                            if (atividade.verificada) {
                                 DetailChip(
-                                    label = if (atividade.verificada) "Verificada" else "Manual",
-                                    color = if (atividade.verificada) Color(0xFF238D25) else Color.Gray
+                                    label = "Verificada",
+                                    color = Color(0xFF238D25)
+                                )
+                            }
+
+                            atividade.descricao?.takeIf { it.isNotBlank() }?.let { descricao ->
+                                Spacer(modifier = Modifier.height(10.dp))
+                                Text(
+                                    text = descricao,
+                                    style = MaterialTheme.typography.bodyMedium.copy(
+                                        fontFamily = Inter,
+                                        color = Color(0xFF4E5D4F)
+                                    )
                                 )
                             }
 
@@ -291,6 +362,45 @@ fun ActivityDetailScreen(navController: NavController, atividadeId: String?) {
                     }
                 }
             }
+            if (confirmarDelete) {
+                AlertDialog(
+                    onDismissRequest = { confirmarDelete = false },
+                    containerColor = Color.White,
+                    title = {
+                        Text(
+                            "Apagar atividade?",
+                            style = MaterialTheme.typography.titleLarge.copy(
+                                fontFamily = Inter,
+                                fontWeight = FontWeight.Bold
+                            )
+                        )
+                    },
+                    text = {
+                        Text(
+                            "Essa ação remove a atividade do perfil, feed e vínculos relacionados.",
+                            fontFamily = Inter
+                        )
+                    },
+                    confirmButton = {
+                        TextButton(
+                            onClick = {
+                                confirmarDelete = false
+                                viewModel.apagarAtividade(atividade.id, context) {
+                                    navController.popBackStack()
+                                }
+                            },
+                            enabled = !isSaving
+                        ) {
+                            Text("Apagar", color = Color(0xFF9B2D20), fontFamily = Inter)
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { confirmarDelete = false }) {
+                            Text("Cancelar", color = Color.Gray, fontFamily = Inter)
+                        }
+                    }
+                )
+            }
         }
     }
 }
@@ -309,11 +419,11 @@ private fun ActivityRouteMap(rota: String?) {
         if (points.size >= 2) {
             val boundsBuilder = LatLngBounds.builder()
             points.forEach { boundsBuilder.include(it) }
-            cameraPositionState.animate(
+            cameraPositionState.move(
                 CameraUpdateFactory.newLatLngBounds(boundsBuilder.build(), 80)
             )
         } else {
-            cameraPositionState.animate(CameraUpdateFactory.newLatLngZoom(initialPoint, 16f))
+            cameraPositionState.move(CameraUpdateFactory.newLatLngZoom(initialPoint, 16f))
         }
     }
 
@@ -356,13 +466,58 @@ private fun ActivityRouteMap(rota: String?) {
 private fun parseRoutePoints(rota: String?): List<LatLng> {
     if (rota.isNullOrBlank()) return emptyList()
     return runCatching {
-        Json.parseToJsonElement(rota).jsonArray.mapNotNull { item ->
+        val points = Json.parseToJsonElement(rota).jsonArray.mapNotNull { item ->
             val obj = item.jsonObject
             val lat = obj["lat"]?.jsonPrimitive?.doubleOrNull
             val lng = obj["lng"]?.jsonPrimitive?.doubleOrNull
             if (lat != null && lng != null) LatLng(lat, lng) else null
         }
+        if (points.size <= MAX_ROUTE_POINTS) {
+            points
+        } else {
+            val step = ceil(points.size.toDouble() / MAX_ROUTE_POINTS.toDouble()).toInt()
+            points.filterIndexed { index, _ -> index % step == 0 }
+        }
     }.getOrDefault(emptyList())
+}
+
+private const val MAX_ROUTE_POINTS = 400
+
+@Composable
+private fun ActivityDetailError(
+    message: String,
+    onBack: () -> Unit,
+    onRetry: (() -> Unit)?
+) {
+    ZenithTheme {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.White)
+                .statusBarsPadding()
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodyLarge.copy(
+                    fontFamily = Inter,
+                    color = Color.Gray
+                )
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            onRetry?.let {
+                Button(onClick = it) {
+                    Text("Tentar novamente")
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+            OutlinedButton(onClick = onBack) {
+                Text("Voltar")
+            }
+        }
+    }
 }
 
 @Composable
@@ -370,8 +525,9 @@ fun EditActivityScreenContent(
     atividade: Atividade,
     exercicios: List<Exercicio>,
     isSaving: Boolean,
+    canEditMetrics: Boolean,
     onBack: () -> Unit,
-    onSave: (String, Double, Int?, String?, String, Int?, String?, String?) -> Unit
+    onSave: (String, Double, Int?, String?, String?, String, Int?, String?, String?) -> Unit
 ) {
     val exercicioInicial = atividade.exercicio
     var exercicioId by remember(atividade.id) { mutableStateOf(atividade.exercicioId) }
@@ -380,12 +536,14 @@ fun EditActivityScreenContent(
     var menuExerciciosAberto by remember { mutableStateOf(false) }
 
     var titulo by remember(atividade.id) { mutableStateOf(atividade.titulo ?: "") }
+    var descricao by remember(atividade.id) { mutableStateOf(atividade.descricao ?: "") }
     var valor by remember(atividade.id) { mutableStateOf(atividade.valor.toString()) }
-    var duracao by remember(atividade.id) { mutableStateOf(atividade.duracaoMin?.toString() ?: "") }
+    var duracao by remember(atividade.id) { mutableIntStateOf(atividade.duracaoMin ?: 0) }
     var data by remember(atividade.id) { mutableStateOf(formatarDataInput(atividade.realizadaEm)) }
     var nota by remember(atividade.id) { mutableStateOf(atividade.nota?.toFloat()) }
     var intensidade by remember(atividade.id) { mutableStateOf(atividade.intensidade) }
     var humor by remember(atividade.id) { mutableStateOf(atividade.humor) }
+    var validationError by remember(atividade.id) { mutableStateOf<String?>(null) }
 
     Box(
         modifier = Modifier
@@ -429,7 +587,7 @@ fun EditActivityScreenContent(
             contentPadding = PaddingValues(horizontal = 24.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            item {
+            if (canEditMetrics) item {
                 Box {
                     TextButton(onClick = { menuExerciciosAberto = true }) {
                         Column(modifier = Modifier.fillMaxWidth()) {
@@ -475,6 +633,18 @@ fun EditActivityScreenContent(
 
             item {
                 ZenithTextField(
+                    value = descricao,
+                    onValueChange = { descricao = it },
+                    label = "Descrição (opcional)",
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 3,
+                    maxLines = 5,
+                    singleLine = false
+                )
+            }
+
+            if (canEditMetrics) item {
+                ZenithTextField(
                     value = valor,
                     onValueChange = { valor = it.filter { char -> char.isDigit() || char == '.' || char == ',' } },
                     label = "$exercicioUnidade realizados *",
@@ -484,23 +654,43 @@ fun EditActivityScreenContent(
                 )
             }
 
-            item {
-                ZenithTextField(
-                    value = duracao,
-                    onValueChange = { duracao = it.filter(Char::isDigit) },
-                    label = "Duração em minutos (opcional)",
+            if (canEditMetrics) item {
+                ZenithDurationField(
+                    minutes = duracao,
+                    onMinutesChange = {
+                        validationError = null
+                        duracao = it
+                    },
+                    label = "Duração (opcional)",
                     modifier = Modifier.fillMaxWidth(),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    singleLine = true
+                    optional = true,
+                    isError = validationError != null,
+                    supportingText = validationError?.let { { Text(it, color = MaterialTheme.colorScheme.error) } }
                 )
             }
 
-            item {
+            if (canEditMetrics) item {
                 ZenithDateTimeField(
                     value = data,
-                    onValueChange = { data = it },
+                    onValueChange = {
+                        validationError = null
+                        data = it
+                    },
                     label = "Data e horário *",
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    isError = validationError != null,
+                    supportingText = validationError?.let { { Text(it, color = MaterialTheme.colorScheme.error) } },
+                    validateSelection = { selected ->
+                        val duration = duracao.takeIf { it > 0 }
+                        val now = java.time.LocalDateTime.now()
+                        when {
+                            selected.toLocalDate().isAfter(now.toLocalDate()) -> "A data da atividade não pode ser futura."
+                            selected.isAfter(now) -> "O horário da atividade não pode ser futuro."
+                            duration != null && selected.plusMinutes(duration.toLong()).isAfter(now) ->
+                                "A duração informada termina depois do horário atual."
+                            else -> null
+                        }
+                    }
                 )
             }
 
@@ -544,7 +734,7 @@ fun EditActivityScreenContent(
                     style = MaterialTheme.typography.bodyMedium.copy(color = Color.Gray)
                 )
                 Spacer(modifier = Modifier.height(8.dp))
-                OptionalSelectionDropdown(
+                ZenithOptionField(
                     selectedValue = intensidade,
                     placeholder = "Selecionar intensidade",
                     options = listOf(
@@ -562,7 +752,7 @@ fun EditActivityScreenContent(
                     style = MaterialTheme.typography.bodyMedium.copy(color = Color.Gray)
                 )
                 Spacer(modifier = Modifier.height(8.dp))
-                OptionalSelectionDropdown(
+                ZenithOptionField(
                     selectedValue = humor,
                     placeholder = "Selecionar humor",
                     options = listOf(
@@ -592,11 +782,23 @@ fun EditActivityScreenContent(
                 Button(
                     onClick = {
                         val valorDouble = valor.replace(",", ".").toDoubleOrNull() ?: return@Button
+                        val selectedDate = parseActivityEditDateTime(data)
+                        val now = java.time.LocalDateTime.now()
+                        validationError = when {
+                            selectedDate == null -> "Escolha uma data e horário válidos."
+                            selectedDate.toLocalDate().isAfter(now.toLocalDate()) -> "A data da atividade não pode ser futura."
+                            selectedDate.isAfter(now) -> "O horário da atividade não pode ser futuro."
+                            duracao > 0 && selectedDate.plusMinutes(duracao.toLong()).isAfter(now) ->
+                                "A duração informada termina depois do horário atual."
+                            else -> null
+                        }
+                        if (validationError != null) return@Button
                         onSave(
                             exercicioId,
                             valorDouble,
-                            duracao.toIntOrNull(),
+                            duracao.takeIf { it > 0 },
                             titulo.ifBlank { null },
+                            descricao.ifBlank { null },
                             data,
                             nota?.toInt(),
                             intensidade,
@@ -619,47 +821,6 @@ fun EditActivityScreenContent(
                         )
                     )
                 }
-            }
-        }
-    }
-}
-
-@Composable
-private fun OptionalSelectionDropdown(
-    selectedValue: String?,
-    placeholder: String,
-    options: List<Pair<String, String>>,
-    onSelected: (String?) -> Unit
-) {
-    var expanded by remember { mutableStateOf(false) }
-    val selectedLabel = options.firstOrNull { it.first == selectedValue }?.second ?: placeholder
-
-    Box {
-        OutlinedButton(
-            onClick = { expanded = true },
-            shape = RoundedCornerShape(8.dp)
-        ) {
-            Text(selectedLabel, fontFamily = Inter, color = Color(0xFF238D25))
-        }
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false }
-        ) {
-            DropdownMenuItem(
-                text = { Text("Não definido", fontFamily = Inter) },
-                onClick = {
-                    onSelected(null)
-                    expanded = false
-                }
-            )
-            options.forEach { (value, label) ->
-                DropdownMenuItem(
-                    text = { Text(label, fontFamily = Inter) },
-                    onClick = {
-                        onSelected(value)
-                        expanded = false
-                    }
-                )
             }
         }
     }
@@ -746,4 +907,13 @@ fun formatarDataInput(isoDate: String?): String {
         java.time.LocalDateTime.now()
             .format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"))
     }
+}
+
+private fun parseActivityEditDateTime(value: String): java.time.LocalDateTime? {
+    return runCatching {
+        java.time.LocalDateTime.parse(
+            value,
+            java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")
+        )
+    }.getOrNull()
 }

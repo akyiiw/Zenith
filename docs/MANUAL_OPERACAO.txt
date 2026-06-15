@@ -1,0 +1,93 @@
+MANUAL DE OPERAÇÃO - ZENITH
+
+1. INTRODUÇÃO
+O Zenith é um aplicativo Android de rastreamento de saúde e atividades físicas com foco em gamificação e interação social. O objetivo principal é motivar os usuários a manterem hábitos saudáveis através de competições, metas personalizadas e reconhecimento de conquistas.
+
+Glossário:
+- Streak: Sequência de dias consecutivos de atividade física.
+- Menções: Recurso que permite convidar amigos para visualizar ou participar de uma atividade específica.
+- Atividades Registradas: Atividades inseridas manualmente pelo usuário.
+- Atividades Monitoradas: Atividades validadas via GPS ou sensores do dispositivo.
+- Premium/Dev: Níveis de conta com permissões especiais, como a criação de desafios.
+
+2. ARQUITETURA TÉCNICA
+O Zenith utiliza uma arquitetura moderna, seguindo os padrões recomendados para Android:
+
+- Linguagem e UI: Kotlin com Jetpack Compose (UI declarativa).
+- Gerenciamento de Estado: Arquitetura baseada em ViewModels para separação de lógica de negócio e interface.
+- Backend (BaaS): Supabase, provendo:
+    - Banco de Dados: PostgreSQL com PostgREST para acesso via API.
+    - Autenticação: Supabase Auth (JWT).
+    - Armazenamento: Supabase Storage para fotos de perfil e banners.
+    - Lógica de Servidor: RPCs (Remote Procedure Calls) para operações complexas (ex: cálculo de streaks).
+- Principais Bibliotecas:
+    - Ktor: Comunicação de rede.
+    - Coil: Carregamento de imagens.
+    - Google Maps SDK: Visualização de rotas de atividades.
+    - BlurHash: Otimização de placeholders de imagem.
+
+3. GUIA DE INSTALAÇÃO E CONFIGURAÇÃO
+
+Pré-requisitos:
+- Android Studio (Versão estável mais recente).
+- JDK 17+.
+- Android SDK API 36 (minSdk 34).
+
+Configuração de Ambiente:
+Para que o aplicativo funcione, as seguintes chaves de API devem ser configuradas:
+
+1. Google Maps:
+   - No arquivo local.properties, adicione:
+     MAPS_API_KEY=SUA_CHAVE_AQUI
+
+2. Supabase:
+   - No arquivo app/src/main/assets/properties.env, configure:
+     SUPABASE_URL=https://seu-projeto.supabase.co
+     ANON_KEY=sua-chave-anon-aqui
+
+Comandos de Build:
+- Compilação rápida (Kotlin): ./gradlew :app:compileDebugKotlin
+- Execução de Testes Unitários: ./gradlew test
+- Instalação no Dispositivo: ./gradlew installDebug
+
+4. GUIA FUNCIONAL
+
+4.1. Fluxo de Onboarding e Autenticação
+O usuário inicia o app pela tela de boas-vindas, podendo realizar o cadastro ou login via e-mail. Após a autenticação, é direcionado para a configuração do perfil (nome, foto e banner).
+
+4.2. Gestão de Atividades
+- Registro: O usuário pode registrar exercícios manualmente, definindo data, hora, duração, intensidade e humor.
+- Publicação: Ao registrar, o usuário pode optar por publicar a atividade no feed social.
+- Interação: É possível mencionar amigos na atividade para que eles recebam uma notificação e possam aceitar a exibição daquela atividade em seus próprios perfis.
+
+4.3. Ecossistema Social
+- Home Feed: Exibe atividades de amigos e publicações recentes.
+- Perfis: O usuário pode alternar entre perfil próprio e público. A visibilidade de atividades e estatísticas é controlada pelas configurações de privacidade.
+- Menções: Sistema de convites onde o amigo mencionado deve aceitar a menção para que a atividade apareça em seu histórico.
+
+4.4. Gamificação e Conquistas
+- Streaks: O sistema monitora a regularidade das atividades. Se o usuário registrar atividades em dias consecutivos, o streak aumenta. A falha de um dia reinicia a contagem para 1.
+- Títulos e Badges: Desbloqueados automaticamente via regras de backend (RPCs).
+    - Exemplo: 7 dias de streak -> Título "Dedicado" e conquista streak_7.
+    - Exemplo: 10 atividades -> Título "Atleta" e conquista atividades_10.
+
+4.5. Desafios e Rankings
+- Criação: Restrita a usuários com status Premium ou Desenvolvedor.
+- Participação: Usuários podem entrar em desafios, registrar atividades vinculadas e acompanhar sua posição no ranking em tempo real.
+- Fórum: Cada desafio possui um espaço de publicações exclusivo para participantes.
+
+4.6. Monitoramento de Saúde
+- Sono: Registro manual de horas dormidas e configuração de janelas de sono. O app busca estimar a duração real baseando-se na interação com o dispositivo.
+- Metas: Definição de metas semanais e mensais (ex: km percorridos, horas de exercício). O progresso é calculado automaticamente a partir das atividades registradas.
+
+5. ADMINISTRAÇÃO E MANUTENÇÃO
+
+Gestão via Supabase:
+- Tabelas: A estrutura de dados reside no esquema public.
+- RLS (Row Level Security): Todas as tabelas críticas (feed, atividades, perfis) possuem políticas de segurança para garantir que usuários não editem dados alheios e respeitem a privacidade.
+- Migrations: Alterações de schema devem ser feitas via arquivos .sql na pasta supabase/migrations.
+
+Verificação de Saúde do Sistema:
+Recomenda-se a execução regular dos Advisors do Supabase:
+- Security Advisor: Para detectar falhas em políticas de RLS.
+- Performance Advisor: Para identificar a necessidade de novos índices em tabelas de grande volume (ex: feed_entries).

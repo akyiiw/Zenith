@@ -12,7 +12,10 @@ import br.com.zenith.ui.theme.ZenithTheme
 import br.com.zenith.viewmodels.challenge.ChallengeViewModel
 
 @Composable
-fun ChallengeScreen(navController: NavController) {
+fun ChallengeScreen(
+    navController: NavController,
+    initialChallengeId: String? = null
+) {
     ZenithTheme {
         val viewModel: ChallengeViewModel = viewModel()
         val context = LocalContext.current
@@ -20,8 +23,8 @@ fun ChallengeScreen(navController: NavController) {
         val isLoading by viewModel.isLoading.collectAsState()
         val isSaving by viewModel.isSaving.collectAsState()
 
-        LaunchedEffect(Unit) {
-            viewModel.fetchChallenges(context)
+        LaunchedEffect(initialChallengeId) {
+            viewModel.fetchChallenges(context, initialChallengeId)
         }
 
         ChallengeContent(

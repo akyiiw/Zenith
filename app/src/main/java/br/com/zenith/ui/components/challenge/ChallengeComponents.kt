@@ -69,13 +69,16 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import br.com.zenith.R
 import br.com.zenith.data.SupabaseConfig
+import br.com.zenith.data.models.ChallengeAwardCalculator.isFinished
 import br.com.zenith.data.models.Desafio as Challenge
 import br.com.zenith.data.models.Profile
 import br.com.zenith.ui.animations.CenteredZenithLoading
 import br.com.zenith.ui.animations.ZenithLoading
+import br.com.zenith.ui.components.common.BottomNavListPadding
 import br.com.zenith.ui.components.common.ScreenHeader
 import br.com.zenith.ui.theme.Green
 import br.com.zenith.ui.theme.Inter
+import br.com.zenith.utils.UnitFormatters
 import br.com.zenith.ui.theme.TextFieldGreen
 import br.com.zenith.ui.theme.items.ZenithTextField
 import br.com.zenith.viewmodels.challenge.ChallengeEntry
@@ -124,7 +127,7 @@ fun ChallengeContent(
                 .padding(padding)
                 .statusBarsPadding()
                 .padding(horizontal = 20.dp),
-            contentPadding = PaddingValues(top = 19.dp, bottom = 104.dp),
+            contentPadding = PaddingValues(top = 19.dp, bottom = BottomNavListPadding),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             if (selectedChallengeDetails == null) {
@@ -143,16 +146,20 @@ fun ChallengeContent(
                 }
 
                 val visibleChallenges = uiState.challenges.filter { challenge ->
+                    val finished = challenge.isFinished()
+                    val participating = uiState.isParticipating(challenge.id)
                     when (selectedTab) {
-                        ChallengeTab.Explorar -> !uiState.isParticipating(challenge.id)
-                        ChallengeTab.Ativos -> uiState.isParticipating(challenge.id)
+                        ChallengeTab.Ativos -> participating && !finished
+                        ChallengeTab.Explorar -> !participating && !finished
+                        ChallengeTab.Finalizados -> participating && finished
                     }
                 }
 
                 if (visibleChallenges.isEmpty()) {
                     val emptyText = when (selectedTab) {
                         ChallengeTab.Explorar -> "Nenhum desafio disponível para explorar"
-                        ChallengeTab.Ativos -> "Você ainda não entrou em nenhum desafio"
+                        ChallengeTab.Ativos -> "Você não tem desafios ativos"
+                        ChallengeTab.Finalizados -> "Nenhum desafio finalizado ainda"
                     }
                     item { EmptyState(emptyText) }
                 } else {
@@ -257,7 +264,8 @@ fun ChallengeContent(
 
 private enum class ChallengeTab(val label: String) {
     Ativos("Ativos"),
-    Explorar("Explorar")
+    Explorar("Explorar"),
+    Finalizados("Finalizados")
 }
 
 private enum class ChallengeDetailTab(val label: String) {
@@ -371,6 +379,7 @@ private fun ChallengeHeader(
     onBack: () -> Unit,
     onJoin: () -> Unit
 ) {
+    val finished = challenge.isFinished()
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -407,7 +416,7 @@ private fun ChallengeHeader(
             ChallengeBanner(challenge = challenge)
         }
 
-        if (!isParticipating) {
+        if (!isParticipating && !finished) {
             OutlinedButton(
                 onClick = onJoin,
                 enabled = !isSaving && challenge.id.isNotBlank(),
@@ -416,6 +425,15 @@ private fun ChallengeHeader(
             ) {
                 Text("Entrar no desafio", fontFamily = Inter, color = Green)
             }
+        } else if (finished) {
+            Text(
+                text = "Desafio finalizado",
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    fontFamily = Inter,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF6F6C6C)
+                )
+            )
         }
     }
 }
@@ -481,6 +499,7 @@ private fun ChallengeRow(
     onOpen: () -> Unit,
     onJoin: () -> Unit
 ) {
+    val finished = challenge.isFinished()
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -511,7 +530,7 @@ private fun ChallengeRow(
                 participantCount = participantCount
             )
 
-            if (!isParticipating) {
+            if (!isParticipating && !finished) {
                 OutlinedButton(
                     onClick = onJoin,
                     enabled = !isSaving && challenge.id.isNotBlank(),
@@ -520,6 +539,15 @@ private fun ChallengeRow(
                 ) {
                     Text("Entrar", fontFamily = Inter, color = TextFieldGreen)
                 }
+            } else if (finished) {
+                Text(
+                    text = "Finalizado",
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        fontFamily = Inter,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF6F6C6C)
+                    )
+                )
             }
         }
         Spacer(modifier = Modifier.width(12.dp))
@@ -775,9 +803,7 @@ private fun ChallengeForumPostCard(
     onComment: (String, String) -> Unit
 ) {
     var commentText by remember(item.post.id) { mutableStateOf("") }
-    val authorName = item.author?.displayName?.takeIf { it.isNotBlank() }
-        ?: item.author?.name?.takeIf { it.isNotBlank() }
-        ?: "Usuário"
+    val authorName = profileUsername(item.author)
 
     Column(
         modifier = Modifier
@@ -840,9 +866,7 @@ private fun ChallengeForumPostCard(
             }
         }
         item.comments.forEach { commentItem ->
-            val commentAuthor = commentItem.author?.displayName?.takeIf { it.isNotBlank() }
-                ?: commentItem.author?.name?.takeIf { it.isNotBlank() }
-                ?: "Usuário"
+            val commentAuthor = profileUsername(commentItem.author)
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -904,6 +928,13 @@ private fun challengeActivityName(activity: String) = when (activity.lowercase(L
     else -> "Caminhada"
 }
 
+private fun profileUsername(profile: Profile?): String {
+    return profile?.name
+        ?.takeIf { it.isNotBlank() }
+        ?.let { "@$it" }
+        ?: "@usuario"
+}
+
 private fun challengeVisibilityLabel(challenge: Challenge): String {
     val visibility = when (challenge.visibilidade) {
         "amigos" -> "Apenas amigos"
@@ -917,9 +948,9 @@ private fun challengeVisibilityLabel(challenge: Challenge): String {
 private fun challengeGoalLabel(challenge: Challenge): String {
     val objective = challenge.objetivoValor ?: challenge.meta
     return when (challenge.rankingTipo) {
-        "menor_tempo" -> "Distância alvo: ${formatGoal(objective)} km · vence menor tempo"
-        "maior_distancia" -> "Tempo alvo: ${formatGoal(objective)} min · vence maior distância"
-        "menor_pace" -> "Distância alvo: ${formatGoal(objective)} km · vence menor pace"
+        "menor_tempo" -> "Distância alvo: ${UnitFormatters.kilometers(objective)} · vence menor tempo"
+        "maior_distancia" -> "Tempo alvo: ${UnitFormatters.minutes(objective.toInt())} · vence maior distância"
+        "menor_pace" -> "Distância alvo: ${UnitFormatters.kilometers(objective)} · vence menor pace"
         "tempo_total" -> "Meta livre · soma tempo"
         else -> "Meta livre · soma distância"
     }
@@ -928,17 +959,17 @@ private fun challengeGoalLabel(challenge: Challenge): String {
 private fun challengeEntryValue(entry: ChallengeEntry, challenge: Challenge): String {
     val usesSteps = challenge.metrica == "passos" || challenge.unidade.contains("pass", ignoreCase = true)
     if (usesSteps && challenge.rankingTipo != "menor_tempo" && challenge.rankingTipo != "menor_pace") {
-        return "${formatGoal(entry.progress)} passos"
+        return "${UnitFormatters.steps(entry.progress.toInt())} passos"
     }
     return when (challenge.rankingTipo) {
-        "menor_tempo" -> "${entry.minutes} min"
+        "menor_tempo" -> UnitFormatters.minutes(entry.minutes)
         "menor_pace" -> {
             val distance = (challenge.objetivoValor ?: challenge.meta).coerceAtLeast(0.01)
-            "${formatGoal(entry.minutes / distance)} min/km"
+            "${UnitFormatters.compactNumber(entry.minutes / distance)} min/km"
         }
-        "maior_distancia", "distancia_total" -> "${formatGoal(entry.progress)} km"
-        "tempo_total" -> "${formatGoal(entry.progress)} min"
-        else -> "${formatGoal(entry.progress)} ${challenge.unidade}"
+        "maior_distancia", "distancia_total" -> UnitFormatters.kilometersWithSpace(entry.progress)
+        "tempo_total" -> UnitFormatters.minutes(entry.progress.toInt())
+        else -> "${UnitFormatters.compactNumber(entry.progress)} ${challenge.unidade}"
     }
 }
 
@@ -1019,7 +1050,7 @@ private fun ChallengeDetailsRow(
         Spacer(modifier = Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = if (isCurrentUser) "${entry.profile.displayName} (voc\u00ea)" else entry.profile.displayName,
+                text = if (isCurrentUser) "${profileUsername(entry.profile)} (voc\u00ea)" else profileUsername(entry.profile),
                 style = MaterialTheme.typography.bodyLarge.copy(fontFamily = Inter, fontWeight = FontWeight.SemiBold),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -1397,8 +1428,4 @@ private fun rankColor(position: Int): Color {
         3 -> Color(0xFFB86E32)
         else -> Green
     }
-}
-
-private fun formatGoal(value: Double): String {
-    return if (value % 1.0 == 0.0) value.toInt().toString() else "%.1f".format(value)
 }

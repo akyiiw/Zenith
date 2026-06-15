@@ -10,6 +10,7 @@ import br.com.zenith.data.models.ChallengeForumEntry
 import br.com.zenith.data.models.ChallengeForumMedia
 import br.com.zenith.data.models.ChallengeForumPost
 import br.com.zenith.data.models.Amizade
+import br.com.zenith.data.models.ChallengeAwardCalculator.isFinished
 import br.com.zenith.data.models.Atividade as UserActivity
 import br.com.zenith.data.models.Desafio as Challenge
 import br.com.zenith.data.models.DesafioParticipacao as ChallengeParticipation
@@ -101,9 +102,9 @@ data class ChallengeUiState(
 
     fun creatorName(creatorId: String): String {
         val profile = profiles.firstOrNull { it.id == creatorId }
-        return profile?.displayName
+        return profile?.name
             ?.takeIf { it.isNotBlank() }
-            ?: profile?.name?.takeIf { it.isNotBlank() }
+            ?.let { "@$it" }
             ?: "Criador desconhecido"
     }
 }
@@ -128,12 +129,12 @@ class ChallengeViewModel : ViewModel() {
     private var forumMediaCache: List<ChallengeForumMedia> = emptyList()
     private var forumCommentsCache: List<ChallengeForumComment> = emptyList()
 
-    fun fetchChallenges(context: Context) {
+    fun fetchChallenges(context: Context, selectedChallengeId: String? = null) {
         viewModelScope.launch {
             _isLoading.value = true
             try {
                 loadData(context)
-                publishState(selectedChallengeId = _uiState.value.selectedChallengeId)
+                publishState(selectedChallengeId = selectedChallengeId ?: _uiState.value.selectedChallengeId)
             } catch (e: Exception) {
                 ZenithNotifier.error("Erro ao carregar desafios: ${e.localizedMessage}")
             } finally {
@@ -232,6 +233,10 @@ class ChallengeViewModel : ViewModel() {
                 val client = SupabaseConfig.getClient()
                 val userId = client.auth.currentUserOrNull()?.id
                     ?: throw Exception("Usuario nao autenticado")
+                val serverNow = fetchServerNow(client)
+                if (draft.startDate.isBefore(serverNow) || draft.endDate.isBefore(serverNow)) {
+                    throw Exception("O período do desafio não pode ficar no passado")
+                }
                 val currentProfile = profilesCache.firstOrNull { it.id == userId }
                     ?: runCatching {
                         client.postgrest.from("profiles").select {
@@ -303,6 +308,9 @@ class ChallengeViewModel : ViewModel() {
                 val userId = client.auth.currentUserOrNull()?.id
                     ?: throw Exception("Usuario nao autenticado")
 
+                if (challenge.isFinished()) {
+                    throw Exception("Este desafio já foi finalizado")
+                }
                 if (_uiState.value.isParticipating(challenge.id)) return@launch
                 val currentProfile = profilesCache.firstOrNull { it.id == userId }
                 if (challenge.apenasPremium && currentProfile?.isPremium != true) {
@@ -516,6 +524,10 @@ class ChallengeViewModel : ViewModel() {
         )
     }
 
+    private suspend fun fetchServerNow(client: io.github.jan.supabase.SupabaseClient): OffsetDateTime {
+        return OffsetDateTime.parse(client.postgrest.rpc("server_now").decodeAs<String>())
+    }
+
     private fun buildForum(challengeId: String?): List<ChallengeForumItem> {
         if (challengeId == null) return emptyList()
         val posts = forumPostsCache
@@ -633,11 +645,11 @@ class ChallengeViewModel : ViewModel() {
             challenge.rankingTipo == "menor_tempo" || challenge.rankingTipo == "menor_pace" ->
                 compareBy<ChallengeEntry> { if (it.minutes > 0) it.minutes else Int.MAX_VALUE }
                     .thenByDescending { it.verifiedActivities }
-                    .thenBy { it.profile.displayName }
+                    .thenBy { it.profile.name }
             else ->
                 compareByDescending<ChallengeEntry> { it.progress }
                     .thenByDescending { it.verifiedActivities }
-                    .thenBy { it.profile.displayName }
+                    .thenBy { it.profile.name }
         }
     }
 

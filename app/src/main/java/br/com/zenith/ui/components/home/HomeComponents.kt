@@ -57,6 +57,7 @@ import br.com.zenith.viewmodels.home.HomeNotificationItem
 import br.com.zenith.viewmodels.home.HomeNotificationType
 import coil.compose.AsyncImage
 import io.github.jan.supabase.storage.storage
+import java.time.LocalTime
 import java.util.Locale
 
 data class HomeGoalItem(
@@ -149,7 +150,8 @@ fun Header(
 fun NotificationsDrawer(
     notifications: List<HomeNotificationItem>,
     isLoading: Boolean,
-    onNotificationClick: (HomeNotificationItem) -> Unit
+    onNotificationClick: (HomeNotificationItem) -> Unit,
+    onMarkAsRead: (HomeNotificationItem) -> Unit
 ) {
     Surface(
         modifier = Modifier
@@ -190,7 +192,8 @@ fun NotificationsDrawer(
                     notifications.forEach { notification ->
                         NotificationRow(
                             notification = notification,
-                            onClick = { onNotificationClick(notification) }
+                            onClick = { onNotificationClick(notification) },
+                            onMarkAsRead = { onMarkAsRead(notification) }
                         )
                     }
                 }
@@ -250,7 +253,8 @@ private fun EmptyNotifications() {
 @Composable
 private fun NotificationRow(
     notification: HomeNotificationItem,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onMarkAsRead: () -> Unit
 ) {
     val color = notification.type.color()
     Row(
@@ -306,6 +310,21 @@ private fun NotificationRow(
                     )
                 )
             }
+            Button(
+                onClick = onMarkAsRead,
+                colors = ButtonDefaults.buttonColors(containerColor = Green),
+                shape = RoundedCornerShape(8.dp),
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+            ) {
+                Text(
+                    text = "Marcar como lida",
+                    style = MaterialTheme.typography.labelMedium.copy(
+                        fontFamily = Inter,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                )
+            }
         }
     }
 }
@@ -326,6 +345,8 @@ private fun HomeNotificationType.icon() = when (this) {
 
 @Composable
 fun WelcomeCard(user: Profile?) {
+    val greeting = currentGreeting()
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -337,7 +358,7 @@ fun WelcomeCard(user: Profile?) {
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Text(
-            text = "Boa noite, ${user?.displayName ?: "Usuário"}",
+            text = "$greeting, ${user?.displayName ?: "Usuário"}",
             style = MaterialTheme.typography.bodyLarge.copy(
                 fontWeight = FontWeight.W600,
                 color = Color.Black
@@ -360,6 +381,13 @@ fun WelcomeCard(user: Profile?) {
             )
         }
     }
+}
+
+private fun currentGreeting(now: LocalTime = LocalTime.now()): String = when (now.hour) {
+    in 5..11 -> "Bom dia"
+    in 12..17 -> "Boa tarde"
+    in 18..23, in 0..4 -> "Boa noite"
+    else -> "Ola"
 }
 
 @Composable
@@ -677,10 +705,12 @@ private fun FeedActivityCard(
                 text = "Duracao: ${formattedDuration(item.activity.duracaoMin)}",
                 style = MaterialTheme.typography.bodySmall.copy(fontFamily = Inter, color = Color(0xFF6F6C6C))
             )
-            Text(
-                text = if (item.activity.verificada) "Verificada" else "Manual",
-                style = MaterialTheme.typography.bodySmall.copy(fontFamily = Inter, color = Color(0xFF6F6C6C))
-            )
+            if (item.activity.verificada) {
+                Text(
+                    text = "Verificada",
+                    style = MaterialTheme.typography.bodySmall.copy(fontFamily = Inter, color = Green)
+                )
+            }
         }
     }
 }

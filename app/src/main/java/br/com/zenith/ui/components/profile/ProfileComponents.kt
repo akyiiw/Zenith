@@ -16,7 +16,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -47,7 +46,12 @@ import io.github.jan.supabase.storage.storage
 import androidx.core.graphics.toColorInt
 import androidx.navigation.NavController
 import br.com.zenith.data.models.Atividade
+import br.com.zenith.data.models.ChallengeAward
+import br.com.zenith.data.models.ChallengeAwardCalculator
+import br.com.zenith.data.models.ChallengeAwardSummary
+import br.com.zenith.data.models.ChallengeMedalType
 import br.com.zenith.data.models.Desafio
+import br.com.zenith.utils.UnitFormatters
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.jsonArray
@@ -89,12 +93,16 @@ fun ProfileHeader(
     onBack: () -> Unit,
     onEdit: (() -> Unit)? = null,
     onTitleClick: () -> Unit = {},
-    onStatusClick: (() -> Unit)? = null
+    onStatusClick: (() -> Unit)? = null,
+    onBadgeClick: (() -> Unit)? = null,
+    onStatClick: (String) -> Unit = {}
 ) {
     ZenithTheme {
         Column(modifier = Modifier.fillMaxWidth()) {
             Box(modifier = Modifier.fillMaxWidth()) {
-                Banner(bannerHash = user?.bannerHash)
+                Banner(
+                    bannerHash = user?.bannerHash
+                )
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -139,17 +147,27 @@ fun ProfileHeader(
                 }
             }
             Spacer(modifier = Modifier.height(8.dp))
-            UserSection(user = user, badge = badge, onTitleClick = onTitleClick)
+            UserSection(
+                user = user,
+                badge = badge,
+                onTitleClick = onTitleClick,
+                onBadgeClick = onBadgeClick
+            )
             Spacer(modifier = Modifier.height(8.dp))
             Streak(streak = user?.streak ?: 0)
             Spacer(modifier = Modifier.height(8.dp))
-            Stats(stats = stats)
+            Stats(stats = stats, onStatClick = onStatClick)
         }
     }
 }
 
 @Composable
-fun UserSection(user: Profile?, badge: Badge?, onTitleClick: () -> Unit) {
+fun UserSection(
+    user: Profile?,
+    badge: Badge?,
+    onTitleClick: () -> Unit,
+    onBadgeClick: (() -> Unit)? = null
+) {
     fun formatDate(isoDate: String): String {
         return try {
             val input = java.time.OffsetDateTime.parse(isoDate)
@@ -167,7 +185,7 @@ fun UserSection(user: Profile?, badge: Badge?, onTitleClick: () -> Unit) {
                 textAlign = TextAlign.Center
             )
             Spacer(modifier = Modifier.width(6.dp))
-            Badge(badge = badge)
+            Badge(badge = badge, onClick = onBadgeClick)
         }
         Text(
             text = "@${user?.name ?: "..."}",
@@ -188,8 +206,22 @@ fun UserSection(user: Profile?, badge: Badge?, onTitleClick: () -> Unit) {
 }
 
 @Composable
-fun Badge(badge: Badge?) {
-    if (badge == null) return
+fun Badge(badge: Badge?, onClick: (() -> Unit)? = null) {
+    if (badge == null) {
+        if (onClick == null) return
+
+        Row(
+            modifier = Modifier
+                .background(color = Color(0xFFEAF3DE), shape = RoundedCornerShape(size = 15.dp))
+                .wrapContentSize()
+                .clickable { onClick() }
+                .padding(start = 10.dp, top = 3.dp, end = 10.dp, bottom = 3.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(text = "Badge", color = Color(0xFF238D25))
+        }
+        return
+    }
 
     val config = badgeConfig(badge.title) ?: return  // ← some silenciosamente
 
@@ -197,6 +229,7 @@ fun Badge(badge: Badge?) {
         modifier = Modifier
             .background(color = config.backgroundColor, shape = RoundedCornerShape(size = 15.dp))
             .wrapContentSize()
+            .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier)
             .padding(start = 10.dp, top = 3.dp, end = 10.dp, bottom = 3.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -212,7 +245,7 @@ fun Badge(badge: Badge?) {
 }
 
 @Composable
-fun RecentHeader() {
+fun RecentHeader(onViewAll: (() -> Unit)? = null) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -234,7 +267,10 @@ fun RecentHeader() {
                 text = "Ver todas",
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.W600,
-                color = Color(0x99111111)
+                color = Color(0x99111111),
+                modifier = Modifier.then(
+                    if (onViewAll != null) Modifier.clickable { onViewAll() } else Modifier
+                )
             )
         }
     }
@@ -318,33 +354,22 @@ fun activityGroup(atividade: Atividade): String {
     }
 }
 
-private fun formatDecimal(value: Double): String {
-    val rounded = kotlin.math.round(value * 10.0) / 10.0
-    return if (rounded % 1.0 == 0.0) rounded.toInt().toString() else rounded.toString()
-}
-
 fun formattedActivityValue(atividade: Atividade): String {
     val text = "${atividade.exercicio?.slug.orEmpty()} ${atividade.exercicio?.nome.orEmpty()} ${atividade.exercicio?.unidade.orEmpty()}".lowercase()
     val value = atividade.valor
     return when {
+        "pass" in text -> "${UnitFormatters.steps(value.toInt())} passos"
         "km" in text || "corr" in text || "caminh" in text || "bike" in text || "cicl" in text ->
-            "${formatDecimal(value)} km"
+            UnitFormatters.kilometersWithSpace(value)
         "min" in text ->
-            "${formatDecimal(value / 60.0)} h"
+            UnitFormatters.minutes(value.toInt())
         else ->
-            "${formatDecimal(value)} h"
+            UnitFormatters.compactNumber(value) + "h"
     }
 }
 
 fun formattedDuration(duracaoMin: Int?): String {
-    if (duracaoMin == null || duracaoMin <= 0) return "-"
-    val hours = duracaoMin / 60
-    val minutes = duracaoMin % 60
-    return when {
-        hours > 0 && minutes > 0 -> "${hours}h ${minutes}min"
-        hours > 0 -> "${hours}h"
-        else -> "${minutes}min"
-    }
+    return UnitFormatters.minutes(duracaoMin)
 }
 
 @Composable
@@ -439,13 +464,15 @@ fun RecentActivityCard(atividade: Atividade, desafio: Desafio? = null, onClick: 
                         color = Color(0xFF6F6C6C)
                     )
                 }
-                Spacer(modifier = Modifier.width(10.dp))
-                Column(
-                    modifier = Modifier.width(92.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    ActivityStatusBadge(verificada = atividade.verificada)
-                    RouteSparkline(rota = atividade.rota)
+                if (atividade.verificada || !atividade.rota.isNullOrBlank()) {
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column(
+                        modifier = Modifier.width(92.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        ActivityStatusBadge(verificada = atividade.verificada)
+                        RouteSparkline(rota = atividade.rota)
+                    }
                 }
             }
             ChallengeActivitySummary(desafio = desafio, atividade = atividade)
@@ -455,6 +482,8 @@ fun RecentActivityCard(atividade: Atividade, desafio: Desafio? = null, onClick: 
 
 @Composable
 private fun ActivityStatusBadge(verificada: Boolean) {
+    if (!verificada) return
+
     Box(
         modifier = Modifier
             .padding(1.dp)
@@ -464,7 +493,7 @@ private fun ActivityStatusBadge(verificada: Boolean) {
     ) {
         Icon(
             painter = painterResource(
-                id = if (verificada) R.drawable.act_verified else R.drawable.nav_social
+                id = R.drawable.act_verified
             ),
             contentDescription = "Status da Atividade",
             tint = Color.Unspecified,
@@ -517,9 +546,9 @@ fun ChallengeActivitySummary(desafio: Desafio?, atividade: Atividade) {
 fun challengeModeLabel(challenge: Desafio): String {
     val objective = challenge.objetivoValor ?: challenge.meta
     return when (challenge.rankingTipo) {
-        "menor_tempo" -> "${formatDecimal(objective)} km - menor tempo"
-        "maior_distancia" -> "${formatDecimal(objective)} min - maior distancia"
-        "menor_pace" -> "${formatDecimal(objective)} km - menor pace"
+        "menor_tempo" -> "${UnitFormatters.compactNumber(objective)} km - menor tempo"
+        "maior_distancia" -> "${UnitFormatters.minutes(objective.toInt())} - maior distancia"
+        "menor_pace" -> "${UnitFormatters.compactNumber(objective)} km - menor pace"
         "tempo_total" -> "tempo total"
         "distancia_total" -> "distancia total"
         else -> "${challenge.unidade.lowercase(Locale.ROOT)} no ranking"
@@ -654,11 +683,10 @@ fun Banner(bannerHash: String?) {
         AsyncImage(
             model = url,
             contentDescription = "Banner",
-            contentScale = ContentScale.FillBounds,
+            contentScale = ContentScale.Crop,
             modifier = Modifier
                 .fillMaxWidth()
                 .height(130.dp)
-                .blur(radius = 10.dp)
         )
     } else {
         Box(
@@ -666,7 +694,6 @@ fun Banner(bannerHash: String?) {
                 .fillMaxWidth()
                 .height(130.dp)
                 .background(color = Color(0xFFB5B5B5))
-                .blur(radius = 10.dp)
         )
     }
 }
@@ -678,7 +705,7 @@ fun ProfilePicture(pictureHash: String?) {
         AsyncImage(
             model = url,
             contentDescription = "Foto de perfil",
-            contentScale = ContentScale.FillBounds,
+            contentScale = ContentScale.Crop,
             modifier = Modifier
                 .size(135.dp)
                 .clip(CircleShape)
@@ -688,7 +715,7 @@ fun ProfilePicture(pictureHash: String?) {
         Image(
             painter = painterResource(id = R.drawable.profile_picture),
             contentDescription = "Foto de perfil",
-            contentScale = ContentScale.FillBounds,
+            contentScale = ContentScale.Crop,
             modifier = Modifier
                 .size(135.dp)
                 .clip(CircleShape)
@@ -698,10 +725,12 @@ fun ProfilePicture(pictureHash: String?) {
 }
 
 @Composable
-fun Stats(stats: UserStats) {
-    val statItems = remember {
-        listOf("Medalhas" to stats.medalhas, "Desafios" to stats.desafios, "Amigos" to stats.amigos, "Conquistas" to stats.conquistas)
-    }
+fun Stats(stats: UserStats, onStatClick: (String) -> Unit = {}) {
+    val statItems = listOf(
+        "Desafios" to stats.desafios,
+        "Amigos" to stats.amigos,
+        "Conquistas" to stats.conquistas
+    )
     val pagerState = rememberPagerState(pageCount = { statItems.size })
     HorizontalPager(
         state = pagerState,
@@ -713,18 +742,200 @@ fun Stats(stats: UserStats) {
             .height(83.dp)
     ) { page ->
         val (type, number) = statItems[page]
-        StatCard(type = type, number = number)
+        StatCard(type = type, number = number, onClick = { onStatClick(type) })
     }
 }
 
 @Composable
-fun StatCard(type: String, number: Int) {
+fun ChallengeAwardsSection(
+    summary: ChallengeAwardSummary,
+    historyLimit: Int? = 5,
+    onAwardClick: (ChallengeAward) -> Unit = {}
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        ChallengePodiumSection(summary = summary)
+        ChallengeAwardHistorySection(
+            summary = summary,
+            historyLimit = historyLimit,
+            onAwardClick = onAwardClick
+        )
+    }
+}
+
+@Composable
+fun ChallengePodiumSection(summary: ChallengeAwardSummary) {
+    Column(
+        modifier = Modifier
+            .padding(start = 32.dp, end = 32.dp, top = 10.dp)
+            .fillMaxWidth()
+            .background(color = Color(0xFFF5F5F5), shape = RoundedCornerShape(size = 5.dp))
+            .border(width = 1.dp, color = Color(0xFFE0E0E0), shape = RoundedCornerShape(size = 5.dp))
+            .padding(horizontal = 14.dp, vertical = 12.dp)
+    ) {
+        Text(
+            text = "Pódio de desafios",
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.W700,
+            color = Color(0xFF000000)
+        )
+        Spacer(modifier = Modifier.height(10.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            MedalCounter("Ouro", summary.gold, Color(0xFFE0A800), Modifier.weight(1f))
+            MedalCounter("Prata", summary.silver, Color(0xFF8A94A6), Modifier.weight(1f))
+            MedalCounter("Bronze", summary.bronze, Color(0xFFB86E32), Modifier.weight(1f))
+            MedalCounter("Part.", summary.participation, Color(0xFF238D25), Modifier.weight(1f))
+        }
+    }
+}
+
+@Composable
+fun ChallengeAwardHistorySection(
+    summary: ChallengeAwardSummary,
+    historyLimit: Int? = 5,
+    onAwardClick: (ChallengeAward) -> Unit = {}
+) {
+    Column(
+        modifier = Modifier
+            .padding(start = 32.dp, end = 32.dp, top = 10.dp)
+            .fillMaxWidth()
+            .background(color = Color(0xFFF5F5F5), shape = RoundedCornerShape(size = 5.dp))
+            .border(width = 1.dp, color = Color(0xFFE0E0E0), shape = RoundedCornerShape(size = 5.dp))
+            .padding(horizontal = 14.dp, vertical = 12.dp)
+    ) {
+        Text(
+            text = "Histórico",
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.W700,
+            color = Color(0xFF000000)
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        if (summary.history.isEmpty()) {
+            Text(
+                text = "Nenhum desafio finalizado com medalha ainda",
+                style = MaterialTheme.typography.labelSmall,
+                color = Color(0xFF6F6C6C)
+            )
+        } else {
+            val history = historyLimit?.let { summary.history.take(it) } ?: summary.history
+            history.forEach { award ->
+                ChallengeAwardHistoryRow(
+                    award = award,
+                    onClick = { onAwardClick(award) }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun MedalCounter(
+    label: String,
+    value: Int,
+    color: Color,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .height(62.dp)
+            .background(color = Color.White, shape = RoundedCornerShape(5.dp))
+            .border(width = 1.dp, color = color.copy(alpha = 0.45f), shape = RoundedCornerShape(5.dp))
+            .padding(vertical = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text(
+            text = value.toString(),
+            style = MaterialTheme.typography.titleMedium,
+            fontFamily = Inter,
+            fontStyle = FontStyle.Italic,
+            fontWeight = FontWeight.W800,
+            color = color
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            maxLines = 1,
+            color = Color(0xFF555555)
+        )
+    }
+}
+
+@Composable
+private fun ChallengeAwardHistoryRow(
+    award: ChallengeAward,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 7.dp)
+            .clickable { onClick() },
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(10.dp)
+                .background(medalColor(award.medalType), CircleShape)
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = award.challengeTitle,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.W600,
+                color = Color(0xFF202020),
+                maxLines = 1
+            )
+            val finishedDate = ChallengeAwardCalculator.formatFinishedDate(award.finishedAt)
+            Text(
+                text = listOfNotNull(
+                    medalLabel(award.medalType, award.position),
+                    finishedDate.takeIf { it.isNotBlank() },
+                    awardScoreLabel(award)
+                ).joinToString(" - "),
+                style = MaterialTheme.typography.labelSmall,
+                color = Color(0xFF6F6C6C),
+                maxLines = 1
+            )
+        }
+    }
+}
+
+private fun medalLabel(type: ChallengeMedalType, position: Int?): String {
+    return when (type) {
+        ChallengeMedalType.GOLD -> "Ouro"
+        ChallengeMedalType.SILVER -> "Prata"
+        ChallengeMedalType.BRONZE -> "Bronze"
+        ChallengeMedalType.PARTICIPATION -> position?.let { "${it}º lugar" } ?: "Participação"
+    }
+}
+
+private fun medalColor(type: ChallengeMedalType): Color {
+    return when (type) {
+        ChallengeMedalType.GOLD -> Color(0xFFE0A800)
+        ChallengeMedalType.SILVER -> Color(0xFF8A94A6)
+        ChallengeMedalType.BRONZE -> Color(0xFFB86E32)
+        ChallengeMedalType.PARTICIPATION -> Color(0xFF238D25)
+    }
+}
+
+private fun awardScoreLabel(award: ChallengeAward): String? {
+    if (award.score <= 0.0) return null
+    return "${UnitFormatters.compactNumber(award.score)} ${award.unit}"
+}
+
+@Composable
+fun StatCard(type: String, number: Int, onClick: () -> Unit = {}) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .height(83.dp)
             .background(color = Color(0xFFEFEFEF), shape = RoundedCornerShape(size = 4.dp))
             .border(width = 1.dp, color = Color(0xFFB0B0B0), shape = RoundedCornerShape(size = 4.dp))
+            .clickable { onClick() }
             .padding(top = 10.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {

@@ -1,0 +1,96 @@
+PLANO DE TESTES - ZENITH
+
+1. ESTRATÉGIA DE TESTES
+O objetivo deste plano é garantir a estabilidade, a segurança e a conformidade do aplicativo Zenith com os requisitos funcionais e de UX definidos.
+
+Níveis de Teste:
+- Testes Unitários: Validação de lógicas isoladas (ex: cálculos de sono, formatação de strings).
+- Testes de Integração: Validação da comunicação entre o App e o Supabase (Auth, Database, RPCs).
+- Testes de UI/E2E: Validação de fluxos completos de usuário no dispositivo/emulador.
+- Testes de Segurança: Verificação de políticas de RLS (Row Level Security) no banco de dados.
+
+Ambiente de Teste:
+- Dispositivo Android físico ou Emulador (API 34 a 36).
+- Instância de desenvolvimento do Supabase.
+
+2. MATRIZ DE CASOS DE TESTE FUNCIONAIS
+
+2.1. Autenticação e Onboarding
+- [ ] Cadastro de novo usuário: Validar se o usuário é criado no Supabase Auth e no perfil.
+- [ ] Login/Logout: Verificar se a sessão é mantida e encerrada corretamente.
+- [ ] Verificação de E-mail: Validar o fluxo de ativação da conta.
+- [ ] Configuração de Perfil: Validar upload de foto e banner.
+
+2.2. Validações Críticas de Input (Requisitos Técnicos)
+- [ ] Datas de Desafios:
+    - Impedir início/conclusão com data PASSADA.
+    - Impedir data de início POSTERIOR à de conclusão.
+- [ ] Registros de Atividades:
+    - Impedir data de realização FUTURA.
+    - Impedir horário de realização FUTURO em relação ao momento atual.
+    - Validar que (Hora Início + Duração) não ultrapasse a data/hora atual.
+- [ ] Integridade de Dados:
+    - Verificar se a data é validada via internet (evitando fraudes por alteração de relógio do aparelho).
+    - Bloquear valores exorbitantes/irrealistas em registros de atividade.
+
+2.3. Módulo Social e Feed
+- [ ] Publicação no Feed: Validar que atividades marcadas como "Publicar no feed" aparecem para amigos.
+- [ ] Privacidade: Verificar que usuários NÃO-amigos não veem atividades privadas.
+- [ ] Menções:
+    - Validar envio de menção para amigo.
+    - Validar que o amigo mencionado recebe notificação.
+    - Validar aceite/recusa de menção e a consequente exibição no perfil.
+- [ ] Perfis: Verificar se as contagens (amigos, conquistas, medalhas) estão corretas e são clicáveis.
+
+2.4. Gamificação e Conquistas
+- [ ] Lógica de Streaks:
+    - Atividade no mesmo dia: Não deve incrementar streak.
+    - Atividade no dia seguinte: Deve incrementar +1.
+    - Falha de 1 ou mais dias: Deve reiniciar streak para 1.
+- [ ] Gatilhos de Recompensa:
+    - Validar desbloqueio de conquista 'primeira_atividade' no primeiro registro.
+    - Validar título 'Dedicado' e conquista 'streak_7' após 7 dias.
+    - Validar título 'Lenda' e conquista 'streak_30' após 30 dias.
+    - Validar título 'Atleta' e conquista 'atividades_10' após 10 atividades.
+
+2.5. Desafios e Rankings
+- [ ] Permissões de Criação:
+    - Usuário Premium/Dev: Deve conseguir criar desafios.
+    - Usuário Comum: Deve receber erro amigável ao tentar criar.
+- [ ] Participação e Ranking:
+    - Validar que a atividade vinculada ao desafio atualiza o ranking.
+    - Verificar se o ranking ignora atividades inválidas ou com GPS inconsistente.
+- [ ] Fórum do Desafio: Validar que apenas participantes podem publicar posts no desafio.
+
+2.6. Saúde e Bem-Estar
+- [ ] Registro de Sono:
+    - Validar registro manual.
+    - Validar que o sono não é duplicado para a mesma noite.
+    - Validar encerramento automático baseado na primeira interação com o celular após a janela prevista.
+- [ ] Metas:
+    - Validar criação de metas semanais/mensais.
+    - Verificar se o progresso atualiza automaticamente com novas atividades.
+
+3. TESTES NÃO-FUNCIONAIS
+
+3.1. Performance e UX
+- [ ] Tempo de Carregamento: Validar que o Header e o Feed da Home carregam em tempo aceitável.
+- [ ] Estética: Verificar se as fontes são 'Inter' e se os paddings estão corretos (especialmente em telas de título).
+- [ ] Animações: Validar transições suaves em botões clicáveis (seleção/deseleção gradual de cor).
+- [ ] Rotação de Tela: Verificar se campos de texto e seleções são preservados ao girar o aparelho (especialmente em Criação de Desafio e Registro de Atividade).
+
+3.2. Segurança (Supabase RLS)
+- [ ] Isolamento de Dados: Validar que um usuário não consegue editar o perfil ou deletar atividades de outro via API.
+- [ ] Vazamento de Dados: Garantir que atividades privadas de amigos só sejam lidas se houver amizade e a atividade tiver sido publicada.
+
+4. CICLO DE VIDA E ACEITE
+
+Critérios de Aceite Final (Definition of Done):
+1. O projeto compila sem erros (`./gradlew :app:compileDebugKotlin`).
+2. Todos os fluxos P0 e P1 (Feed, Registro, Social, Streaks, Perfil, Desafios, Sono) passam nos testes manuais.
+3. O app não perde dados ao girar a tela em fluxos críticos.
+4. O banco de dados não apresenta vulnerabilidades críticas no Security Advisor do Supabase.
+5. Não há segredos (API Keys) commitados no repositório.
+
+Fluxo de Defeitos:
+Identificação -> Registro (Issue) -> Correção -> Re-teste -> Fechamento.

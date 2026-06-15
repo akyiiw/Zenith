@@ -9,6 +9,7 @@ import br.com.zenith.data.models.Amizade
 import br.com.zenith.data.models.Atividade
 import br.com.zenith.data.models.Desafio
 import br.com.zenith.data.models.DesafioParticipacao
+import br.com.zenith.data.models.NotificationRead
 import br.com.zenith.data.models.Profile
 import br.com.zenith.ui.notifications.ZenithNotifier
 import io.github.jan.supabase.auth.auth
@@ -19,6 +20,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 enum class HomeNotificationType {
     FriendRequest,
@@ -46,6 +49,7 @@ data class HomeNotificationsUiState(
 class HomeNotificationsViewModel : ViewModel() {
     private val _uiState = MutableStateFlow(HomeNotificationsUiState())
     val uiState: StateFlow<HomeNotificationsUiState> = _uiState.asStateFlow()
+    private val dismissedNotificationIds = mutableSetOf<String>()
 
     fun load(context: Context) {
         viewModelScope.launch {
@@ -73,15 +77,63 @@ class HomeNotificationsViewModel : ViewModel() {
 
                 val rankingNotifications = buildRankingNotifications(userId = userId)
                 val achievementsNotification = buildAchievementsNotification(userId = userId)
+                val readIds = loadReadNotificationIds(userId)
 
                 _uiState.value = HomeNotificationsUiState(
-                    notifications = friendRequests + mentionRequests + rankingNotifications + listOfNotNull(achievementsNotification)
+                    notifications = (
+                        friendRequests +
+                            mentionRequests +
+                            rankingNotifications +
+                            listOfNotNull(achievementsNotification)
+                        ).filterNot { it.id in dismissedNotificationIds || it.id in readIds }
                 )
             } catch (e: Exception) {
                 ZenithNotifier.error("Erro ao carregar notificações: ${e.localizedMessage}")
                 _uiState.value = _uiState.value.copy(isLoading = false)
             }
         }
+    }
+
+    fun dismiss(notificationId: String) {
+        dismissedNotificationIds += notificationId
+        _uiState.value = _uiState.value.copy(
+            notifications = _uiState.value.notifications.filterNot { it.id == notificationId }
+        )
+    }
+
+    fun markAsRead(notificationId: String, context: Context) {
+        viewModelScope.launch {
+            try {
+                SupabaseConfig.init(context)
+                val client = SupabaseConfig.getClient()
+                val userId = client.auth.currentUserOrNull()?.id
+                    ?: throw Exception("Usuário não autenticado")
+
+                runCatching {
+                    client.postgrest.from("notification_reads").insert(
+                        buildJsonObject {
+                            put("user_id", userId)
+                            put("notification_id", notificationId)
+                        }
+                    )
+                }
+                dismiss(notificationId)
+            } catch (e: Exception) {
+                ZenithNotifier.error("Erro ao marcar notificação como lida: ${e.localizedMessage}")
+            }
+        }
+    }
+
+    private suspend fun loadReadNotificationIds(userId: String): Set<String> {
+        return runCatching {
+            SupabaseConfig.getClient().postgrest.from("notification_reads")
+                .select {
+                    filter { eq("user_id", userId) }
+                }
+                .decodeList<NotificationRead>()
+                .map { it.notificationId }
+                .toSet()
+        }.getOrDefault(emptySet())
     }
 
     private suspend fun buildMentionRequests(userId: String): List<HomeNotificationItem> {
@@ -95,8 +147,7 @@ class HomeNotificationsViewModel : ViewModel() {
             .decodeList<ActivityMention>()
 
         return mentions.map { mention ->
-            val publisherName = mention.publisher?.displayName?.takeIf { it.isNotBlank() }
-                ?: mention.publisher?.name
+            val publisherName = mention.publisher?.name?.takeIf { it.isNotBlank() }?.let { "@$it" }
                 ?: "Um amigo"
             val activityName = mention.activity?.titulo?.takeIf { it.isNotBlank() }
                 ?: mention.activity?.exercicio?.nome
@@ -121,8 +172,7 @@ class HomeNotificationsViewModel : ViewModel() {
             .filter { it.friendId == userId && it.status == "pendente" }
             .map { request ->
                 val profile = profiles.firstOrNull { it.id == request.userId }
-                val name = profile?.displayName?.takeIf { it.isNotBlank() }
-                    ?: profile?.name
+                val name = profile?.name?.takeIf { it.isNotBlank() }?.let { "@$it" }
                     ?: "Alguém"
                 HomeNotificationItem(
                     id = "friend-${request.userId}",

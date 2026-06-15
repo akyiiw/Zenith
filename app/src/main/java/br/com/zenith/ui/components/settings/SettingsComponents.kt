@@ -2,6 +2,7 @@ package br.com.zenith.ui.components.settings
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -18,7 +19,6 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Key
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -35,6 +35,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import br.com.zenith.ui.theme.Inter
+
+data class SettingsActionItem(
+    val icon: ImageVector,
+    val title: String,
+    val subtitle: String,
+    val onClick: () -> Unit
+)
 
 @Composable
 fun SettingsSectionTitle(text: String) {
@@ -53,7 +60,6 @@ fun AccountSettingsGroup(
     email: String?,
     onEmailClick: () -> Unit,
     onPasswordClick: () -> Unit,
-    onProfileClick: () -> Unit,
     onSecurityClick: () -> Unit
 ) {
     Column(
@@ -63,12 +69,6 @@ fun AccountSettingsGroup(
             .border(1.dp, Color(0xFFE4E4E4), RoundedCornerShape(8.dp))
             .padding(vertical = 4.dp)
     ) {
-        SettingsRow(
-            icon = Icons.Default.Person,
-            title = "Perfil",
-            subtitle = "Nome, foto e bio",
-            onClick = onProfileClick
-        )
         SettingsRow(
             icon = Icons.Default.Email,
             title = "E-mail",
@@ -87,6 +87,28 @@ fun AccountSettingsGroup(
             subtitle = "Sessão e preferências de acesso",
             onClick = onSecurityClick
         )
+    }
+}
+
+@Composable
+fun SettingsActionGroup(
+    items: List<SettingsActionItem>
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color(0xFFF7F7F7), RoundedCornerShape(8.dp))
+            .border(1.dp, Color(0xFFE4E4E4), RoundedCornerShape(8.dp))
+            .padding(vertical = 4.dp)
+    ) {
+        items.forEach { item ->
+            SettingsRow(
+                icon = item.icon,
+                title = item.title,
+                subtitle = item.subtitle,
+                onClick = item.onClick
+            )
+        }
     }
 }
 
@@ -136,6 +158,7 @@ private fun SettingsRow(
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = 68.dp)
+            .clickable { onClick() }
             .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {

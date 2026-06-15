@@ -40,6 +40,7 @@ import androidx.navigation.NavController
 import br.com.zenith.data.models.ActivityMention
 import br.com.zenith.data.models.Profile
 import br.com.zenith.ui.animations.CenteredZenithLoading
+import br.com.zenith.ui.components.common.BottomNavListPadding
 import br.com.zenith.ui.components.common.ScreenHeader
 import br.com.zenith.ui.components.social.SocialEmptyState
 import br.com.zenith.ui.components.social.SocialSectionTitle
@@ -101,6 +102,9 @@ private fun SocialContent(
     val friends = uiState.friends()
     val receivedRequests = uiState.receivedRequests()
     val sentRequests = uiState.sentRequests()
+    val pendingMentions = uiState.pendingMentions()
+    val acceptedMentions = uiState.acceptedMentions()
+    val declinedMentions = uiState.declinedMentions()
     val searchResults = remember(query, uiState) {
         val term = query.trim()
         if (term.isBlank()) {
@@ -133,7 +137,7 @@ private fun SocialContent(
                 .padding(padding)
                 .statusBarsPadding()
                 .padding(horizontal = 20.dp),
-            contentPadding = PaddingValues(top = 19.dp, bottom = 104.dp),
+            contentPadding = PaddingValues(top = 19.dp, bottom = BottomNavListPadding),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             item {
@@ -180,9 +184,9 @@ private fun SocialContent(
                 }
             }
 
-            if (uiState.pendingMentions.isNotEmpty()) {
-                item { SocialSectionTitle("Menções em atividades") }
-                items(uiState.pendingMentions, key = { "mention-${it.id}" }) { mention ->
+            if (pendingMentions.isNotEmpty() || acceptedMentions.isNotEmpty() || declinedMentions.isNotEmpty()) {
+                item { SocialSectionTitle("Participações") }
+                items(pendingMentions, key = { "mention-${it.id}" }) { mention ->
                     ActivityMentionRequestCard(
                         mention = mention,
                         isSaving = isSaving,
@@ -190,6 +194,12 @@ private fun SocialContent(
                         onAcceptHidden = { onAcceptMention(mention, false) },
                         onReject = { onRejectMention(mention) }
                     )
+                }
+                items(acceptedMentions, key = { "accepted-mention-${it.id}" }) { mention ->
+                    ActivityMentionStatusCard(mention = mention)
+                }
+                items(declinedMentions, key = { "declined-mention-${it.id}" }) { mention ->
+                    ActivityMentionStatusCard(mention = mention)
                 }
             }
 
@@ -252,6 +262,54 @@ private fun SocialContent(
 }
 
 @Composable
+private fun ActivityMentionStatusCard(mention: ActivityMention) {
+    val publisherName = mention.publisher?.name?.takeIf { it.isNotBlank() }?.let { "@$it" }
+        ?: "Um amigo"
+    val activityName = mention.activity?.titulo?.takeIf { it.isNotBlank() }
+        ?: mention.activity?.exercicio?.nome
+        ?: "atividade"
+    val accepted = mention.status == ActivityMention.STATUS_ACCEPTED
+    val statusText = when {
+        accepted && mention.showOnMentionedProfile -> "Aceita e visível no seu perfil"
+        accepted -> "Aceita, oculta no seu perfil"
+        else -> "Recusada"
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color(0xFFF8FAF8), RoundedCornerShape(8.dp))
+            .border(1.dp, Color(0xFFE3EAE3), RoundedCornerShape(8.dp))
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Text(
+            text = activityName,
+            style = MaterialTheme.typography.bodyMedium.copy(
+                fontFamily = Inter,
+                fontWeight = FontWeight.Bold,
+                color = Color.Black
+            )
+        )
+        Text(
+            text = "Participação vinculada à atividade de $publisherName",
+            style = MaterialTheme.typography.bodySmall.copy(
+                fontFamily = Inter,
+                color = Color(0xFF536057)
+            )
+        )
+        Text(
+            text = statusText,
+            style = MaterialTheme.typography.bodySmall.copy(
+                fontFamily = Inter,
+                fontWeight = FontWeight.SemiBold,
+                color = if (accepted) Color(0xFF238D25) else Color(0xFF8A4B44)
+            )
+        )
+    }
+}
+
+@Composable
 private fun ActivityMentionRequestCard(
     mention: ActivityMention,
     isSaving: Boolean,
@@ -259,8 +317,7 @@ private fun ActivityMentionRequestCard(
     onAcceptHidden: () -> Unit,
     onReject: () -> Unit
 ) {
-    val publisherName = mention.publisher?.displayName?.takeIf { it.isNotBlank() }
-        ?: mention.publisher?.name
+    val publisherName = mention.publisher?.name?.takeIf { it.isNotBlank() }?.let { "@$it" }
         ?: "Um amigo"
     val activityName = mention.activity?.titulo?.takeIf { it.isNotBlank() }
         ?: mention.activity?.exercicio?.nome
@@ -283,7 +340,7 @@ private fun ActivityMentionRequestCard(
             )
         )
         Text(
-            text = "Atividade: $activityName",
+            text = "Quer participar de $activityName? Ela poderá ficar linkada ao seu perfil, mas não contará como atividade verificada para você.",
             style = MaterialTheme.typography.bodySmall.copy(
                 fontFamily = Inter,
                 color = Color(0xFF536057)
@@ -301,14 +358,14 @@ private fun ActivityMentionRequestCard(
                 shape = RoundedCornerShape(8.dp),
                 contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
             ) {
-                Text("Mostrar", color = Color.White, fontFamily = Inter)
+                Text("Participar", color = Color.White, fontFamily = Inter)
             }
             TextButton(
                 onClick = onAcceptHidden,
                 enabled = !isSaving,
                 modifier = Modifier.weight(1f)
             ) {
-                Text("Ocultar", color = Color(0xFF238D25), fontFamily = Inter)
+                Text("Participar oculto", color = Color(0xFF238D25), fontFamily = Inter)
             }
             TextButton(
                 onClick = onReject,

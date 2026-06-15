@@ -48,10 +48,16 @@ import br.com.zenith.ui.screens.home.HomeScreen
 import br.com.zenith.ui.screens.progress.ProgressScreen
 import br.com.zenith.ui.screens.goals.GoalsScreen
 import br.com.zenith.ui.screens.profile.EditProfileScreen
+import br.com.zenith.ui.screens.profile.AchievementsScreen
+import br.com.zenith.ui.screens.profile.BadgeSelectScreen
+import br.com.zenith.ui.screens.profile.ChallengeAwardsScreen
+import br.com.zenith.ui.screens.profile.MedalsScreen
+import br.com.zenith.ui.screens.profile.ProfileActivitiesScreen
 import br.com.zenith.ui.screens.profile.ProfileScreen
 import br.com.zenith.ui.screens.profile.TitleSelectScreen
 import br.com.zenith.ui.screens.challenge.CreateChallengeScreen
 import br.com.zenith.ui.screens.challenge.ChallengeScreen
+import br.com.zenith.ui.screens.settings.AppBlockSettingsScreen
 import br.com.zenith.ui.screens.settings.SettingsScreen
 import br.com.zenith.ui.screens.profile.PublicProfileScreen
 import br.com.zenith.ui.screens.social.SocialScreen
@@ -83,8 +89,10 @@ private fun bottomTabDirection(initialRoute: String, targetRoute: String): Int {
 }
 
 private fun isVerticalForwardRoute(route: String): Boolean =
-    route == "sleep_settings" ||
+        route == "sleep_settings" ||
         route == "create_challenge" ||
+        route.startsWith("achievements") ||
+        route.startsWith("challenge_awards") ||
         route.startsWith("new_activity") ||
         route.startsWith("start_activity") ||
         route.startsWith("register_activity")
@@ -275,6 +283,13 @@ class MainActivity : ComponentActivity() {
                             ChallengeScreen(navController)
                         }
 
+                        composable("challenge/{challengeId}") { back ->
+                            ChallengeScreen(
+                                navController = navController,
+                                initialChallengeId = back.arguments?.getString("challengeId")
+                            )
+                        }
+
                         composable("create_challenge") {
                             CreateChallengeScreen(navController)
                         }
@@ -285,6 +300,13 @@ class MainActivity : ComponentActivity() {
 
                         composable("user_profile/{userId}") { back ->
                             PublicProfileScreen(
+                                navController = navController,
+                                userId = back.arguments?.getString("userId") ?: ""
+                            )
+                        }
+
+                        composable("profile_activities/{userId}") { back ->
+                            ProfileActivitiesScreen(
                                 navController = navController,
                                 userId = back.arguments?.getString("userId") ?: ""
                             )
@@ -312,6 +334,32 @@ class MainActivity : ComponentActivity() {
 
                         composable("title_select") {
                             TitleSelectScreen(navController)
+                        }
+
+                        composable("badge_select") {
+                            BadgeSelectScreen(navController)
+                        }
+
+                        composable("medals") {
+                            MedalsScreen(navController)
+                        }
+
+                        composable("challenge_awards/{userId}") { back ->
+                            ChallengeAwardsScreen(
+                                navController = navController,
+                                userId = back.arguments?.getString("userId") ?: ""
+                            )
+                        }
+
+                        composable("achievements/{userId}") { back ->
+                            AchievementsScreen(
+                                navController = navController,
+                                userId = back.arguments?.getString("userId") ?: ""
+                            )
+                        }
+
+                        composable("app_blocks") {
+                            AppBlockSettingsScreen(navController)
                         }
 
                         composable("activity_detail/{atividadeId}") { back ->

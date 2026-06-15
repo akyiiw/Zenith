@@ -23,6 +23,7 @@ data class Profile(
     @SerialName("titulo_id") val tituloId: String? = null,
     @SerialName("titulos") val titulo: Titulo? = null,
     @SerialName("badge_id") val badgeId: Int? = null,
-    @SerialName("name_updated_at") val nameUpdatedAt: String? = null
+    @SerialName("name_updated_at") val nameUpdatedAt: String? = null,
+    @SerialName("banner_blur_radius") val bannerBlurRadius: Int = 10
 
 )

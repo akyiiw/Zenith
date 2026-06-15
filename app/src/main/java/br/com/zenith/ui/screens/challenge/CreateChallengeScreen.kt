@@ -42,6 +42,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -58,6 +59,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import br.com.zenith.ui.animations.ZenithLoading
+import br.com.zenith.ui.components.common.zenithSwitchColors
 import br.com.zenith.ui.theme.Black
 import br.com.zenith.ui.theme.Inter
 import br.com.zenith.ui.theme.White
@@ -102,20 +104,20 @@ fun CreateChallengeContent(
     onBack: () -> Unit = {},
     onFinish: (ChallengeDraft) -> Unit
 ) {
-    var step by remember { mutableIntStateOf(1) }
-    var title by remember { mutableStateOf("") }
-    var description by remember { mutableStateOf("") }
-    var exercise by remember { mutableStateOf("corrida") }
-    var goalMode by remember { mutableStateOf("fixa") }
-    var rankingType by remember { mutableStateOf("menor_tempo") }
-    var goal by remember { mutableStateOf("") }
-    var visibility by remember { mutableStateOf("publico") }
-    var premiumOnly by remember { mutableStateOf(false) }
-    var maxParticipants by remember { mutableStateOf("") }
-    var startDate by remember { mutableStateOf(LocalDate.now().format(dateFormatter)) }
-    var endDate by remember { mutableStateOf(LocalDate.now().plusDays(7).format(dateFormatter)) }
-    var bannerUri by remember { mutableStateOf<Uri?>(null) }
-    var allowManualEntries by remember { mutableStateOf(false) }
+    var step by rememberSaveable { mutableIntStateOf(1) }
+    var title by rememberSaveable { mutableStateOf("") }
+    var description by rememberSaveable { mutableStateOf("") }
+    var exercise by rememberSaveable { mutableStateOf("corrida") }
+    var goalMode by rememberSaveable { mutableStateOf("fixa") }
+    var rankingType by rememberSaveable { mutableStateOf("menor_tempo") }
+    var goal by rememberSaveable { mutableStateOf("") }
+    var visibility by rememberSaveable { mutableStateOf("publico") }
+    var premiumOnly by rememberSaveable { mutableStateOf(false) }
+    var maxParticipants by rememberSaveable { mutableStateOf("") }
+    var startDate by rememberSaveable { mutableStateOf(LocalDate.now().format(dateFormatter)) }
+    var endDate by rememberSaveable { mutableStateOf(LocalDate.now().plusDays(7).format(dateFormatter)) }
+    var bannerUri by rememberSaveable { mutableStateOf<Uri?>(null) }
+    var allowManualEntries by rememberSaveable { mutableStateOf(false) }
 
     val parsedGoal = goal.replace(',', '.').toDoubleOrNull()
     val parsedStart = parseDate(startDate)
@@ -173,7 +175,15 @@ fun CreateChallengeContent(
             5 -> StepChallengeVisibility(visibility, { visibility = it }, { step++ }, { step-- })
             6 -> StepChallengePremium(premiumOnly, { premiumOnly = it }, { step++ }, { step-- })
             7 -> StepChallengeParticipants(visibility, maxParticipants, { maxParticipants = it }, { step++ }, { step-- })
-            8 -> StepChallengeDates(startDate, { startDate = it }, endDate, { endDate = it }, { step++ }, { step-- })
+            8 -> StepChallengeDates(
+                startDate = startDate,
+                onStartDateChange = { startDate = it },
+                endDate = endDate,
+                onEndDateChange = { endDate = it },
+                minDate = LocalDate.now(),
+                onNext = { step++ },
+                onBack = { step-- }
+            )
             9 -> StepChallengeBannerAndRules(
                 bannerUri = bannerUri,
                 onPhotoSelected = { bannerUri = it },
@@ -418,30 +428,63 @@ private fun StepChallengeDates(
     onStartDateChange: (String) -> Unit,
     endDate: String,
     onEndDateChange: (String) -> Unit,
+    minDate: LocalDate,
     onNext: () -> Unit,
     onBack: () -> Unit
 ) {
+    var dateError by rememberSaveable { mutableStateOf<String?>(null) }
     val start = parseDate(startDate)
     val end = parseDate(endDate)
+    fun validateStartSelection(selected: LocalDate): String? = when {
+        selected.isBefore(minDate) -> "O início não pode ficar no passado."
+        end != null && end.isBefore(selected) -> "O início não pode ser posterior à conclusão."
+        else -> null
+    }
+    fun validateEndSelection(selected: LocalDate): String? = when {
+        selected.isBefore(minDate) -> "A conclusão não pode ficar no passado."
+        start != null && selected.isBefore(start) -> "A conclusão não pode ser anterior ao início."
+        else -> null
+    }
+    fun validateAndNext() {
+        dateError = when {
+            start == null || end == null -> "Escolha as duas datas."
+            start.isBefore(minDate) || end.isBefore(minDate) -> "O período do desafio não pode ficar no passado."
+            end.isBefore(start) -> "A conclusão não pode ser anterior ao início."
+            else -> null
+        }
+        if (dateError == null) onNext()
+    }
     CreateChallengeScaffold(
         step = 8,
         title = "Período",
         subtitle = "Use o formato dd/MM/yyyy.",
         onBack = onBack,
-        onNext = onNext,
-        nextEnabled = start != null && end != null && !end.isBefore(start)
+        onNext = { validateAndNext() },
+        nextEnabled = start != null && end != null
     ) {
         ZenithDateField(
             value = startDate,
-            onValueChange = onStartDateChange,
+            onValueChange = {
+                dateError = null
+                onStartDateChange(it)
+            },
             label = "Início",
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            isError = dateError != null,
+            supportingText = dateError?.let { { Text(it, color = MaterialTheme.colorScheme.error) } },
+            validateSelection = ::validateStartSelection
         )
         ZenithDateField(
             value = endDate,
-            onValueChange = onEndDateChange,
+            onValueChange = {
+                dateError = null
+                onEndDateChange(it)
+            },
             label = "Conclusão",
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            isError = dateError != null,
+            supportingText = dateError?.let { { Text(it, color = MaterialTheme.colorScheme.error) } },
+            validateSelection = ::validateEndSelection
         )
     }
 }
@@ -513,7 +556,11 @@ private fun StepChallengeBannerAndRules(
                     fontSize = 13.sp
                 )
             }
-            Switch(checked = allowManualEntries, onCheckedChange = onAllowManualEntriesChange)
+            Switch(
+                checked = allowManualEntries,
+                onCheckedChange = onAllowManualEntriesChange,
+                colors = zenithSwitchColors()
+            )
         }
     }
 }

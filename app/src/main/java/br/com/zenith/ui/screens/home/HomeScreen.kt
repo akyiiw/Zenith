@@ -32,6 +32,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import br.com.zenith.ui.components.common.BottomNavListPadding
 import br.com.zenith.ui.components.home.ActivitySection
 import br.com.zenith.ui.components.home.FeedSection
 import br.com.zenith.ui.components.home.HomeGoalItem
@@ -87,7 +88,7 @@ fun HomeScreen(navController: NavController) {
                         .fillMaxSize()
                         .padding(horizontal = 20.dp),
                     verticalArrangement = Arrangement.spacedBy(24.dp),
-                    contentPadding = PaddingValues(top = 19.dp, bottom = 24.dp)
+                    contentPadding = PaddingValues(top = 19.dp, bottom = BottomNavListPadding)
                 ) {
                     item {
                         if (isLoading || user == null) {
@@ -166,8 +167,12 @@ fun HomeScreen(navController: NavController) {
                         notifications = notificationsState.notifications,
                         isLoading = notificationsState.isLoading,
                         onNotificationClick = { notification ->
+                            notificationsViewModel.markAsRead(notification.id, context)
                             showNotifications = false
                             notification.targetRoute?.let { navController.navigate(it) }
+                        },
+                        onMarkAsRead = { notification ->
+                            notificationsViewModel.markAsRead(notification.id, context)
                         }
                     )
                 }

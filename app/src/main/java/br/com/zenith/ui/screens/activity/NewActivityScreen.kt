@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -24,7 +25,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.DirectionsBike
@@ -63,17 +63,18 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import br.com.zenith.data.models.ChallengeAwardCalculator.isFinished
 import br.com.zenith.data.models.Desafio
 import br.com.zenith.data.models.Exercicio
 import br.com.zenith.ui.animations.CenteredZenithLoading
 import br.com.zenith.ui.notifications.ZenithNotifier
 import br.com.zenith.ui.theme.Inter
 import br.com.zenith.ui.theme.ZenithTheme
+import br.com.zenith.ui.theme.items.ZenithDurationField
 import br.com.zenith.ui.theme.items.ZenithTextField
 import br.com.zenith.viewmodels.activity.ActivityViewModel
 import br.com.zenith.viewmodels.challenge.ChallengeViewModel
@@ -117,7 +118,9 @@ fun NewActivityScreen(navController: NavController) {
         NewActivityContent(
             exercicios = exercicios,
             isLoading = isLoading,
-            participatingChallenges = challengeState.challenges.filter { challengeState.isParticipating(it.id) },
+            participatingChallenges = challengeState.challenges.filter {
+                challengeState.isParticipating(it.id) && !it.isFinished()
+            },
             onSleepSettings = { navController.navigate("sleep_settings") },
             onSaveManualSleep = { hours, quality, onSuccess ->
                 sleepRecordViewModel.addManualSleep(hours, quality, context, onSuccess)
@@ -390,19 +393,10 @@ fun NewActivityContent(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Color.White, RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
-                    .padding(24.dp),
+                    .navigationBarsPadding()
+                    .padding(horizontal = 24.dp, vertical = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Text(
-                    text = selection.title,
-                    style = MaterialTheme.typography.titleLarge.copy(fontFamily = Inter, fontWeight = FontWeight.Bold)
-                )
-                Text(
-                    text = sheetSubtitle(mode, exercise, selection.subtitle),
-                    style = MaterialTheme.typography.bodyMedium.copy(color = Color.Gray)
-                )
-
                 Button(
                     onClick = {
                         when {
@@ -483,9 +477,9 @@ private fun ManualSleepSheet(
     onDismiss: () -> Unit,
     onSave: (Float, Int?) -> Unit
 ) {
-    var hoursText by remember { mutableStateOf("8") }
+    var durationMinutes by remember { mutableIntStateOf(8 * 60) }
     var quality by remember { mutableIntStateOf(4) }
-    val hours = hoursText.replace(",", ".").toFloatOrNull()
+    val hours = durationMinutes / 60f
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -506,14 +500,11 @@ private fun ManualSleepSheet(
                     fontWeight = FontWeight.Bold
                 )
             )
-            ZenithTextField(
-                value = hoursText,
-                onValueChange = { input ->
-                    hoursText = input.filter { it.isDigit() || it == ',' || it == '.' }
-                },
+            ZenithDurationField(
+                minutes = durationMinutes,
+                onMinutesChange = { durationMinutes = it.coerceAtLeast(1) },
                 label = "Duração em horas",
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                singleLine = true
+                modifier = Modifier.fillMaxWidth()
             )
             Text("Qualidade", fontFamily = Inter)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -543,9 +534,9 @@ private fun ManualSleepSheet(
                 }
                 Button(
                     onClick = {
-                        hours?.let { onSave(it, quality) }
+                        onSave(hours, quality)
                     },
-                    enabled = hours != null && hours > 0f,
+                    enabled = durationMinutes > 0,
                     modifier = Modifier.weight(1f),
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF238D25))
                 ) {

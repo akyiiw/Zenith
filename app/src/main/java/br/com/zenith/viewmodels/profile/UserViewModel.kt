@@ -2,14 +2,21 @@ package br.com.zenith.viewmodels.profile
 
 import android.content.Context
 import android.net.Uri
-import android.widget.Toast
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import br.com.zenith.data.SupabaseConfig
 import br.com.zenith.data.models.Badge
+import br.com.zenith.data.models.Atividade
+import br.com.zenith.data.models.ChallengeAwardCalculator
+import br.com.zenith.data.models.ChallengeAwardSummary
+import br.com.zenith.data.models.Desafio
+import br.com.zenith.data.models.DesafioParticipacao
+import br.com.zenith.data.models.Medalha
 import br.com.zenith.data.models.Profile
 import br.com.zenith.data.models.Titulo
 import br.com.zenith.data.models.UsuarioTitulo
+import br.com.zenith.data.models.UsuarioMedalha
+import br.com.zenith.data.models.UserBadgeEntitlement
 import br.com.zenith.ui.notifications.ZenithNotifier
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.postgrest.postgrest
@@ -45,6 +52,15 @@ class UserViewModel : ViewModel() {
     private val _badgeState = MutableStateFlow<Badge?>(null)
     val badgeState: StateFlow<Badge?> = _badgeState.asStateFlow()
 
+    private val _badgesDisponiveis = MutableStateFlow<List<Badge>>(emptyList())
+    val badgesDisponiveis: StateFlow<List<Badge>> = _badgesDisponiveis.asStateFlow()
+
+    private val _medalhas = MutableStateFlow<List<Medalha>>(emptyList())
+    val medalhas: StateFlow<List<Medalha>> = _medalhas.asStateFlow()
+
+    private val _challengeAwards = MutableStateFlow(ChallengeAwardSummary())
+    val challengeAwards: StateFlow<ChallengeAwardSummary> = _challengeAwards.asStateFlow()
+
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
@@ -60,6 +76,11 @@ class UserViewModel : ViewModel() {
         aboutMe: String?,
         pictureUri: Uri?,
         bannerUri: Uri?,
+        bannerBlurRadius: Int,
+        pictureFocusX: Float,
+        pictureFocusY: Float,
+        bannerFocusX: Float,
+        bannerFocusY: Float,
         context: Context,
         onSucesso: () -> Unit
     ) {
@@ -88,7 +109,10 @@ class UserViewModel : ViewModel() {
                         context = context,
                         uri = uri,
                         path = "avatars/$userId.jpg",
-                        maxDimension = 400
+                        maxDimension = 400,
+                        aspectRatio = 1f,
+                        focusX = pictureFocusX,
+                        focusY = pictureFocusY
                     )
                 }
 
@@ -97,7 +121,10 @@ class UserViewModel : ViewModel() {
                         context = context,
                         uri = uri,
                         path = "banners/$userId.jpg",
-                        maxDimension = 1080
+                        maxDimension = 1440,
+                        aspectRatio = PROFILE_BANNER_ASPECT_RATIO,
+                        focusX = bannerFocusX,
+                        focusY = bannerFocusY
                     )
                 }
 
@@ -106,6 +133,7 @@ class UserViewModel : ViewModel() {
                         put("name", name)
                         put("displayName", displayName)
                         put("aboutMe", aboutMe)
+                        put("banner_blur_radius", bannerBlurRadius.coerceIn(0, 24))
                         pictureHash?.let { put("pictureHash", it) }
                         bannerHash?.let { put("bannerHash", it) }
                         if (nameChanged) {
@@ -120,7 +148,8 @@ class UserViewModel : ViewModel() {
                     aboutMe = aboutMe,
                     pictureHash = pictureHash ?: _userState.value?.pictureHash,
                     bannerHash = bannerHash ?: _userState.value?.bannerHash,
-                    nameUpdatedAt = if (nameChanged) now.toString() else _userState.value?.nameUpdatedAt
+                    nameUpdatedAt = if (nameChanged) now.toString() else _userState.value?.nameUpdatedAt,
+                    bannerBlurRadius = bannerBlurRadius.coerceIn(0, 24)
                 )
 
                 onSucesso()
@@ -171,7 +200,7 @@ class UserViewModel : ViewModel() {
                 SupabaseConfig.init(context)
                 val client = SupabaseConfig.getClient()
                 val userId = client.auth.currentUserOrNull()?.id
-                    ?: throw Exception("UsuÃ¡rio nÃ£o autenticado")
+                    ?: throw Exception("Usuário não autenticado")
                 val visibility = if (privado) "privado" else "publico"
 
                 client.postgrest.from("profiles").update(
@@ -182,7 +211,7 @@ class UserViewModel : ViewModel() {
 
                 _userState.value = _userState.value?.copy(profileVisibility = visibility)
             } catch (e: Exception) {
-                Toast.makeText(context, "Erro ao salvar privacidade: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+                ZenithNotifier.error("Erro ao salvar privacidade: ${e.localizedMessage}")
             } finally {
                 _isSaving.value = false
             }
@@ -193,10 +222,20 @@ class UserViewModel : ViewModel() {
         context: Context,
         uri: Uri,
         path: String,
-        maxDimension: Int
+        maxDimension: Int,
+        aspectRatio: Float,
+        focusX: Float,
+        focusY: Float
     ): String {
         val originalFile = copyUriToCacheFile(context, uri)
-        val compressedFile = ImageUtils.comprimirImagem(context, originalFile, maxDimension)
+        val compressedFile = ImageUtils.recortarEComprimirImagem(
+            context = context,
+            fileOriginal = originalFile,
+            maxDimensao = maxDimension,
+            aspectRatio = aspectRatio,
+            focusX = focusX,
+            focusY = focusY
+        )
         val bytes = compressedFile.readBytes()
 
         if (bytes.isEmpty()) {
@@ -237,16 +276,14 @@ class UserViewModel : ViewModel() {
                     .decodeSingle<Profile>()
                 _userState.value = profile
 
-                profile.badgeId?.let { badgeId ->
+                if (profile.badgeId == null) {
+                    _badgeState.value = null
+                } else {
                     val badge = client.postgrest.from("badge")
-                        .select { filter { eq("id", badgeId.toLong()) } }
+                        .select { filter { eq("id", profile.badgeId.toLong()) } }
                         .decodeSingle<Badge>()
                     _badgeState.value = badge
                 }
-
-                val medalhas = client.postgrest.from("conquistas")
-                    .select { filter { eq("user_id", userId) }; count(Count.EXACT) }
-                    .countOrNull() ?: 0
 
                 val desafios = client.postgrest.from("desafio_participacoes")
                     .select { filter { eq("user_id", userId) }; count(Count.EXACT) }
@@ -278,14 +315,55 @@ class UserViewModel : ViewModel() {
                     .select { filter { eq("user_id", userId) }; count(Count.EXACT) }
                     .countOrNull() ?: 0
 
+                val challengeParticipations = client.postgrest.from("desafio_participacoes")
+                    .select()
+                    .decodeList<DesafioParticipacao>()
+                val challenges = client.postgrest.from("desafios")
+                    .select()
+                    .decodeList<Desafio>()
+                val challengeActivities = client.postgrest.from("atividades")
+                    .select(columns = Columns.raw("*, exercicios(*)"))
+                    .decodeList<Atividade>()
+                val challengeAwards = ChallengeAwardCalculator.buildSummary(
+                    userId = userId,
+                    challenges = challenges,
+                    participations = challengeParticipations,
+                    activities = challengeActivities
+                )
+                _challengeAwards.value = challengeAwards
+
                 _statsState.value = UserStats(
-                    medalhas = medalhas.toInt(),
+                    medalhas = challengeAwards.total,
                     desafios = desafios.toInt(),
                     amigos = amigos,
                     conquistas = conquistas.toInt()
                 )
 
             } catch (_: Exception) {
+                _challengeAwards.value = ChallengeAwardSummary()
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
+    fun fetchMedalhas(context: Context) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            try {
+                SupabaseConfig.init(context)
+                val client = SupabaseConfig.getClient()
+                val userId = client.auth.currentUserOrNull()?.id
+                    ?: throw Exception("Usuário não autenticado")
+                _medalhas.value = client.postgrest.from("usuario_medalhas")
+                    .select(columns = Columns.raw("*, medalhas(*)")) {
+                        filter { eq("id_usuario", userId) }
+                    }
+                    .decodeList<UsuarioMedalha>()
+                    .mapNotNull { it.medalha }
+            } catch (e: Exception) {
+                ZenithNotifier.error("Erro ao carregar medalhas: ${e.localizedMessage}")
+                _medalhas.value = emptyList()
             } finally {
                 _isLoading.value = false
             }
@@ -323,6 +401,28 @@ class UserViewModel : ViewModel() {
         }
     }
 
+    fun fetchBadgesDisponiveis(context: Context) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            try {
+                SupabaseConfig.init(context)
+                val badges = SupabaseConfig.getClient().postgrest
+                    .from("user_badge_entitlements")
+                    .select(columns = Columns.raw("*, badge(*)"))
+                    .decodeList<UserBadgeEntitlement>()
+                    .mapNotNull { it.badge }
+                    .distinctBy { it.id }
+                    .sortedBy { it.id }
+
+                _badgesDisponiveis.value = badges
+            } catch (e: Exception) {
+                ZenithNotifier.error("Erro ao carregar badges: ${e.localizedMessage}")
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
     fun selecionarTitulo(tituloId: String, context: Context, onSucesso: () -> Unit) {
         viewModelScope.launch {
             _isSaving.value = true
@@ -344,7 +444,43 @@ class UserViewModel : ViewModel() {
         }
     }
 
+    fun selecionarBadge(badgeId: Int?, context: Context, onSucesso: () -> Unit) {
+        viewModelScope.launch {
+            _isSaving.value = true
+            try {
+                SupabaseConfig.init(context)
+                val client = SupabaseConfig.getClient()
+                val userId = client.auth.currentUserOrNull()?.id
+                    ?: throw Exception("Usuário não autenticado")
+
+                client.postgrest.from("profiles").update(
+                    buildJsonObject {
+                        if (badgeId == null) put("badge_id", JsonNull)
+                        else put("badge_id", badgeId)
+                    }
+                ) { filter { eq("id", userId) } }
+
+                val badge = badgeId?.let { selectedId ->
+                    _badgesDisponiveis.value.firstOrNull { it.id == selectedId }
+                        ?: client.postgrest.from("badge")
+                            .select { filter { eq("id", selectedId.toLong()) } }
+                            .decodeSingle<Badge>()
+                }
+
+                _badgeState.value = badge
+                _userState.value = _userState.value?.copy(badgeId = badgeId)
+                ZenithNotifier.success("Badge atualizado.")
+                onSucesso()
+            } catch (e: Exception) {
+                ZenithNotifier.error("Erro ao selecionar badge: ${e.localizedMessage}")
+            } finally {
+                _isSaving.value = false
+            }
+        }
+    }
+
     companion object {
         const val USERNAME_COOLDOWN_DAYS = 14L
+        const val PROFILE_BANNER_ASPECT_RATIO = 3.2f
     }
 }

@@ -1,0 +1,225 @@
+# Zenith - Plano de Fechamento
+
+Documento de requisitos vivo para terminar o Zenith. A ordem abaixo prioriza:
+
+1. Correcoes que impedem uso confiavel do app.
+2. Integridade de dados e regras de negocio.
+3. Fluxos centrais de usuario.
+4. Estetica, animacoes e acabamento.
+5. Performance e limpeza tecnica.
+
+## Fase 0 - Bloqueadores e Integridade
+
+### Datas, horarios e duracoes
+
+- [x] Validar inputs sem bloquear o dialog com comportamentos estranhos; quando invalido, manter o usuario na interface e exibir erro claro no proprio campo/tela.
+- [x] Em desafio, impedir data de inicio ou conclusao no passado.
+- [x] Em desafio, impedir data de inicio posterior a data de conclusao.
+- [x] Em desafio, impedir data de conclusao anterior a data de inicio.
+- [x] Em registro de atividade, impedir data de realizacao no futuro.
+- [x] Em registro de atividade, impedir horario futuro quando a atividade for no dia atual.
+- [x] Em registro de atividade, impedir duracao cujo horario final calculado seja maior que o horario atual.
+- [x] Usar horario confiavel obtido pela internet/backend, nao o relogio local do dispositivo, para validacoes sensiveis.
+- [x] Padronizar todos os seletores de data e horario com dialogs alinhados ao tema Zenith.
+- [x] Usar wheel para duracao em todas as telas que exigem duracao.
+- [x] Recriar `ZenithDateField`, `ZenithTimeField` e `ZenithDurationField` sem DatePicker/Dialog/Button/Surface do Material, usando superficie branca e bordas verdes do Zenith.
+- [x] Corrigir a wheel Zenith para selecionar o valor centralizado, nao o item no topo da lista.
+
+### Banco, RLS e publicacao
+
+- [x] Corrigir `Infinite recursion detected in policy for relation "feed_entries"`.
+- [x] Confirmar que `activity_mentions` nao apresenta mais recursao infinita em RLS.
+- [x] Corrigir erro ao publicar: `Could not find the column "desafio_id" of posts in the schema cache`.
+- [x] Revisar schema/cache do Supabase depois das migrations relacionadas a posts, desafios, atividades, mencoes e feed.
+
+### Navegacao critica
+
+- [x] Corrigir fluxo em que, apos finalizar uma atividade monitorada a partir da lista de desafios, nao e possivel voltar.
+- [x] Ao tentar sair da revisao de atividade monitorada com alteracoes pendentes, avisar que as mudancas serao perdidas.
+- [x] Adicionar paddings restantes de bottom navigation em listas/telas que ainda cortam conteudo, incluindo tela de titulo e historicos longos.
+
+## Fase 1 - Atividades
+
+### Registro, monitoramento e edicao
+
+- [x] Remover fundo branco da aba/tela de detalhes da atividade; manter apenas o botao flutuante de registrar atividade no mesmo lugar.
+- [x] Estilizar seletores de options, especialmente intensidade e humor.
+- [x] Permitir descricao em atividades.
+- [x] Alterar schema/model/repositorio/UI para persistir descricao.
+- [x] Permitir apagar atividades.
+- [x] Permitir editar atividades monitoradas.
+- [x] Remover selos de atividades nao verificadas; deixar apenas o selo verde das monitoradas/verificadas.
+- [x] Corrigir padding desnecessario nos cards de atividades recentes que desalinha o selo de atividade verificada.
+- [x] Corrigir registros duplicados da mesma atividade no perfil, caso sejam duplicatas reais ou duplicidade de renderizacao.
+- [x] Adicionar verificacao simples contra valores exorbitantes em atividades registradas.
+
+### Agrupamento de atividades
+
+- [x] Implementar grupos de atividades no estilo playlist.
+- [x] Ao terminar ou registrar uma atividade, permitir adicionar a atividade a um grupo existente.
+- [x] Ao terminar ou registrar uma atividade, permitir criar um grupo novo.
+- [x] Permitir grupos como "Atividades que fiz com meus amigos" ou "Caominhadas".
+- [x] Criar estrutura de banco para linkar atividades relacionadas.
+- [x] Exibir agrupamentos nos detalhes da atividade.
+
+### Atividades recentes do perfil
+
+- [x] Fazer o botao "Ver todas" funcionar na secao de atividades recentes.
+- [x] Criar tela/lista completa de atividades do usuario.
+- [x] Permitir filtro por exercicio.
+- [x] Permitir filtro por verificadas/nao verificadas.
+- [x] Permitir filtro por agrupamento.
+
+## Fase 2 - Desafios
+
+### Lista, estado e finalizacao
+
+- [x] Na aba de desafios, nao exibir desafios encerrados junto com desafios ativos.
+- [x] Manter tab/lista propria para desafios finalizados.
+- [x] Garantir que desafio encerrado nao permita novas participacoes.
+- [ ] Ajustar cards de desafio para a estetica final definida manualmente.
+- [ ] Remover sublinhado da tab do desafio.
+
+### Criacao de desafio
+
+- [ ] Trocar textos e botoes fora da estetica Zenith na tela de criar desafio.
+- [ ] Corrigir botoes de exercicio do desafio para usarem fonte/medidas consistentes e texto legivel.
+- [ ] Corrigir botoes da etapa "Meta do desafio", exceto "Continuar", para ficarem legiveis e alinhados ao tema.
+- [ ] Adicionar animacao de selecao/deselecao em botoes e areas clicaveis.
+- [ ] A animacao deve preencher/remover cor gradualmente ao selecionar/deselecionar, em vez de apenas clarear a opcao.
+
+### Detalhes de desafio
+
+- [ ] Colocar "criado por @..." antes das informacoes do desafio.
+- [ ] Mostrar o usuario criador/autor por username.
+- [ ] Adicionar animacao na mudanca entre tabs de informacao e ranking.
+
+## Fase 3 - Perfil, Conquistas e Medalhas
+
+### Edicao de perfil
+
+- [x] Garantir que a tela de edicao permita alterar banner.
+- [x] Garantir que a tela de edicao permita alterar foto.
+- [x] Garantir que a tela de edicao permita alterar nome de usuario.
+- [x] Garantir que a tela de edicao permita alterar nome de exibicao.
+- [ ] Permitir alterar titulo.
+- [ ] Permitir alterar badge.
+- [x] Garantir que a tela de edicao permita alterar "sobre mim".
+- [x] Remover configuracoes de blur e crop dentro da screen.
+- [x] Manter crop apenas no fluxo nativo de escolha/edicao da imagem no dispositivo.
+
+### Conquistas
+
+- [x] Corrigir clique em "Conquistas": deve abrir a tela de conquistas, nao a tela de progresso.
+- [x] Criar tela de conquistas.
+- [x] Exibir conquistas por categorias.
+- [x] Usar icones unicos provisoriamente ate os icones finais serem desenhados.
+- [x] No proprio perfil, exibir todas as conquistas e como desbloquear cada uma.
+- [x] Em perfil alheio, exibir apenas conquistas desbloqueadas pelo usuario.
+- [ ] Conquistas existentes no backend atual:
+  - `primeira_atividade`: desbloqueada ao registrar pelo menos 1 atividade.
+  - `atividades_10`: desbloqueada ao atingir 10 atividades; concede titulo `atleta`.
+  - `streak_7`: desbloqueada ao atingir streak de 7; concede titulo `dedicado`.
+  - `streak_30`: desbloqueada ao atingir streak de 30; concede titulo `lenda`.
+
+### Medalhas de desafios
+
+- [x] Manter a screen de desafios do perfil com podio separado do historico.
+- [x] O podio deve exibir totais de ouro, prata, bronze e participacao.
+- [x] O historico deve listar cada desafio em que o usuario ganhou medalha.
+- [x] Cada item do historico deve abrir o desafio correspondente.
+- [ ] Remover card separado de medalhas, se ainda existir.
+
+## Fase 4 - Feed e Social
+
+### Feed
+
+- [x] Ao abrir uma atividade vinda do feed, mostrar no cabecalho o usuario que completou a atividade usando `@username`.
+- [ ] Usar username em telas de estatisticas e visualizacao de outros usuarios, evitando nome de exibicao como identificador principal.
+- [x] Melhorar tempo de carregamento do header e feed da home.
+- [x] Evitar refetch completo desnecessario toda vez que voltar para a tela inicial.
+
+### Mencoes e participacoes
+
+- [x] Permitir mencoes de usuarios em atividades.
+- [x] Mostrar mencoes na aba social do usuario como "Participacoes".
+- [x] Ao receber mencao, perguntar se o usuario quer ser participante da atividade mencionada.
+- [x] Se aceito, a atividade aparece no perfil do usuario mencionado.
+- [x] Se o usuario mencionado participou mas nao monitorou a atividade, ela nao deve contar como verificada.
+- [x] Exibir link visual entre participacao e atividade original.
+
+### Notificacoes
+
+- [x] Manter botao de marcar notificacoes como lidas.
+- [ ] Validar que notificacoes lidas nao voltam a aparecer como nao lidas apos recarregar.
+
+## Fase 5 - Metas e Progresso
+
+### Metas
+
+- [ ] Implementar autoconclusao das metas.
+- [ ] Quando concluidas, mostrar metas finalizadas na screen de progresso.
+- [ ] Em metas finalizadas, exibir quanto tempo demorou para concluir.
+- [ ] Em metas finalizadas, exibir quantas atividades contribuiram para a meta.
+- [ ] Corrigir exibicao de duracoes em metas, trocando minutos crus por horas/minutos.
+
+### Relatorios
+
+- [ ] Adicionar grafico de kilometragem nos relatorios.
+- [ ] Ao clicar em "Ver todos", permitir ver grafico de kilometragem.
+- [ ] Permitir graficos por atividades especificas, como caminhadas.
+- [ ] Em graficos especificos, exibir contagens relevantes, como numero de caminhadas.
+
+## Fase 6 - Configuracoes e Sistema
+
+### Bloqueio de apps
+
+- [ ] Reavaliar "Configurar Bloqueio de Apps" porque precisa atuar fora da camada interna do aplicativo.
+- [ ] Investigar alternativa baseada em APIs do Android disponiveis para estatisticas de uso, acessibilidade ou integracao com Modo Foco quando possivel.
+- [ ] Registrar quantas vezes apps configurados foram abertos.
+- [ ] Deixar claro se o app esta apenas monitorando, bloqueando via acessibilidade, ou orientando uso do Modo Foco do dispositivo.
+
+### Cores e componentes
+
+- [ ] Remover cores fora da paleta verde/neutral em componentes padrao, especialmente switches azuis.
+- [ ] Trocar dialogs restantes para cores coerentes com o tema.
+- [ ] Garantir que dialogs brancos nao fiquem "branco com branco" sem contraste em campos, botoes ou superficies.
+
+## Fase 7 - Acabamento e Qualidade
+
+### Animacoes
+
+- [ ] Adicionar animacoes nas telas acessadas pelo botao "Novo" na home: desafios, registrar e iniciar.
+- [ ] Adicionar transicoes leves em tabs e seletores onde fizer sentido.
+
+### Formatacao de unidades
+
+- [x] Trocar exibicao em minutos crus por horas/minutos:
+  - `600.0 min` deve virar `10h`.
+  - `630 min` deve virar `10h30m`.
+- [x] Em kilometros, remover decimal quando for zero.
+- [x] Em kilometros, manter uma casa quando necessario, por exemplo `25,2km`.
+- [x] Em passos, remover decimais sempre.
+
+### Logs e warnings
+
+- [ ] Remover ou silenciar corretamente o warning `Job was cancelled`, sem esconder erros reais.
+
+## Criterios de Aceite Final
+
+- [ ] `./gradlew --stop` executado antes da instalacao final.
+- [ ] `./gradlew installRelease` executado no final de cada ciclo de implementacao relevante.
+- [ ] App instala em device/emulador conectado ou falha apenas por ausencia de dispositivo.
+- [ ] Fluxos principais testados manualmente:
+  - registrar atividade;
+  - iniciar/finalizar atividade monitorada;
+  - criar desafio;
+  - entrar em desafio ativo/finalizado;
+  - abrir perfil proprio;
+  - abrir perfil alheio;
+  - abrir conquistas;
+  - abrir feed e detalhe de atividade;
+  - criar/acompanhar meta;
+  - notificacoes e mencoes.
+- [ ] Supabase advisors revisados apos migrations relevantes.
+- [ ] Nenhum erro conhecido de RLS recursiva em telas usadas pelo app.

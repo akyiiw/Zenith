@@ -7,14 +7,21 @@ import br.com.zenith.data.SupabaseConfig
 import br.com.zenith.data.models.ActivityMention
 import br.com.zenith.data.models.Amizade
 import br.com.zenith.data.models.AmizadeInsert
+import br.com.zenith.data.models.ActivityGroup
+import br.com.zenith.data.models.ActivityGroupItem
 import br.com.zenith.data.models.Atividade
 import br.com.zenith.data.models.Badge
+import br.com.zenith.data.models.ChallengeAwardCalculator
+import br.com.zenith.data.models.ChallengeAwardSummary
 import br.com.zenith.data.models.ChallengeForumEntry
+import br.com.zenith.data.models.Desafio
+import br.com.zenith.data.models.DesafioParticipacao
 import br.com.zenith.data.models.Profile
 import br.com.zenith.ui.notifications.ZenithNotifier
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Columns
+import io.github.jan.supabase.postgrest.query.Count
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -26,7 +33,7 @@ data class SocialUiState(
     val currentUserId: String = "",
     val profiles: List<Profile> = emptyList(),
     val friendships: List<Amizade> = emptyList(),
-    val pendingMentions: List<ActivityMention> = emptyList()
+    val activityMentions: List<ActivityMention> = emptyList()
 ) {
     fun friendshipWith(profileId: String): Amizade? {
         return friendships.firstOrNull {
@@ -58,6 +65,15 @@ data class SocialUiState(
             .toSet()
         return profiles.filter { it.id in ids }
     }
+
+    fun pendingMentions(): List<ActivityMention> =
+        activityMentions.filter { it.status == ActivityMention.STATUS_PENDING }
+
+    fun acceptedMentions(): List<ActivityMention> =
+        activityMentions.filter { it.status == ActivityMention.STATUS_ACCEPTED }
+
+    fun declinedMentions(): List<ActivityMention> =
+        activityMentions.filter { it.status == ActivityMention.STATUS_DECLINED }
 
     companion object {
         const val STATUS_PENDENTE = "pendente"
@@ -172,6 +188,7 @@ class SocialViewModel : ViewModel() {
                 ) {
                     filter { eq("id", mentionId) }
                 }
+                ZenithNotifier.success("Menção aceita.")
                 loadSocial(context)
             }
         }
@@ -188,6 +205,7 @@ class SocialViewModel : ViewModel() {
                 ) {
                     filter { eq("id", mentionId) }
                 }
+                ZenithNotifier.success("Menção recusada.")
                 loadSocial(context)
             }
         }
@@ -209,22 +227,22 @@ class SocialViewModel : ViewModel() {
             .decodeList<Amizade>()
             .filter { it.userId == currentUserId || it.friendId == currentUserId }
 
-        val pendingMentions = runCatching {
+        val activityMentions = runCatching {
             client.postgrest.from("activity_mentions")
                 .select(columns = Columns.raw("*, atividades(*, exercicios(*)), publisher:profiles!activity_mentions_publisher_id_fkey(*)")) {
                     filter {
                         eq("mentioned_user_id", currentUserId)
-                        eq("status", ActivityMention.STATUS_PENDING)
                     }
                 }
                 .decodeList<ActivityMention>()
         }.getOrDefault(emptyList())
+            .sortedByDescending { it.createdAt.orEmpty() }
 
         _uiState.value = SocialUiState(
             currentUserId = currentUserId,
             profiles = profiles,
             friendships = friendships,
-            pendingMentions = pendingMentions
+            activityMentions = activityMentions
         )
     }
 
@@ -275,7 +293,10 @@ data class PublicProfileUiState(
     val profile: Profile? = null,
     val badge: Badge? = null,
     val stats: br.com.zenith.viewmodels.profile.UserStats = br.com.zenith.viewmodels.profile.UserStats(),
+    val challengeAwards: ChallengeAwardSummary = ChallengeAwardSummary(),
     val atividades: List<Atividade> = emptyList(),
+    val activityGroups: List<ActivityGroup> = emptyList(),
+    val activityGroupItems: List<ActivityGroupItem> = emptyList(),
     val canViewActivities: Boolean = true
 )
 
@@ -307,13 +328,15 @@ class PublicProfileViewModel : ViewModel() {
                     }.getOrNull()
                 }
 
-                val atividades = runCatching {
-                    val ownActivities = client.postgrest.from("atividades")
+                val ownActivities = runCatching {
+                    client.postgrest.from("atividades")
                         .select(columns = Columns.raw("*, exercicios(*)")) {
                             filter { eq("user_id", userId) }
                         }
                         .decodeList<Atividade>()
-                    val mentionedActivities = client.postgrest.from("activity_mentions")
+                }.getOrDefault(emptyList())
+                val mentionedActivities = runCatching {
+                    client.postgrest.from("activity_mentions")
                         .select(columns = Columns.raw("*, atividades(*, exercicios(*))")) {
                             filter {
                                 eq("mentioned_user_id", userId)
@@ -322,8 +345,7 @@ class PublicProfileViewModel : ViewModel() {
                             }
                         }
                         .decodeList<ActivityMention>()
-                        .mapNotNull { it.activity }
-                    (ownActivities + mentionedActivities).distinctBy { it.id }
+                        .mapNotNull { it.activity?.copy(verificada = false) }
                 }.getOrDefault(emptyList())
 
                 val friendships = runCatching {
@@ -353,8 +375,33 @@ class PublicProfileViewModel : ViewModel() {
                 }
                 val visibleActivities = when {
                     !canViewActivities -> emptyList()
-                    profile.profileVisibility == "privado" && isFriend -> atividades.filter { it.id in publishedActivityIds }
-                    else -> atividades
+                    profile.profileVisibility == "privado" && isFriend -> {
+                        (ownActivities.filter { it.id in publishedActivityIds } + mentionedActivities)
+                            .distinctBy { it.id }
+                    }
+                    else -> (ownActivities + mentionedActivities).distinctBy { it.id }
+                }
+                val visibleActivityIds = visibleActivities.map { it.id }.toSet()
+                val groupItems = if (visibleActivityIds.isEmpty()) {
+                    emptyList()
+                } else {
+                    runCatching {
+                        client.postgrest.from("activity_group_items")
+                            .select()
+                            .decodeList<ActivityGroupItem>()
+                            .filter { it.activityId in visibleActivityIds }
+                    }.getOrDefault(emptyList())
+                }
+                val groupIds = groupItems.map { it.groupId }.toSet()
+                val activityGroups = if (groupIds.isEmpty()) {
+                    emptyList()
+                } else {
+                    runCatching {
+                        client.postgrest.from("activity_groups")
+                            .select()
+                            .decodeList<ActivityGroup>()
+                            .filter { it.id in groupIds }
+                    }.getOrDefault(emptyList())
                 }
 
                 val amigos = friendships
@@ -365,17 +412,55 @@ class PublicProfileViewModel : ViewModel() {
                     .map { if (it.userId == userId) it.friendId else it.userId }
                     .distinct()
                     .size
+                val desafios = runCatching {
+                    client.postgrest.from("desafio_participacoes")
+                        .select {
+                            filter { eq("user_id", userId) }
+                            count(Count.EXACT)
+                        }
+                        .countOrNull()
+                        ?.toInt()
+                }.getOrNull() ?: 0
+                val conquistas = runCatching {
+                    client.postgrest.from("conquistas")
+                        .select {
+                            filter { eq("user_id", userId) }
+                            count(Count.EXACT)
+                        }
+                        .countOrNull()
+                        ?.toInt()
+                }.getOrNull() ?: 0
+                val challengeAwards = runCatching {
+                    val challengeParticipations = client.postgrest.from("desafio_participacoes")
+                        .select()
+                        .decodeList<DesafioParticipacao>()
+                    val challenges = client.postgrest.from("desafios")
+                        .select()
+                        .decodeList<Desafio>()
+                    val challengeActivities = client.postgrest.from("atividades")
+                        .select(columns = Columns.raw("*, exercicios(*)"))
+                        .decodeList<Atividade>()
+                    ChallengeAwardCalculator.buildSummary(
+                        userId = userId,
+                        challenges = challenges,
+                        participations = challengeParticipations,
+                        activities = challengeActivities
+                    )
+                }.getOrDefault(ChallengeAwardSummary())
 
                 _uiState.value = PublicProfileUiState(
                     profile = profile,
                     badge = badge,
                     stats = br.com.zenith.viewmodels.profile.UserStats(
                         amigos = amigos,
-                        conquistas = 0,
-                        desafios = 0,
-                        medalhas = 0
+                        conquistas = conquistas,
+                        desafios = desafios,
+                        medalhas = challengeAwards.total
                     ),
+                    challengeAwards = challengeAwards,
                     atividades = visibleActivities,
+                    activityGroups = activityGroups,
+                    activityGroupItems = groupItems,
                     canViewActivities = canViewActivities
                 )
             } catch (e: Exception) {

@@ -1,7 +1,6 @@
 package br.com.zenith.viewmodels.home
 
 import android.content.Context
-import android.widget.Toast
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import br.com.zenith.data.SupabaseConfig
@@ -9,6 +8,7 @@ import br.com.zenith.data.models.Amizade
 import br.com.zenith.data.models.Atividade
 import br.com.zenith.data.models.ChallengeForumEntry
 import br.com.zenith.data.models.Profile
+import br.com.zenith.ui.notifications.ZenithNotifier
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Columns
@@ -38,12 +38,15 @@ data class HomeFeedUiState(
 class HomeFeedViewModel : ViewModel() {
     private val _uiState = MutableStateFlow(HomeFeedUiState(isLoading = true))
     val uiState: StateFlow<HomeFeedUiState> = _uiState.asStateFlow()
+    private var hasLoadedOnce = false
 
-    fun load(context: Context) {
+    fun load(context: Context, forceRefresh: Boolean = false) {
+        if (hasLoadedOnce && !forceRefresh) return
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
             try {
                 _uiState.value = loadState(context)
+                hasLoadedOnce = true
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
@@ -73,22 +76,32 @@ class HomeFeedViewModel : ViewModel() {
                     .decodeList<ChallengeForumEntry>()
                     .isNotEmpty()
 
-                if (!alreadyPublished) {
-                    client.postgrest.from("feed_entries").insert(
-                        buildJsonObject {
-                            put("id", UUID.randomUUID().toString())
-                            put("author_id", userId)
-                            put("entry_type", "activity")
-                            put("activity_id", activityId)
-                        }
-                    )
+                if (alreadyPublished) {
+                    refreshAfterPublishAttempt(context)
+                    ZenithNotifier.warning("Essa atividade ja foi publicada")
+                    return@launch
                 }
 
+                client.postgrest.from("feed_entries").insert(
+                    buildJsonObject {
+                        put("id", UUID.randomUUID().toString())
+                        put("author_id", userId)
+                        put("entry_type", "activity")
+                        put("activity_id", activityId)
+                    }
+                )
+
                 _uiState.value = loadState(context).copy(isPublishing = false)
-                Toast.makeText(context, "Atividade publicada", Toast.LENGTH_SHORT).show()
+                hasLoadedOnce = true
+                ZenithNotifier.success("Atividade publicada")
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(isPublishing = false)
-                Toast.makeText(context, "Erro ao publicar: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+                if (e.isDuplicateActivityPublication()) {
+                    refreshAfterPublishAttempt(context)
+                    ZenithNotifier.warning("Essa atividade ja foi publicada")
+                } else {
+                    ZenithNotifier.error("Erro ao publicar: ${e.localizedMessage}")
+                }
             }
         }
     }
@@ -115,10 +128,14 @@ class HomeFeedViewModel : ViewModel() {
 
         val entries = runCatching {
             client.postgrest.from("feed_entries")
-                .select()
+                .select {
+                    filter {
+                        eq("entry_type", "activity")
+                    }
+                }
                 .decodeList<ChallengeForumEntry>()
         }.getOrDefault(emptyList())
-            .filter { it.entryType == "activity" && it.activityId != null }
+            .filter { it.activityId != null }
 
         val activities = client.postgrest.from("atividades")
             .select(columns = Columns.raw("*, exercicios(*)"))
@@ -146,5 +163,22 @@ class HomeFeedViewModel : ViewModel() {
             items = items,
             publishableActivities = publishableActivities
         )
+    }
+
+    private suspend fun refreshAfterPublishAttempt(context: Context) {
+        _uiState.value = runCatching { loadState(context) }
+            .getOrElse { _uiState.value }
+            .copy(isPublishing = false)
+        hasLoadedOnce = true
+    }
+
+    private fun Exception.isDuplicateActivityPublication(): Boolean {
+        val message = listOfNotNull(message, localizedMessage, cause?.message)
+            .joinToString(" ")
+            .lowercase()
+        return "duplicate" in message ||
+            "unique" in message ||
+            "feed_entries_activity_id" in message ||
+            "feed_entries_activity_unique" in message
     }
 }

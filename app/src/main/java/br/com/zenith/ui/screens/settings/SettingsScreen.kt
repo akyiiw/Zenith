@@ -10,7 +10,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.filled.Block
+import androidx.compose.material.icons.filled.Flag
+import androidx.compose.material.icons.filled.Groups
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -35,10 +43,15 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import br.com.zenith.data.SupabaseConfig
+import br.com.zenith.ui.components.common.BottomNavListPadding
 import br.com.zenith.ui.components.common.ScreenHeader
+import br.com.zenith.ui.components.common.zenithSwitchColors
 import br.com.zenith.ui.components.settings.AccountSettingsGroup
 import br.com.zenith.ui.components.settings.LogoutButton
+import br.com.zenith.ui.components.settings.SettingsActionGroup
+import br.com.zenith.ui.components.settings.SettingsActionItem
 import br.com.zenith.ui.components.settings.SettingsSectionTitle
+import br.com.zenith.ui.notifications.ZenithNotifier
 import br.com.zenith.ui.theme.Inter
 import br.com.zenith.ui.theme.ZenithTheme
 import br.com.zenith.viewmodels.app.AuthViewModel
@@ -74,7 +87,7 @@ fun SettingsScreen(navController: NavController) {
                     .statusBarsPadding()
                     .padding(horizontal = 20.dp),
                 verticalArrangement = Arrangement.spacedBy(24.dp),
-                contentPadding = PaddingValues(top = 19.dp, bottom = 104.dp)
+                contentPadding = PaddingValues(top = 19.dp, bottom = BottomNavListPadding)
             ) {
                 item {
                     ScreenHeader(
@@ -88,10 +101,37 @@ fun SettingsScreen(navController: NavController) {
                         SettingsSectionTitle("Conta")
                         AccountSettingsGroup(
                             email = email,
-                            onEmailClick = {},
-                            onPasswordClick = {},
-                            onProfileClick = { navController.navigate("edit_profile") },
-                            onSecurityClick = {}
+                            onEmailClick = { ZenithNotifier.info("Alteração de e-mail ainda não disponível") },
+                            onPasswordClick = { ZenithNotifier.info("Alteração de senha ainda não disponível") },
+                            onSecurityClick = { ZenithNotifier.info("Preferências de segurança ainda não disponíveis") }
+                        )
+                    }
+                }
+
+                item {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        SettingsSectionTitle("Perfil")
+                        SettingsActionGroup(
+                            items = listOf(
+                                SettingsActionItem(
+                                    icon = Icons.Default.Person,
+                                    title = "Editar perfil",
+                                    subtitle = "Nome, foto, banner, bio e status",
+                                    onClick = { navController.navigate("edit_profile") }
+                                ),
+                                SettingsActionItem(
+                                    icon = Icons.Default.Star,
+                                    title = "Título ativo",
+                                    subtitle = "Escolher um título desbloqueado",
+                                    onClick = { navController.navigate("title_select") }
+                                ),
+                                SettingsActionItem(
+                                    icon = Icons.Default.Groups,
+                                    title = "Amigos",
+                                    subtitle = "Buscar pessoas e gerenciar solicitações",
+                                    onClick = { navController.navigate("social") }
+                                )
+                            )
                         )
                     }
                 }
@@ -125,9 +165,96 @@ fun SettingsScreen(navController: NavController) {
                             Switch(
                                 checked = user?.profileVisibility == "privado",
                                 onCheckedChange = { userViewModel.atualizarVisibilidadePerfil(it, context) },
-                                enabled = !isSaving
+                                enabled = !isSaving,
+                                colors = zenithSwitchColors()
                             )
                         }
+                    }
+                }
+
+                item {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        SettingsSectionTitle("Notificações")
+                        SettingsActionGroup(
+                            items = listOf(
+                                SettingsActionItem(
+                                    icon = Icons.Default.Notifications,
+                                    title = "Central de notificações",
+                                    subtitle = "Abra o sino na Home para ver solicitações, menções e conquistas",
+                                    onClick = { ZenithNotifier.info("Use o sino da Home para abrir suas notificações") }
+                                )
+                            )
+                        )
+                    }
+                }
+
+                item {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        SettingsSectionTitle("Sono")
+                        SettingsActionGroup(
+                            items = listOf(
+                                SettingsActionItem(
+                                    icon = Icons.Default.Settings,
+                                    title = "Monitoramento de sono",
+                                    subtitle = "Fontes, janela de descanso e estimativa do aparelho",
+                                    onClick = { navController.navigate("sleep_settings") }
+                                )
+                            )
+                        )
+                    }
+                }
+
+                item {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        SettingsSectionTitle("Dados e relatórios")
+                        SettingsActionGroup(
+                            items = listOf(
+                                SettingsActionItem(
+                                    icon = Icons.Default.BarChart,
+                                    title = "Progresso",
+                                    subtitle = "Atividades, sono, desafios e conquistas",
+                                    onClick = { navController.navigate("progress") }
+                                ),
+                                SettingsActionItem(
+                                    icon = Icons.Default.Flag,
+                                    title = "Metas",
+                                    subtitle = "Criar e gerenciar metas semanais ou mensais",
+                                    onClick = { navController.navigate("goals") }
+                                )
+                            )
+                        )
+                    }
+                }
+
+                item {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        SettingsSectionTitle("Bloqueio de aplicativos")
+                        SettingsActionGroup(
+                            items = listOf(
+                                SettingsActionItem(
+                                    icon = Icons.Default.Block,
+                                    title = "Configurar bloqueios",
+                                    subtitle = "Apps, horários e janelas de foco",
+                                    onClick = { navController.navigate("app_blocks") }
+                                )
+                            )
+                        )
+                    }
+                }
+
+                item {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        SettingsSectionTitle("Sobre")
+                        SettingsActionGroup(
+                            items = listOf(
+                                SettingsActionItem(
+                                    icon = Icons.Default.Info,
+                                    title = "Zenith",
+                                    subtitle = "Versão 1.0",
+                                    onClick = { ZenithNotifier.info("Zenith versão 1.0") }
+                                )
+                            )
+                        )
                     }
                 }
 

@@ -31,7 +31,8 @@ object SleepDeviceEstimateCalculator {
         settings: SleepMonitoringSettings,
         events: List<SleepDeviceEvent>,
         date: LocalDate,
-        zoneId: ZoneId = ZoneId.systemDefault()
+        zoneId: ZoneId = ZoneId.systemDefault(),
+        maxSleepMinutes: Int = 14 * 60
     ): SleepDeviceEstimate? {
         if (!settings.enabled || !settings.useDeviceEstimate) return null
 
@@ -51,14 +52,16 @@ object SleepDeviceEstimateCalculator {
 
         val windowStartMillis = windowStart.toInstant().toEpochMilli()
         val windowEndMillis = windowEnd.toInstant().toEpochMilli()
-        val eventsInWindow = events
-            .filter { it.occurredAtMillis in windowStartMillis..windowEndMillis }
+        val analysisEndMillis = windowStartMillis + maxSleepMinutes.coerceAtLeast(MIN_SLEEP_MINUTES) * 60_000L
+        val eventsForAnalysis = events
+            .filter { it.occurredAtMillis in windowStartMillis..analysisEndMillis }
             .sortedBy { it.occurredAtMillis }
 
         val inactiveRanges = buildInactiveRanges(
-            events = eventsInWindow,
+            events = eventsForAnalysis,
             windowStartMillis = windowStartMillis,
-            windowEndMillis = windowEndMillis
+            windowEndMillis = windowEndMillis,
+            analysisEndMillis = analysisEndMillis
         )
 
         val longestInactiveRange = inactiveRanges.maxByOrNull { it.endMillis - it.startMillis }
@@ -67,8 +70,11 @@ object SleepDeviceEstimateCalculator {
         val durationMinutes = ((longestInactiveRange.endMillis - longestInactiveRange.startMillis) / 60_000L).toInt()
         if (durationMinutes < MIN_SLEEP_MINUTES) return null
 
-        val unlocks = eventsInWindow.count { it.type == SleepDeviceEventType.UserPresent }
-        val screenOns = eventsInWindow.count { it.type == SleepDeviceEventType.ScreenOn }
+        val eventsInSleepRange = eventsForAnalysis.filter {
+            it.occurredAtMillis in longestInactiveRange.startMillis..longestInactiveRange.endMillis
+        }
+        val unlocks = eventsInSleepRange.count { it.type == SleepDeviceEventType.UserPresent }
+        val screenOns = eventsInSleepRange.count { it.type == SleepDeviceEventType.ScreenOn }
         val interruptions = if (unlocks > 0) unlocks else screenOns
 
         val confidence = calculateConfidence(durationMinutes, interruptions)
@@ -85,7 +91,8 @@ object SleepDeviceEstimateCalculator {
     private fun buildInactiveRanges(
         events: List<SleepDeviceEvent>,
         windowStartMillis: Long,
-        windowEndMillis: Long
+        windowEndMillis: Long,
+        analysisEndMillis: Long
     ): List<InactiveRange> {
         val ranges = mutableListOf<InactiveRange>()
         var screenOffStartedAt: Long? = null
@@ -93,7 +100,7 @@ object SleepDeviceEstimateCalculator {
         events.forEach { event ->
             when (event.type) {
                 SleepDeviceEventType.ScreenOff -> {
-                    if (screenOffStartedAt == null) {
+                    if (screenOffStartedAt == null && event.occurredAtMillis <= windowEndMillis) {
                         screenOffStartedAt = max(event.occurredAtMillis, windowStartMillis)
                     }
                 }
@@ -101,7 +108,11 @@ object SleepDeviceEstimateCalculator {
                 SleepDeviceEventType.ScreenOn,
                 SleepDeviceEventType.UserPresent -> {
                     val startedAt = screenOffStartedAt
-                    if (startedAt != null && event.occurredAtMillis > startedAt) {
+                    if (
+                        startedAt != null &&
+                        event.occurredAtMillis <= windowEndMillis &&
+                        event.occurredAtMillis > startedAt
+                    ) {
                         ranges.add(
                             InactiveRange(
                                 startMillis = startedAt,
@@ -114,12 +125,23 @@ object SleepDeviceEstimateCalculator {
             }
         }
 
-        val openRangeStart = screenOffStartedAt ?: inferWindowStartIfNoScreenEvents(events, windowStartMillis)
-        if (openRangeStart != null && windowEndMillis > openRangeStart) {
+        val openRangeStart = screenOffStartedAt ?: inferWindowStartIfNoRestWindowInteraction(
+            events = events,
+            windowStartMillis = windowStartMillis,
+            windowEndMillis = windowEndMillis
+        )
+        val openRangeEnd = openRangeStart?.let {
+            postWindowWakeMillis(
+                events = events,
+                afterMillis = windowEndMillis,
+                fallbackEndMillis = analysisEndMillis
+            )
+        }
+        if (openRangeStart != null && openRangeEnd != null && openRangeEnd > openRangeStart) {
             ranges.add(
                 InactiveRange(
                     startMillis = openRangeStart,
-                    endMillis = windowEndMillis
+                    endMillis = openRangeEnd
                 )
             )
         }
@@ -127,15 +149,31 @@ object SleepDeviceEstimateCalculator {
         return ranges
     }
 
-    private fun inferWindowStartIfNoScreenEvents(
+    private fun inferWindowStartIfNoRestWindowInteraction(
         events: List<SleepDeviceEvent>,
-        windowStartMillis: Long
+        windowStartMillis: Long,
+        windowEndMillis: Long
     ): Long? {
-        return if (events.none { it.type == SleepDeviceEventType.ScreenOn || it.type == SleepDeviceEventType.UserPresent }) {
+        return if (events.none { it.occurredAtMillis <= windowEndMillis && it.isInteraction() }) {
             windowStartMillis
         } else {
             null
         }
+    }
+
+    private fun postWindowWakeMillis(
+        events: List<SleepDeviceEvent>,
+        afterMillis: Long,
+        fallbackEndMillis: Long
+    ): Long {
+        val postWindowEvents = events.filter { it.occurredAtMillis > afterMillis }
+        return postWindowEvents.firstOrNull { it.type == SleepDeviceEventType.UserPresent }?.occurredAtMillis
+            ?: postWindowEvents.firstOrNull { it.type == SleepDeviceEventType.ScreenOn }?.occurredAtMillis
+            ?: fallbackEndMillis
+    }
+
+    private fun SleepDeviceEvent.isInteraction(): Boolean {
+        return type == SleepDeviceEventType.ScreenOn || type == SleepDeviceEventType.UserPresent
     }
 
     private fun calculateConfidence(durationMinutes: Int, interruptions: Int): Float {

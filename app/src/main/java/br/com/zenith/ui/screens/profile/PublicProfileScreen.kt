@@ -28,10 +28,12 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import br.com.zenith.ui.animations.CenteredZenithLoading
+import br.com.zenith.ui.components.common.BottomNavListPadding
 import br.com.zenith.ui.components.profile.AboutSection
 import br.com.zenith.ui.components.profile.ProfileHeader
 import br.com.zenith.ui.components.profile.RecentActivitySection
 import br.com.zenith.ui.components.profile.RecentHeader
+import br.com.zenith.ui.notifications.ZenithNotifier
 import br.com.zenith.ui.theme.Inter
 import br.com.zenith.ui.theme.ZenithTheme
 import br.com.zenith.viewmodels.social.PublicProfileViewModel
@@ -78,14 +80,21 @@ fun PublicProfileScreen(
                         .fillMaxSize()
                         .padding(padding),
                     verticalArrangement = Arrangement.spacedBy(11.dp),
-                    contentPadding = PaddingValues(top = 2.dp, bottom = 24.dp)
+                    contentPadding = PaddingValues(top = 2.dp, bottom = BottomNavListPadding)
                 ) {
                     item {
                         ProfileHeader(
                             user = uiState.profile,
                             stats = uiState.stats,
                             badge = uiState.badge,
-                            onBack = { navController.popBackStack() }
+                            onBack = { navController.popBackStack() },
+                            onStatClick = { stat ->
+                                when (stat) {
+                                    "Desafios" -> uiState.profile?.id?.let { navController.navigate("challenge_awards/$it") }
+                                    "Conquistas" -> uiState.profile?.id?.let { navController.navigate("achievements/$it") }
+                                    else -> ZenithNotifier.info("$stat deste perfil ainda não tem lista dedicada")
+                                }
+                            }
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         AboutSection(
@@ -93,7 +102,11 @@ fun PublicProfileScreen(
                             isOwnProfile = false
                         )
                         Spacer(modifier = Modifier.height(8.dp))
-                        RecentHeader()
+                        RecentHeader(
+                            onViewAll = {
+                                uiState.profile?.id?.let { navController.navigate("profile_activities/$it") }
+                            }
+                        )
                         Spacer(modifier = Modifier.height(8.dp))
                         if (!uiState.canViewActivities) {
                             Text(
