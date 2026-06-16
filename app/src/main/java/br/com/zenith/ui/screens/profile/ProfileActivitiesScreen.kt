@@ -39,6 +39,7 @@ import androidx.navigation.NavController
 import br.com.zenith.ui.animations.CenteredZenithLoading
 import br.com.zenith.ui.components.common.BottomNavListPadding
 import br.com.zenith.ui.components.profile.RecentActivityCard
+import br.com.zenith.ui.components.profile.groupNamesByActivityId
 import br.com.zenith.ui.theme.Inter
 import br.com.zenith.ui.theme.ZenithTheme
 import br.com.zenith.viewmodels.social.PublicProfileViewModel
@@ -87,6 +88,9 @@ fun ProfileActivitiesScreen(
                 .filterKeys { it != null }
                 .mapKeys { it.key.orEmpty() }
                 .mapValues { entry -> entry.value.map { it.activityId }.toSet() }
+        }
+        val activityGroupNamesByActivityId = remember(uiState.activityGroups, uiState.activityGroupItems) {
+            groupNamesByActivityId(uiState.activityGroups, uiState.activityGroupItems)
         }
         val filteredActivities = remember(
             uiState.atividades,
@@ -173,6 +177,8 @@ fun ProfileActivitiesScreen(
                     items(filteredActivities, key = { it.id }) { activity ->
                         RecentActivityCard(
                             atividade = activity,
+                            groupNames = activityGroupNamesByActivityId[activity.id].orEmpty(),
+                            acceptedMentions = uiState.acceptedMentionsByActivityId[activity.id].orEmpty(),
                             onClick = { navController.navigate("activity_detail/${activity.id}") }
                         )
                     }

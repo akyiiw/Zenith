@@ -27,12 +27,12 @@ import br.com.zenith.data.models.Atividade
 import br.com.zenith.data.models.Exercicio
 import br.com.zenith.ui.animations.CenteredZenithLoading
 import br.com.zenith.ui.animations.ZenithLoading
-import br.com.zenith.ui.components.profile.activityGroup
 import br.com.zenith.ui.components.profile.activityType
 import br.com.zenith.ui.components.profile.ChallengeActivitySummary
 import br.com.zenith.ui.components.profile.challengeModeLabel
 import br.com.zenith.ui.components.profile.formattedActivityValue
 import br.com.zenith.ui.components.profile.formattedDuration
+import br.com.zenith.ui.components.profile.mentionLabel
 import br.com.zenith.ui.components.profile.tempoRelativo
 import br.com.zenith.ui.theme.Inter
 import br.com.zenith.ui.theme.ZenithTheme
@@ -239,10 +239,6 @@ fun ActivityDetailScreen(navController: NavController, atividadeId: String?) {
                                 )
                             )
 
-                            Text(
-                                text = activityGroup(atividade),
-                                style = MaterialTheme.typography.bodySmall.copy(color = Color.Gray)
-                            )
                             detailState.groupNames.takeIf { it.isNotEmpty() }?.let { groups ->
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text(
@@ -250,6 +246,16 @@ fun ActivityDetailScreen(navController: NavController, atividadeId: String?) {
                                     style = MaterialTheme.typography.bodySmall.copy(
                                         color = Color(0xFF238D25),
                                         fontWeight = FontWeight.W600
+                                    )
+                                )
+                            }
+                            detailState.acceptedMentions.takeIf { it.isNotEmpty() }?.let { mentions ->
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = mentionLabel(mentions),
+                                    style = MaterialTheme.typography.bodySmall.copy(
+                                        fontFamily = Inter,
+                                        color = Color(0xFF536057)
                                     )
                                 )
                             }
@@ -290,17 +296,6 @@ fun ActivityDetailScreen(navController: NavController, atividadeId: String?) {
                                 DetailChip(
                                     label = "Verificada",
                                     color = Color(0xFF238D25)
-                                )
-                            }
-
-                            atividade.descricao?.takeIf { it.isNotBlank() }?.let { descricao ->
-                                Spacer(modifier = Modifier.height(10.dp))
-                                Text(
-                                    text = descricao,
-                                    style = MaterialTheme.typography.bodyMedium.copy(
-                                        fontFamily = Inter,
-                                        color = Color(0xFF4E5D4F)
-                                    )
                                 )
                             }
 

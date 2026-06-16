@@ -36,6 +36,7 @@ data class ActivityDetailUiState(
     val activity: Atividade? = null,
     val authorUsername: String? = null,
     val groupNames: List<String> = emptyList(),
+    val acceptedMentions: List<Profile> = emptyList(),
     val errorMessage: String? = null
 )
 
@@ -53,6 +54,8 @@ class ActivityViewModel : ViewModel() {
     val activityGroups: StateFlow<List<ActivityGroup>> = _activityGroups
     private val _activityGroupItems = MutableStateFlow<List<ActivityGroupItem>>(emptyList())
     val activityGroupItems: StateFlow<List<ActivityGroupItem>> = _activityGroupItems
+    private val _acceptedMentionsByActivityId = MutableStateFlow<Map<String, List<Profile>>>(emptyMap())
+    val acceptedMentionsByActivityId: StateFlow<Map<String, List<Profile>>> = _acceptedMentionsByActivityId
     private val _detailState = MutableStateFlow(ActivityDetailUiState())
     val detailState: StateFlow<ActivityDetailUiState> = _detailState
 
@@ -171,6 +174,9 @@ class ActivityViewModel : ViewModel() {
                     .distinctBy { it.id }
                 _atividades.value = allActivities
                 loadGroupItemsForActivities(allActivities)
+                _acceptedMentionsByActivityId.value = loadAcceptedMentionsForActivities(
+                    allActivities.map { it.id }.toSet()
+                )
 
                 val linkedChallengeIds = allActivities.mapNotNull { it.desafioId }.toSet()
                 _desafios.value = if (linkedChallengeIds.isEmpty()) {
@@ -232,6 +238,7 @@ class ActivityViewModel : ViewModel() {
                         .decodeSingle<Profile>()
                 }.getOrNull()
                 val groupNames = loadGroupNamesForActivity(atividade.id)
+                val acceptedMentions = loadAcceptedMentionsForActivities(setOf(atividade.id))[atividade.id].orEmpty()
 
                 _atividades.value = _atividades.value.filterNot { it.id == atividade.id } + atividade
                 atividade.desafioId?.let { challengeId ->
@@ -248,7 +255,8 @@ class ActivityViewModel : ViewModel() {
                 _detailState.value = ActivityDetailUiState(
                     activity = atividade,
                     authorUsername = author?.name,
-                    groupNames = groupNames
+                    groupNames = groupNames,
+                    acceptedMentions = acceptedMentions
                 )
             } catch (e: Exception) {
                 val message = "Erro ao carregar atividade: ${e.localizedMessage}"
@@ -304,9 +312,11 @@ class ActivityViewModel : ViewModel() {
                 if (realizadaEm.isAfter(serverNow)) {
                     throw Exception("A data e o horário da atividade não podem ser futuros")
                 }
-                duracaoMin?.let { duration ->
-                    if (realizadaEm.plusMinutes(duration.toLong()).isAfter(serverNow)) {
-                        throw Exception("A duração informada termina depois do horário atual")
+                if (!verificada) {
+                    duracaoMin?.let { duration ->
+                        if (realizadaEm.plusMinutes(duration.toLong()).isAfter(serverNow)) {
+                            throw Exception("A duração informada termina depois do horário atual")
+                        }
                     }
                 }
 
@@ -473,7 +483,7 @@ class ActivityViewModel : ViewModel() {
                     filter { eq("id", atividadeId) }
                 }
                 _detailState.value.activity?.takeIf { it.id == atividadeId }?.let { current ->
-                    _detailState.value = ActivityDetailUiState(
+                    _detailState.value = _detailState.value.copy(
                         activity = current.copy(
                             titulo = titulo,
                             descricao = descricao,
@@ -578,6 +588,37 @@ class ActivityViewModel : ViewModel() {
                 .decodeList<ActivityGroupItem>()
                 .filter { it.activityId in activityIds }
         }.getOrDefault(emptyList())
+    }
+
+    private suspend fun loadAcceptedMentionsForActivities(activityIds: Set<String>): Map<String, List<Profile>> {
+        if (activityIds.isEmpty()) return emptyMap()
+        val client = SupabaseConfig.getClient()
+        val mentions = runCatching {
+            client.postgrest.from("activity_mentions")
+                .select {
+                    filter { eq("status", ActivityMention.STATUS_ACCEPTED) }
+                }
+                .decodeList<ActivityMention>()
+                .filter { it.activityId in activityIds && it.showOnMentionedProfile }
+        }.getOrDefault(emptyList())
+        if (mentions.isEmpty()) return emptyMap()
+
+        val mentionedUserIds = mentions.map { it.mentionedUserId }.toSet()
+        val profiles = runCatching {
+            client.postgrest.from("profiles")
+                .select()
+                .decodeList<Profile>()
+                .filter { it.id in mentionedUserIds }
+                .associateBy { it.id }
+        }.getOrDefault(emptyMap())
+
+        return mentions
+            .groupBy { it.activityId }
+            .mapValues { entry ->
+                entry.value.mapNotNull { profiles[it.mentionedUserId] }
+                    .distinctBy { it.id }
+                    .sortedBy { it.name.lowercase() }
+            }
     }
 
     private suspend fun loadGroupNamesForActivity(activityId: String): List<String> {

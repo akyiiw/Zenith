@@ -434,19 +434,19 @@ private fun PickerTextField(
                 .background(Color.White, pickerShape)
                 .border(1.dp, borderColor.copy(alpha = if (enabled) 0.8f else 0.45f), pickerShape)
                 .clickable(enabled = enabled, onClick = onClick)
-                .padding(horizontal = 14.dp, vertical = 10.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(5.dp)
         ) {
             Text(
                 text = label,
-                style = MaterialTheme.typography.bodySmall.copy(
+                style = MaterialTheme.typography.bodyMedium.copy(
                     fontWeight = FontWeight.Bold,
                     color = if (isError) pickerError else Green
                 )
             )
             Text(
                 text = value.ifBlank { placeholder },
-                style = MaterialTheme.typography.bodyLarge.copy(
+                style = MaterialTheme.typography.titleMedium.copy(
                     color = if (value.isBlank()) Color(0xFF8A8A8A) else Black
                 )
             )

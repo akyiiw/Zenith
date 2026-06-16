@@ -1,5 +1,8 @@
 package br.com.zenith.ui.components.home
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -14,9 +17,12 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.DirectionsRun
+import androidx.compose.material.icons.filled.AddPhotoAlternate
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.Groups
@@ -33,6 +39,10 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -48,10 +58,12 @@ import br.com.zenith.data.models.ProgressGoal
 import br.com.zenith.data.models.Profile
 import br.com.zenith.ui.components.profile.formattedActivityValue
 import br.com.zenith.ui.components.profile.formattedDuration
+import br.com.zenith.ui.components.profile.mentionLabel
 import br.com.zenith.ui.components.profile.tempoRelativo
 import br.com.zenith.ui.theme.Green
 import br.com.zenith.ui.theme.Inter
 import br.com.zenith.ui.theme.SecondaryGreen
+import br.com.zenith.ui.theme.items.ZenithTextField
 import br.com.zenith.viewmodels.home.HomeFeedItem
 import br.com.zenith.viewmodels.home.HomeNotificationItem
 import br.com.zenith.viewmodels.home.HomeNotificationType
@@ -331,9 +343,9 @@ private fun NotificationRow(
 
 private fun HomeNotificationType.color(): Color = when (this) {
     HomeNotificationType.FriendRequest -> Color(0xFF238D25)
-    HomeNotificationType.Mention -> Color(0xFF5A6EE8)
+    HomeNotificationType.Mention -> Color(0xFF2B792C)
     HomeNotificationType.Ranking -> Color(0xFFE0A500)
-    HomeNotificationType.Achievement -> Color(0xFF8B5CF6)
+    HomeNotificationType.Achievement -> Color(0xFFF26500)
 }
 
 private fun HomeNotificationType.icon() = when (this) {
@@ -583,7 +595,8 @@ fun FeedSection(
     isLoading: Boolean,
     onPublishClick: () -> Unit,
     onOpenProfile: (Profile) -> Unit,
-    onOpenActivity: (Atividade) -> Unit
+    onOpenActivity: (HomeFeedItem) -> Unit,
+    onViewPost: (HomeFeedItem) -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(
@@ -639,7 +652,8 @@ fun FeedSection(
                     FeedActivityCard(
                         item = item,
                         onOpenProfile = { onOpenProfile(item.author) },
-                        onOpenActivity = { onOpenActivity(item.activity) }
+                        onOpenActivity = { onOpenActivity(item) },
+                        onViewPost = { onViewPost(item) }
                     )
                 }
             }
@@ -651,14 +665,19 @@ fun FeedSection(
 private fun FeedActivityCard(
     item: HomeFeedItem,
     onOpenProfile: () -> Unit,
-    onOpenActivity: () -> Unit
+    onOpenActivity: () -> Unit,
+    onViewPost: () -> Unit
 ) {
+    val activity = item.activity
+    val post = item.post
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .background(Color(0xFFF8F8F8), RoundedCornerShape(8.dp))
             .border(1.dp, Color(0xFFE6E6E6), RoundedCornerShape(8.dp))
-            .clickable { onOpenActivity() }
+            .clickable {
+                if (activity != null) onOpenActivity() else onViewPost()
+            }
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
@@ -675,7 +694,7 @@ private fun FeedActivityCard(
                     )
                 )
                 Text(
-                    text = tempoRelativo(item.activity.realizadaEm ?: item.activity.criadaEm),
+                    text = tempoRelativo(activity?.realizadaEm ?: activity?.criadaEm ?: post?.createdAt),
                     style = MaterialTheme.typography.bodySmall.copy(
                         fontFamily = Inter,
                         color = Color(0xFF6F6C6C)
@@ -684,32 +703,93 @@ private fun FeedActivityCard(
             }
         }
 
-        Text(
-            text = item.activity.titulo ?: item.activity.exercicio?.nome ?: "Atividade registrada",
-            style = MaterialTheme.typography.bodyLarge.copy(
-                fontFamily = Inter,
-                fontWeight = FontWeight.SemiBold,
-                color = Color.Black
-            )
-        )
-        Text(
-            text = formattedActivityValue(item.activity),
-            style = MaterialTheme.typography.titleLarge.copy(
-                fontFamily = Inter,
-                fontWeight = FontWeight.Bold,
-                color = Green
-            )
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        if (activity != null) {
             Text(
-                text = "Duracao: ${formattedDuration(item.activity.duracaoMin)}",
-                style = MaterialTheme.typography.bodySmall.copy(fontFamily = Inter, color = Color(0xFF6F6C6C))
-            )
-            if (item.activity.verificada) {
-                Text(
-                    text = "Verificada",
-                    style = MaterialTheme.typography.bodySmall.copy(fontFamily = Inter, color = Green)
+                text = activity.titulo ?: activity.exercicio?.nome ?: "Atividade registrada",
+                style = MaterialTheme.typography.bodyLarge.copy(
+                    fontFamily = Inter,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color.Black
                 )
+            )
+        }
+        post?.content?.takeIf { it.isNotBlank() }?.let { content ->
+            Text(
+                text = content,
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    fontFamily = Inter,
+                    color = Color(0xFF3E3E3E)
+                )
+            )
+        }
+        if (item.media.isNotEmpty()) {
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(item.media, key = { it.id }) { media ->
+                    val mediaUrl = SupabaseConfig.getClient().storage
+                        .from("post-media")
+                        .publicUrl(media.storagePath)
+                    AsyncImage(
+                        model = mediaUrl,
+                        contentDescription = "Foto da publicacao",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .width(156.dp)
+                            .height(112.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color(0xFFE8EFE8))
+                    )
+                }
+            }
+        }
+        if (activity != null) {
+            item.groupNames.takeIf { it.isNotEmpty() }?.let { groups ->
+                Text(
+                    text = groups.joinToString(prefix = "Grupo: "),
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        fontFamily = Inter,
+                        color = Color(0xFF536057)
+                    )
+                )
+            }
+            item.acceptedMentions.takeIf { it.isNotEmpty() }?.let { mentions ->
+                Text(
+                    text = mentionLabel(mentions),
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        fontFamily = Inter,
+                        color = Color(0xFF536057)
+                    )
+                )
+            }
+        }
+        activity?.descricao?.takeIf { it.isNotBlank() }?.let { descricao ->
+            Text(
+                text = descricao,
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    fontFamily = Inter,
+                    color = Color(0xFF4E5D4F)
+                )
+            )
+        }
+        if (activity != null) {
+            Text(
+                text = formattedActivityValue(activity),
+                style = MaterialTheme.typography.titleLarge.copy(
+                    fontFamily = Inter,
+                    fontWeight = FontWeight.Bold,
+                    color = Green
+                )
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    text = "Duracao: ${formattedDuration(activity.duracaoMin)}",
+                    style = MaterialTheme.typography.bodySmall.copy(fontFamily = Inter, color = Color(0xFF6F6C6C))
+                )
+                if (activity.verificada) {
+                    Text(
+                        text = "Verificada",
+                        style = MaterialTheme.typography.bodySmall.copy(fontFamily = Inter, color = Green)
+                    )
+                }
             }
         }
     }
@@ -746,8 +826,18 @@ fun PublishActivitySheet(
     activities: List<Atividade>,
     isPublishing: Boolean,
     onDismiss: () -> Unit,
-    onPublish: (Atividade) -> Unit
+    onPublish: (Atividade) -> Unit,
+    onPublishPost: (String, List<Uri>) -> Unit
 ) {
+    var postText by remember { mutableStateOf("") }
+    var imageUris by remember { mutableStateOf<List<Uri>>(emptyList()) }
+    val imageLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetMultipleContents()
+    ) { uris ->
+        imageUris = (imageUris + uris).distinct().take(4)
+    }
+    val canPublishPost = !isPublishing && (postText.isNotBlank() || imageUris.isNotEmpty())
+
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         containerColor = Color.White,
@@ -761,10 +851,93 @@ fun PublishActivitySheet(
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             Text(
-                text = "Publicar atividade",
+                text = "Publicar",
                 style = MaterialTheme.typography.titleMedium.copy(
                     fontFamily = Inter,
                     fontWeight = FontWeight.Bold
+                )
+            )
+
+            ZenithTextField(
+                value = postText,
+                onValueChange = { postText = it },
+                label = "O que voce quer compartilhar?",
+                modifier = Modifier.fillMaxWidth(),
+                minLines = 3,
+                maxLines = 6
+            )
+            if (imageUris.isNotEmpty()) {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(imageUris, key = { it.toString() }) { uri ->
+                        Box {
+                            AsyncImage(
+                                model = uri,
+                                contentDescription = "Imagem selecionada",
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier
+                                    .width(112.dp)
+                                    .height(86.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(Color(0xFFE8EFE8))
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .padding(4.dp)
+                                    .size(24.dp)
+                                    .background(Color(0xCC000000), CircleShape)
+                                    .clickable { imageUris = imageUris.filterNot { it == uri } },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = "Remover imagem",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Button(
+                    onClick = { imageLauncher.launch("image/*") },
+                    enabled = !isPublishing && imageUris.size < 4,
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEAF3DE)),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.AddPhotoAlternate,
+                        contentDescription = null,
+                        tint = Green,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Imagens", color = Green, fontFamily = Inter)
+                }
+                Button(
+                    onClick = {
+                        onPublishPost(postText, imageUris)
+                        postText = ""
+                        imageUris = emptyList()
+                    },
+                    enabled = canPublishPost,
+                    colors = ButtonDefaults.buttonColors(containerColor = Green),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("Publicar", color = Color.White, fontFamily = Inter)
+                }
+            }
+
+            Text(
+                text = "Atividades",
+                style = MaterialTheme.typography.titleSmall.copy(
+                    fontFamily = Inter,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.Black
                 )
             )
 

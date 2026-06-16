@@ -119,7 +119,7 @@ fun TitleSelectContent(
                 items(titulos) { titulo ->
                     val cor = remember(titulo.cor) {
                         try { Color(titulo.cor.toColorInt()) }
-                        catch (e: Exception) { Color(0xFF580C83) }
+                        catch (e: Exception) { Color(0xFF238D25) }
                     }
                     val selecionado = titulo.id == tituloAtualId
 

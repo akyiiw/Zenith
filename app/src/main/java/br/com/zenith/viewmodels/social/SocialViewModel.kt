@@ -297,6 +297,7 @@ data class PublicProfileUiState(
     val atividades: List<Atividade> = emptyList(),
     val activityGroups: List<ActivityGroup> = emptyList(),
     val activityGroupItems: List<ActivityGroupItem> = emptyList(),
+    val acceptedMentionsByActivityId: Map<String, List<Profile>> = emptyMap(),
     val canViewActivities: Boolean = true
 )
 
@@ -403,6 +404,37 @@ class PublicProfileViewModel : ViewModel() {
                             .filter { it.id in groupIds }
                     }.getOrDefault(emptyList())
                 }
+                val acceptedMentionsByActivityId = if (visibleActivityIds.isEmpty()) {
+                    emptyMap()
+                } else {
+                    val acceptedMentions = runCatching {
+                        client.postgrest.from("activity_mentions")
+                            .select {
+                                filter { eq("status", ActivityMention.STATUS_ACCEPTED) }
+                            }
+                            .decodeList<ActivityMention>()
+                            .filter { it.activityId in visibleActivityIds && it.showOnMentionedProfile }
+                    }.getOrDefault(emptyList())
+                    val mentionedUserIds = acceptedMentions.map { it.mentionedUserId }.toSet()
+                    val mentionProfiles = if (mentionedUserIds.isEmpty()) {
+                        emptyMap()
+                    } else {
+                        runCatching {
+                            client.postgrest.from("profiles")
+                                .select()
+                                .decodeList<Profile>()
+                                .filter { it.id in mentionedUserIds }
+                                .associateBy { it.id }
+                        }.getOrDefault(emptyMap())
+                    }
+                    acceptedMentions
+                        .groupBy { it.activityId }
+                        .mapValues { entry ->
+                            entry.value.mapNotNull { mentionProfiles[it.mentionedUserId] }
+                                .distinctBy { it.id }
+                                .sortedBy { it.name.lowercase() }
+                        }
+                }
 
                 val amigos = friendships
                     .filter {
@@ -461,6 +493,7 @@ class PublicProfileViewModel : ViewModel() {
                     atividades = visibleActivities,
                     activityGroups = activityGroups,
                     activityGroupItems = groupItems,
+                    acceptedMentionsByActivityId = acceptedMentionsByActivityId,
                     canViewActivities = canViewActivities
                 )
             } catch (e: Exception) {

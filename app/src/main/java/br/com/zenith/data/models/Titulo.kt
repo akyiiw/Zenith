@@ -7,6 +7,6 @@ data class Titulo(
     val id: String,
     val slug: String,
     val nome: String,
-    val cor: String = "#580C83",
+    val cor: String = "#238D25",
     val descricao: String? = null
 )

@@ -32,6 +32,7 @@ import br.com.zenith.data.repositories.GoalsRepository
 import br.com.zenith.ui.components.common.zenithSwitchColors
 import br.com.zenith.ui.notifications.ZenithNotifier
 import br.com.zenith.ui.theme.*
+import br.com.zenith.ui.theme.items.ZenithOptionField
 import br.com.zenith.ui.theme.items.ZenithTextField
 import kotlinx.coroutines.launch
 
@@ -330,8 +331,169 @@ fun GoalItem(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GoalFormBottomSheet(
+    goal: PersonalGoal?,
+    onDismiss: () -> Unit,
+    onSave: (PersonalGoal) -> Unit
+) {
+    val formKey = goal?.id ?: "new"
+    var title by rememberSaveable(formKey) { mutableStateOf(goal?.title ?: "") }
+    var metric by rememberSaveable(formKey) { mutableStateOf(goal?.metric ?: "distance_km") }
+    var period by rememberSaveable(formKey) { mutableStateOf(goal?.period ?: "weekly") }
+    var targetValue by rememberSaveable(formKey) { mutableStateOf(goal?.targetValue?.toString() ?: "") }
+    val cleanedTitle = title.trim()
+    val targetVal = targetValue.toDoubleOrNull()
+    val canSave = cleanedTitle.isNotBlank() && targetVal != null && targetVal > 0.0
+    val targetUnit = getUnitForMetric(metric)
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = Color.White,
+        scrimColor = Color.Transparent,
+        shape = RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(horizontal = 24.dp)
+                .padding(bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Text(
+                text = if (goal == null) "Nova meta" else "Editar meta",
+                style = MaterialTheme.typography.titleLarge.copy(
+                    fontFamily = Poppins,
+                    fontWeight = FontWeight.Bold,
+                    color = Black
+                )
+            )
+
+            ZenithTextField(
+                value = title,
+                onValueChange = { title = it },
+                label = "Titulo",
+                placeholder = "Ex: Caminhada matinal",
+                isError = title.isNotBlank() && cleanedTitle.isBlank(),
+                supportingText = {
+                    if (title.isNotBlank() && cleanedTitle.isBlank()) {
+                        Text(
+                            "Informe um titulo valido",
+                            color = MaterialTheme.colorScheme.error,
+                            fontFamily = Inter
+                        )
+                    }
+                }
+            )
+
+            ZenithOptionField(
+                selectedValue = metric,
+                placeholder = "Selecionar metrica",
+                options = goalMetricOptions(),
+                onSelected = { selected -> selected?.let { metric = it } },
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            ZenithOptionField(
+                selectedValue = period,
+                placeholder = "Selecionar periodo",
+                options = goalPeriodOptions(),
+                onSelected = { selected -> selected?.let { period = it } },
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            ZenithTextField(
+                value = targetValue,
+                onValueChange = { value ->
+                    targetValue = value
+                        .replace(',', '.')
+                        .filter { it.isDigit() || it == '.' }
+                },
+                label = "Valor alvo" + targetUnit.takeIf { it.isNotBlank() }?.let { " ($it)" }.orEmpty(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                placeholder = "Ex: 10.5",
+                isError = targetValue.isNotBlank() && (targetVal == null || targetVal <= 0.0),
+                supportingText = {
+                    if (targetValue.isNotBlank() && (targetVal == null || targetVal <= 0.0)) {
+                        Text(
+                            "Informe um valor maior que zero",
+                            color = MaterialTheme.colorScheme.error,
+                            fontFamily = Inter
+                        )
+                    }
+                }
+            )
+
+            Button(
+                onClick = {
+                    val validTarget = targetValue.toDoubleOrNull() ?: return@Button
+                    if (cleanedTitle.isNotBlank() && validTarget > 0.0) {
+                        onSave(
+                            PersonalGoal(
+                                id = goal?.id,
+                                userId = "",
+                                title = cleanedTitle,
+                                metric = metric,
+                                period = period,
+                                targetValue = validTarget,
+                                isActive = goal?.isActive ?: true
+                            )
+                        )
+                    }
+                },
+                enabled = canSave,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp),
+                shape = RoundedCornerShape(10.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Green,
+                    disabledContainerColor = Color(0xFFE6E6E6)
+                )
+            ) {
+                Text(
+                    text = "Salvar meta",
+                    style = MaterialTheme.typography.labelLarge.copy(
+                        fontFamily = Inter,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                )
+            }
+
+            TextButton(
+                onClick = onDismiss,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = "Cancelar",
+                    style = MaterialTheme.typography.labelLarge.copy(
+                        fontFamily = Inter,
+                        color = Color(0xFF6F6C6C)
+                    )
+                )
+            }
+        }
+    }
+}
+
+private fun goalMetricOptions(): List<Pair<String, String>> = listOf(
+    "distance_km" to "Distancia (km)",
+    "steps" to "Passos",
+    "active_minutes" to "Minutos ativos",
+    "activities" to "Atividades",
+    "sleep_hours" to "Sono (horas)"
+)
+
+private fun goalPeriodOptions(): List<Pair<String, String>> = listOf(
+    "weekly" to "Semanal",
+    "monthly" to "Mensal"
+)
+
+@Composable
+private fun LegacyGoalFormBottomSheet(
     goal: PersonalGoal?,
     onDismiss: () -> Unit,
     onSave: (PersonalGoal) -> Unit

@@ -131,7 +131,10 @@ fun PublicProfileScreen(
                         } else {
                             RecentActivitySection(
                                 navController = navController,
-                                atividades = uiState.atividades
+                                atividades = uiState.atividades,
+                                activityGroups = uiState.activityGroups,
+                                activityGroupItems = uiState.activityGroupItems,
+                                acceptedMentionsByActivityId = uiState.acceptedMentionsByActivityId
                             )
                         }
                     }

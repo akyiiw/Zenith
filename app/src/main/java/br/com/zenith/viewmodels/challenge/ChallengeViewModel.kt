@@ -234,7 +234,7 @@ class ChallengeViewModel : ViewModel() {
                 val userId = client.auth.currentUserOrNull()?.id
                     ?: throw Exception("Usuario nao autenticado")
                 val serverNow = fetchServerNow(client)
-                if (draft.startDate.isBefore(serverNow) || draft.endDate.isBefore(serverNow)) {
+                if (draft.endDate.isBefore(serverNow)) {
                     throw Exception("O período do desafio não pode ficar no passado")
                 }
                 val currentProfile = profilesCache.firstOrNull { it.id == userId }

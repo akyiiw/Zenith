@@ -183,8 +183,9 @@ private fun StartedActivityReviewContent(
             trackingResult.distanceMeters / 1000.0
         }
     }
-    val data = rememberSaveable {
+    val data = rememberSaveable(duracaoMin) {
         java.time.LocalDateTime.now()
+            .minusMinutes(duracaoMin.toLong())
             .format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"))
     }
 

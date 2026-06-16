@@ -51,6 +51,9 @@ fun ProfileScreen(
     val badge by userViewModel.badgeState.collectAsState(initial = null)
     val atividades by activityViewModel.atividades.collectAsState()
     val desafios by activityViewModel.desafios.collectAsState()
+    val activityGroups by activityViewModel.activityGroups.collectAsState()
+    val activityGroupItems by activityViewModel.activityGroupItems.collectAsState()
+    val acceptedMentionsByActivityId by activityViewModel.acceptedMentionsByActivityId.collectAsState()
     val isLoading by userViewModel.isLoading.collectAsState()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     var showStatusDialog by remember { mutableStateOf(false) }
@@ -127,7 +130,10 @@ fun ProfileScreen(
                         RecentActivitySection(
                             navController = navController,
                             atividades = atividades,
-                            desafios = desafios
+                            desafios = desafios,
+                            activityGroups = activityGroups,
+                            activityGroupItems = activityGroupItems,
+                            acceptedMentionsByActivityId = acceptedMentionsByActivityId
                         )
                     }
                 }

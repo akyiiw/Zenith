@@ -45,6 +45,8 @@ import coil.compose.AsyncImage
 import io.github.jan.supabase.storage.storage
 import androidx.core.graphics.toColorInt
 import androidx.navigation.NavController
+import br.com.zenith.data.models.ActivityGroup
+import br.com.zenith.data.models.ActivityGroupItem
 import br.com.zenith.data.models.Atividade
 import br.com.zenith.data.models.ChallengeAward
 import br.com.zenith.data.models.ChallengeAwardCalculator
@@ -340,20 +342,6 @@ fun activityType(atividade: Atividade): String {
     return atividade.exercicio?.nome ?: "Atividade"
 }
 
-fun activityGroup(atividade: Atividade): String {
-    atividade.exercicio?.grupo?.takeIf { it.isNotBlank() }?.let { return it }
-
-    val text = "${atividade.exercicio?.slug.orEmpty()} ${atividade.exercicio?.nome.orEmpty()}".lowercase()
-    return when {
-        "caminh" in text -> "Caminhadas com meus amigos"
-        "corr" in text -> "Corridas"
-        "sono" in text || "dorm" in text -> "Sono e descanso"
-        "bike" in text || "cicl" in text -> "Pedaladas"
-        "academia" in text || "muscul" in text -> "Treinos de forca"
-        else -> "Atividades pessoais"
-    }
-}
-
 fun formattedActivityValue(atividade: Atividade): String {
     val text = "${atividade.exercicio?.slug.orEmpty()} ${atividade.exercicio?.nome.orEmpty()} ${atividade.exercicio?.unidade.orEmpty()}".lowercase()
     val value = atividade.valor
@@ -372,12 +360,36 @@ fun formattedDuration(duracaoMin: Int?): String {
     return UnitFormatters.minutes(duracaoMin)
 }
 
+fun groupNamesByActivityId(
+    activityGroups: List<ActivityGroup>,
+    activityGroupItems: List<ActivityGroupItem>
+): Map<String, List<String>> {
+    val groupsById = activityGroups.associateBy { it.id }
+    return activityGroupItems
+        .groupBy { it.activityId }
+        .mapValues { entry ->
+            entry.value.mapNotNull { groupsById[it.groupId]?.name }.distinct().sorted()
+        }
+}
+
+fun mentionLabel(profiles: List<Profile>): String {
+    return profiles.joinToString(prefix = "Com ") { profile ->
+        profile.name.takeIf { it.isNotBlank() }?.let { "@$it" } ?: profile.displayName
+    }
+}
+
 @Composable
 fun RecentActivitySection(
     navController: NavController,
     atividades: List<Atividade>,
-    desafios: Map<String, Desafio> = emptyMap()
+    desafios: Map<String, Desafio> = emptyMap(),
+    activityGroups: List<ActivityGroup> = emptyList(),
+    activityGroupItems: List<ActivityGroupItem> = emptyList(),
+    acceptedMentionsByActivityId: Map<String, List<Profile>> = emptyMap()
 ) {
+    val activityGroupNamesByActivityId = remember(activityGroups, activityGroupItems) {
+        groupNamesByActivityId(activityGroups, activityGroupItems)
+    }
     val recent = remember(atividades) {
         atividades.sortedByDescending { it.realizadaEm }.take(5)
     }
@@ -386,6 +398,8 @@ fun RecentActivitySection(
             RecentActivityCard(
                 atividade = atividade,
                 desafio = atividade.desafioId?.let { desafios[it] },
+                groupNames = activityGroupNamesByActivityId[atividade.id].orEmpty(),
+                acceptedMentions = acceptedMentionsByActivityId[atividade.id].orEmpty(),
                 onClick = { navController.navigate("activity_detail/${atividade.id}") }
             )
         }
@@ -393,7 +407,13 @@ fun RecentActivitySection(
 }
 
 @Composable
-fun RecentActivityCard(atividade: Atividade, desafio: Desafio? = null, onClick: () -> Unit) {
+fun RecentActivityCard(
+    atividade: Atividade,
+    desafio: Desafio? = null,
+    groupNames: List<String> = emptyList(),
+    acceptedMentions: List<Profile> = emptyList(),
+    onClick: () -> Unit
+) {
     ZenithTheme {
         Column(
             modifier = Modifier
@@ -427,11 +447,21 @@ fun RecentActivityCard(atividade: Atividade, desafio: Desafio? = null, onClick: 
                         color = Color(0xFF238D25)
                     )
                     Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = activityGroup(atividade),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Color(0xFF6F6C6C)
-                    )
+                    groupNames.takeIf { it.isNotEmpty() }?.let { groups ->
+                        Text(
+                            text = groups.joinToString(prefix = "Grupo: "),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color(0xFF6F6C6C)
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                    }
+                    acceptedMentions.takeIf { it.isNotEmpty() }?.let { mentions ->
+                        Text(
+                            text = mentionLabel(mentions),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color(0xFF6F6C6C)
+                        )
+                    }
                     Spacer(modifier = Modifier.height(10.dp))
                     Text(
                         text = atividade.titulo ?: "Atividade registrada:",
@@ -614,7 +644,7 @@ fun Title(titulo: Titulo?, onClick: () -> Unit = {}) {
     if (titulo != null) {
         val cor = remember(titulo.cor) {
             try { Color(titulo.cor.toColorInt()) }
-            catch (e: Exception) { Color(0xFF580C83) }
+            catch (e: Exception) { Color(0xFF238D25) }
         }
         Text(
             text = titulo.nome,

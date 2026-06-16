@@ -33,6 +33,14 @@ data class ChallengeForumEntry(
 )
 
 @Serializable
+data class FeedEntryView(
+    val id: String? = null,
+    @SerialName("user_id") val userId: String,
+    @SerialName("feed_entry_id") val feedEntryId: String,
+    @SerialName("viewed_at") val viewedAt: String? = null
+)
+
+@Serializable
 data class ChallengeForumComment(
     val id: String,
     @SerialName("entry_id") val entryId: String,

@@ -139,7 +139,15 @@ fun HomeScreen(navController: NavController) {
                             isLoading = feedState.isLoading,
                             onPublishClick = { showPublishSheet = true },
                             onOpenProfile = { profile -> navController.navigate("user_profile/${profile.id}") },
-                            onOpenActivity = { activity -> navController.navigate("activity_detail/${activity.id}") }
+                            onOpenActivity = { item ->
+                                homeFeedViewModel.markAsViewed(item.entry.id, context)
+                                item.activity?.let { activity ->
+                                    navController.navigate("activity_detail/${activity.id}")
+                                }
+                            },
+                            onViewPost = { item ->
+                                homeFeedViewModel.markAsViewed(item.entry.id, context)
+                            }
                         )
                     }
                 }
@@ -186,6 +194,10 @@ fun HomeScreen(navController: NavController) {
                 onDismiss = { showPublishSheet = false },
                 onPublish = { activity ->
                     homeFeedViewModel.publishActivity(activity.id, context)
+                    showPublishSheet = false
+                },
+                onPublishPost = { content, images ->
+                    homeFeedViewModel.publishPost(content, images, context)
                     showPublishSheet = false
                 }
             )
