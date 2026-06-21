@@ -11,6 +11,8 @@
 
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_HEALTH" />
 
     <!-- Wake Lock e notificação -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
@@ -41,7 +43,7 @@
 
         <service
             android:name=".service.ActivityTrackingService"
-            android:foregroundServiceType="dataSync"
+            android:foregroundServiceType="location|health"
             android:exported="false" />
 
         <meta-data

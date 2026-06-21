@@ -4,6 +4,7 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -19,9 +20,14 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.BiasAlignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -45,6 +51,11 @@ import java.time.Duration
 import java.time.OffsetDateTime
 import java.time.format.DateTimeFormatter
 
+private enum class ProfileMediaEditType {
+    Picture,
+    Banner
+}
+
 @Composable
 fun EditProfileScreen(navController: NavController) {
     ZenithTheme {
@@ -60,7 +71,7 @@ fun EditProfileScreen(navController: NavController) {
             user = user,
             isLoading = isLoading,
             isSaving = isSaving,
-            onSave = { name, displayName, aboutMe, pictureUri, bannerUri, bannerBlurRadius, pictureFocusX, pictureFocusY, bannerFocusX, bannerFocusY ->
+            onSave = { name, displayName, aboutMe, pictureUri, bannerUri, bannerBlurRadius, pictureFocusX, pictureFocusY, pictureZoom, bannerFocusX, bannerFocusY, bannerZoom ->
                 userViewModel.atualizarPerfil(
                     name = name,
                     displayName = displayName,
@@ -70,8 +81,10 @@ fun EditProfileScreen(navController: NavController) {
                     bannerBlurRadius = bannerBlurRadius,
                     pictureFocusX = pictureFocusX,
                     pictureFocusY = pictureFocusY,
+                    pictureZoom = pictureZoom,
                     bannerFocusX = bannerFocusX,
                     bannerFocusY = bannerFocusY,
+                    bannerZoom = bannerZoom,
                     context = context
                 ) { navController.popBackStack() }
             },
@@ -85,6 +98,11 @@ private fun ProfileMediaPicker(
     user: Profile?,
     pictureUri: Uri?,
     bannerUri: Uri?,
+    pictureFocusX: Float,
+    pictureFocusY: Float,
+    bannerFocusX: Float,
+    bannerFocusY: Float,
+    bannerBlurRadius: Int,
     onPickPicture: () -> Unit,
     onPickBanner: () -> Unit
 ) {
@@ -106,7 +124,9 @@ private fun ProfileMediaPicker(
                     model = bannerModel,
                     contentDescription = "Banner",
                     contentScale = ContentScale.Crop,
+                    alignment = BiasAlignment(bannerFocusX, bannerFocusY),
                     modifier = Modifier.fillMaxSize()
+                        .then(if (bannerBlurRadius > 0) Modifier.blur(bannerBlurRadius.dp) else Modifier)
                 )
             }
 
@@ -141,6 +161,7 @@ private fun ProfileMediaPicker(
                         model = pictureModel,
                         contentDescription = "Foto de perfil",
                         contentScale = ContentScale.Crop,
+                        alignment = BiasAlignment(pictureFocusX, pictureFocusY),
                         modifier = Modifier.fillMaxSize()
                     )
                 } else {
@@ -163,7 +184,9 @@ private fun ProfileMediaPicker(
                 )
                 OutlinedButton(
                     onClick = onPickPicture,
-                    shape = RoundedCornerShape(10.dp)
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(containerColor = Color.White),
+                    border = BorderStroke(1.2.dp, Color(0xFF238D25).copy(alpha = 0.62f))
                 ) {
                     Icon(Icons.Default.AddAPhoto, contentDescription = null, tint = Color(0xFF238D25))
                     Spacer(modifier = Modifier.width(8.dp))
@@ -205,6 +228,195 @@ private data class UsernameCooldownInfo(
     val nextEditLabel: String
 )
 
+@Composable
+private fun ProfileMediaAdjustScreen(
+    uri: Uri,
+    type: ProfileMediaEditType,
+    focusX: Float,
+    focusY: Float,
+    bannerBlurRadius: Int,
+    onFocusXChange: (Float) -> Unit,
+    onFocusYChange: (Float) -> Unit,
+    zoom: Float,
+    onZoomChange: (Float) -> Unit,
+    onBannerBlurRadiusChange: (Int) -> Unit,
+    onCancel: () -> Unit,
+    onApply: () -> Unit
+) {
+    val isBanner = type == ProfileMediaEditType.Banner
+    val title = if (isBanner) "Ajustar banner" else "Ajustar foto"
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.White)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 88.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 11.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onCancel) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Voltar",
+                        tint = Color(0xFF238D25)
+                    )
+                }
+                Column(modifier = Modifier.padding(start = 6.dp)) {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            fontFamily = Inter,
+                            fontWeight = FontWeight.W800,
+                            color = Color(0xFF111111)
+                        )
+                    )
+                }
+            }
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .then(
+                        if (isBanner) Modifier.height(150.dp)
+                        else Modifier
+                            .size(220.dp)
+                            .align(Alignment.CenterHorizontally)
+                    )
+                    .clip(if (isBanner) RoundedCornerShape(12.dp) else CircleShape)
+                    .background(Color(0xFFF5F5F5))
+                    .border(
+                        1.dp,
+                        Color(0xFFE0E0E0),
+                        if (isBanner) RoundedCornerShape(12.dp) else CircleShape
+                    )
+                    .pointerInput(isBanner) {
+                        detectTransformGestures { _, pan, gestureZoom, _ ->
+                            val panScale = if (isBanner) 180f else 120f
+                            onFocusXChange((focusX - pan.x / panScale / zoom).coerceIn(-1f, 1f))
+                            onFocusYChange((focusY - pan.y / panScale / zoom).coerceIn(-1f, 1f))
+                            onZoomChange((zoom * gestureZoom).coerceIn(1f, 4f))
+                        }
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                AsyncImage(
+                    model = uri,
+                    contentDescription = if (isBanner) "Prévia do banner" else "Prévia da foto",
+                    contentScale = ContentScale.Crop,
+                    alignment = BiasAlignment(focusX, focusY),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer {
+                            scaleX = zoom
+                            scaleY = zoom
+                        }
+                        .then(if (isBanner && bannerBlurRadius > 0) Modifier.blur(bannerBlurRadius.dp) else Modifier)
+                )
+            }
+
+            if (isBanner) {
+                MediaAdjustmentCard(title = "Blur do banner") {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        BannerBlurButton("0%", 0, bannerBlurRadius, onBannerBlurRadiusChange)
+                        BannerBlurButton("50%", 12, bannerBlurRadius, onBannerBlurRadiusChange)
+                        BannerBlurButton("100%", 24, bannerBlurRadius, onBannerBlurRadiusChange)
+                    }
+                }
+            }
+        }
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .align(Alignment.BottomCenter)
+                .background(Color.White)
+                .navigationBarsPadding()
+                .padding(horizontal = 24.dp, vertical = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            OutlinedButton(
+                onClick = onCancel,
+                modifier = Modifier
+                    .weight(1f)
+                    .height(52.dp),
+                shape = RoundedCornerShape(10.dp),
+                colors = ButtonDefaults.outlinedButtonColors(containerColor = Color.White),
+                border = BorderStroke(1.dp, Color(0xFFE0E0E0))
+            ) {
+                Text("Cancelar", color = Color(0xFF1A1A1A), fontFamily = Inter, fontWeight = FontWeight.Bold)
+            }
+            Button(
+                onClick = onApply,
+                modifier = Modifier
+                    .weight(1f)
+                    .height(52.dp),
+                shape = RoundedCornerShape(10.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF238D25))
+            ) {
+                Text("Aplicar", color = Color.White, fontFamily = Inter, fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
+
+@Composable
+private fun MediaAdjustmentCard(
+    title: String,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color(0xFFF5F5F5), RoundedCornerShape(10.dp))
+            .border(1.dp, Color(0xFFE0E0E0), RoundedCornerShape(10.dp))
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.bodyMedium.copy(
+                fontFamily = Inter,
+                fontWeight = FontWeight.W800,
+                color = Color(0xFF111111)
+            )
+        )
+        content()
+    }
+}
+
+@Composable
+private fun RowScope.BannerBlurButton(
+    label: String,
+    value: Int,
+    selectedValue: Int,
+    onSelected: (Int) -> Unit
+) {
+    val selected = value == selectedValue
+    Button(
+        onClick = { onSelected(value) },
+        modifier = Modifier
+            .weight(1f)
+            .height(44.dp),
+        shape = RoundedCornerShape(10.dp),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = if (selected) Color(0xFFEAF3DE) else Color.White,
+            contentColor = if (selected) Color(0xFF238D25) else Color(0xFF1A1A1A)
+        ),
+        border = BorderStroke(1.dp, if (selected) Color(0xFF238D25) else Color(0xFFE0E0E0))
+    ) {
+        Text(label, fontFamily = Inter, fontWeight = FontWeight.Bold)
+    }
+}
+
 private fun usernameCooldownInfo(nameUpdatedAt: String?): UsernameCooldownInfo {
     val lastUpdate = nameUpdatedAt
         ?.let { runCatching { OffsetDateTime.parse(it) }.getOrNull() }
@@ -234,7 +446,7 @@ fun EditProfileContent(
     user: Profile?,
     isLoading: Boolean,
     isSaving: Boolean,
-    onSave: (String, String, String?, Uri?, Uri?, Int, Float, Float, Float, Float) -> Unit,
+    onSave: (String, String, String?, Uri?, Uri?, Int, Float, Float, Float, Float, Float, Float) -> Unit,
     onBack: () -> Unit
 ) {
     var initializedUserId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -245,9 +457,17 @@ fun EditProfileContent(
     var bannerUri by rememberSaveable { mutableStateOf<Uri?>(null) }
     var pictureFocusX by rememberSaveable { mutableFloatStateOf(0f) }
     var pictureFocusY by rememberSaveable { mutableFloatStateOf(0f) }
+    var pictureZoom by rememberSaveable { mutableFloatStateOf(1f) }
     var bannerFocusX by rememberSaveable { mutableFloatStateOf(0f) }
     var bannerFocusY by rememberSaveable { mutableFloatStateOf(0f) }
+    var bannerZoom by rememberSaveable { mutableFloatStateOf(1f) }
     var bannerBlurRadius by rememberSaveable { mutableIntStateOf(10) }
+    var pendingMediaUri by rememberSaveable { mutableStateOf<Uri?>(null) }
+    var pendingMediaType by rememberSaveable { mutableStateOf<ProfileMediaEditType?>(null) }
+    var pendingFocusX by rememberSaveable { mutableFloatStateOf(0f) }
+    var pendingFocusY by rememberSaveable { mutableFloatStateOf(0f) }
+    var pendingZoom by rememberSaveable { mutableFloatStateOf(1f) }
+    var pendingBannerBlurRadius by rememberSaveable { mutableIntStateOf(10) }
 
     LaunchedEffect(user?.id) {
         val loadedUser = user ?: return@LaunchedEffect
@@ -260,19 +480,39 @@ fun EditProfileContent(
             bannerUri = null
             pictureFocusX = 0f
             pictureFocusY = 0f
+            pictureZoom = 1f
             bannerFocusX = 0f
             bannerFocusY = 0f
+            bannerZoom = 1f
             bannerBlurRadius = loadedUser.bannerBlurRadius
         }
     }
 
     val pictureLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
-    ) { uri -> pictureUri = uri }
+    ) { uri ->
+        if (uri != null) {
+            pendingMediaUri = uri
+            pendingMediaType = ProfileMediaEditType.Picture
+            pendingFocusX = pictureFocusX
+            pendingFocusY = pictureFocusY
+            pendingZoom = pictureZoom
+            pendingBannerBlurRadius = bannerBlurRadius
+        }
+    }
 
     val bannerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
-    ) { uri -> bannerUri = uri }
+    ) { uri ->
+        if (uri != null) {
+            pendingMediaUri = uri
+            pendingMediaType = ProfileMediaEditType.Banner
+            pendingFocusX = bannerFocusX
+            pendingFocusY = bannerFocusY
+            pendingZoom = bannerZoom
+            pendingBannerBlurRadius = bannerBlurRadius
+        }
+    }
 
     val usernameCooldown = remember(user?.nameUpdatedAt) {
         usernameCooldownInfo(user?.nameUpdatedAt)
@@ -286,6 +526,47 @@ fun EditProfileContent(
             .background(Color.White)
             .statusBarsPadding()
     ) {
+        val mediaUri = pendingMediaUri
+        val mediaType = pendingMediaType
+        if (mediaUri != null && mediaType != null) {
+            ProfileMediaAdjustScreen(
+                uri = mediaUri,
+                type = mediaType,
+                focusX = pendingFocusX,
+                focusY = pendingFocusY,
+                zoom = pendingZoom,
+                bannerBlurRadius = pendingBannerBlurRadius,
+                onFocusXChange = { pendingFocusX = it },
+                onFocusYChange = { pendingFocusY = it },
+                onZoomChange = { pendingZoom = it },
+                onBannerBlurRadiusChange = { pendingBannerBlurRadius = it },
+                onCancel = {
+                    pendingMediaUri = null
+                    pendingMediaType = null
+                },
+                onApply = {
+                    when (mediaType) {
+                        ProfileMediaEditType.Picture -> {
+                            pictureUri = mediaUri
+                            pictureFocusX = pendingFocusX
+                            pictureFocusY = pendingFocusY
+                            pictureZoom = pendingZoom
+                        }
+                        ProfileMediaEditType.Banner -> {
+                            bannerUri = mediaUri
+                            bannerFocusX = pendingFocusX
+                            bannerFocusY = pendingFocusY
+                            bannerZoom = pendingZoom
+                            bannerBlurRadius = pendingBannerBlurRadius
+                        }
+                    }
+                    pendingMediaUri = null
+                    pendingMediaType = null
+                }
+            )
+            return@Box
+        }
+
         // Header
         Row(
             modifier = Modifier
@@ -325,6 +606,11 @@ fun EditProfileContent(
                         user = user,
                         pictureUri = pictureUri,
                         bannerUri = bannerUri,
+                        pictureFocusX = pictureFocusX,
+                        pictureFocusY = pictureFocusY,
+                        bannerFocusX = bannerFocusX,
+                        bannerFocusY = bannerFocusY,
+                        bannerBlurRadius = bannerBlurRadius,
                         onPickPicture = { pictureLauncher.launch("image/*") },
                         onPickBanner = { bannerLauncher.launch("image/*") }
                     )
@@ -393,8 +679,10 @@ fun EditProfileContent(
                             bannerBlurRadius,
                             pictureFocusX,
                             pictureFocusY,
+                            pictureZoom,
                             bannerFocusX,
-                            bannerFocusY
+                            bannerFocusY,
+                            bannerZoom
                         )
                     },
                     enabled = name.isNotBlank() && displayName.isNotBlank() && usernameEnabled,

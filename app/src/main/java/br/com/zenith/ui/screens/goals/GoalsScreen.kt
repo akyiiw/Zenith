@@ -12,6 +12,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -29,11 +30,16 @@ import androidx.navigation.NavController
 import br.com.zenith.data.SupabaseConfig
 import br.com.zenith.data.models.PersonalGoal
 import br.com.zenith.data.repositories.GoalsRepository
+import br.com.zenith.ui.components.common.ZenithConfirmSheet
+import br.com.zenith.ui.components.common.ZenithFilterBar
+import br.com.zenith.ui.components.common.ZenithFilterOption
+import br.com.zenith.ui.components.common.ZenithSheetDragHandle
 import br.com.zenith.ui.components.common.zenithSwitchColors
 import br.com.zenith.ui.notifications.ZenithNotifier
 import br.com.zenith.ui.theme.*
 import br.com.zenith.ui.theme.items.ZenithOptionField
 import br.com.zenith.ui.theme.items.ZenithTextField
+import br.com.zenith.utils.UnitFormatters
 import kotlinx.coroutines.launch
 
 @Composable
@@ -46,6 +52,17 @@ fun GoalsScreen(navController: NavController) {
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var showForm by remember { mutableStateOf(false) }
     var editingGoal by remember { mutableStateOf<PersonalGoal?>(null) }
+    var goalPendingDelete by remember { mutableStateOf<PersonalGoal?>(null) }
+    var selectedFilter by remember { mutableStateOf(GoalFilter.All) }
+    val filteredGoals = remember(goals, selectedFilter) {
+        goals.filter { goal ->
+            when (selectedFilter) {
+                GoalFilter.All -> true
+                GoalFilter.Active -> goal.isActive
+                GoalFilter.Paused -> !goal.isActive
+            }
+        }
+    }
 
     fun refreshGoals(showLoading: Boolean = false) {
         scope.launch {
@@ -74,27 +91,22 @@ fun GoalsScreen(navController: NavController) {
                 .padding(horizontal = 20.dp)
                 .statusBarsPadding()
         ) {
-            Spacer(modifier = Modifier.height(24.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = { navController.popBackStack() }) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Voltar",
-                        tint = Green
-                    )
+            Spacer(modifier = Modifier.height(18.dp))
+            GoalsHeader(
+                onBack = { navController.popBackStack() },
+                onCreate = {
+                    editingGoal = null
+                    showForm = true
                 }
-                Text(
-                    text = "Minhas Metas",
-                    style = MaterialTheme.typography.headlineMedium.copy(
-                        fontFamily = Poppins,
-                        fontWeight = FontWeight.Bold
-                    )
-                )
-            }
-            Spacer(modifier = Modifier.height(24.dp))
+            )
+            Spacer(modifier = Modifier.height(14.dp))
+            GoalsSummaryCard(goals = goals)
+            Spacer(modifier = Modifier.height(12.dp))
+            GoalFilterBar(
+                selectedFilter = selectedFilter,
+                onFilterSelected = { selectedFilter = it }
+            )
+            Spacer(modifier = Modifier.height(14.dp))
 
             when {
                 isLoading -> {
@@ -128,13 +140,22 @@ fun GoalsScreen(navController: NavController) {
                         modifier = Modifier.weight(1f)
                     )
                 }
+                filteredGoals.isEmpty() -> {
+                    GoalMessageState(
+                        title = "Nada por aqui",
+                        message = "Não há metas nesse filtro.",
+                        actionLabel = "Ver todas",
+                        onAction = { selectedFilter = GoalFilter.All },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
                 else -> {
                     LazyColumn(
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(14.dp),
                         modifier = Modifier.weight(1f),
-                        contentPadding = PaddingValues(bottom = 96.dp)
+                        contentPadding = PaddingValues(bottom = 32.dp)
                     ) {
-                        items(goals, key = { it.id ?: it.title }) { goal ->
+                        items(filteredGoals, key = { it.id ?: it.title }) { goal ->
                             GoalItem(
                                 goal = goal,
                                 onToggleActive = { isActive ->
@@ -149,16 +170,7 @@ fun GoalsScreen(navController: NavController) {
                                     }
                                 },
                                 onDelete = {
-                                    val goalId = goal.id ?: return@GoalItem
-                                    scope.launch {
-                                        try {
-                                            goalsRepository.deleteGoal(goalId)
-                                            ZenithNotifier.success("Meta excluída.")
-                                            refreshGoals()
-                                        } catch (e: Exception) {
-                                            ZenithNotifier.error("Erro ao excluir meta: ${e.localizedMessage}")
-                                        }
-                                    }
+                                    goalPendingDelete = goal
                                 },
                                 onEdit = {
                                     editingGoal = goal
@@ -169,20 +181,6 @@ fun GoalsScreen(navController: NavController) {
                     }
                 }
             }
-        }
-
-        FloatingActionButton(
-            onClick = {
-                editingGoal = null
-                showForm = true
-            },
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(24.dp),
-            containerColor = Green,
-            contentColor = Color.White
-        ) {
-            Icon(Icons.Default.Add, contentDescription = "Adicionar Meta")
         }
 
         if (showForm) {
@@ -207,7 +205,146 @@ fun GoalsScreen(navController: NavController) {
                 }
             )
         }
+
+        goalPendingDelete?.let { goal ->
+            ZenithConfirmSheet(
+                title = "Excluir meta?",
+                message = "Essa ação remove a meta e não pode ser desfeita.",
+                confirmLabel = "Excluir",
+                onDismiss = { goalPendingDelete = null },
+                onConfirm = {
+                    val goalId = goal.id
+                    if (goalId != null) {
+                        goalPendingDelete = null
+                        scope.launch {
+                            try {
+                                goalsRepository.deleteGoal(goalId)
+                                ZenithNotifier.success("Meta excluída.")
+                                refreshGoals()
+                            } catch (e: Exception) {
+                                ZenithNotifier.error("Erro ao excluir meta: ${e.localizedMessage}")
+                            }
+                        }
+                    }
+                }
+            )
+        }
     }
+}
+
+private enum class GoalFilter(val label: String) {
+    All("Todas"),
+    Active("Ativas"),
+    Paused("Pausadas")
+}
+
+@Composable
+private fun GoalsHeader(
+    onBack: () -> Unit,
+    onCreate: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        IconButton(onClick = onBack) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = "Voltar",
+                tint = Green
+            )
+        }
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(start = 4.dp)
+        ) {
+            Text(
+                text = "Metas",
+                style = MaterialTheme.typography.headlineLarge.copy(
+                    fontFamily = Inter,
+                    fontWeight = FontWeight.W800,
+                    fontSize = 28.sp,
+                    color = Black
+                )
+            )
+            Text(
+                text = "Organize objetivos semanais e mensais",
+                style = MaterialTheme.typography.bodySmall.copy(
+                    fontFamily = Inter,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFF667066)
+                )
+            )
+        }
+        Button(
+            onClick = onCreate,
+            shape = RoundedCornerShape(10.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = Green),
+            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 9.dp)
+        ) {
+            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(modifier = Modifier.width(6.dp))
+            Text("Criar", fontFamily = Inter, fontWeight = FontWeight.Bold)
+        }
+    }
+}
+
+@Composable
+private fun GoalsSummaryCard(goals: List<PersonalGoal>) {
+    val active = goals.count { it.isActive }
+    val paused = goals.size - active
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color(0xFFF5F5F5), RoundedCornerShape(10.dp))
+            .border(1.dp, Color(0xFFE0E0E0), RoundedCornerShape(10.dp))
+            .padding(14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(42.dp)
+                .background(Color(0xFFEAF3DE), CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(Icons.Default.Flag, contentDescription = null, tint = Green)
+        }
+        Spacer(modifier = Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = "${goals.size} ${if (goals.size == 1) "meta" else "metas"}",
+                style = MaterialTheme.typography.titleMedium.copy(
+                    fontFamily = Inter,
+                    fontWeight = FontWeight.W800,
+                    color = Black
+                )
+            )
+            Text(
+                text = "$active ativas • $paused pausadas",
+                style = MaterialTheme.typography.bodySmall.copy(
+                    fontFamily = Inter,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFF667066)
+                )
+            )
+        }
+
+    }
+}
+
+@Composable
+private fun GoalFilterBar(
+    selectedFilter: GoalFilter,
+    onFilterSelected: (GoalFilter) -> Unit
+) {
+    ZenithFilterBar(
+        options = GoalFilter.entries.map { ZenithFilterOption(it, it.label) },
+        selectedValue = selectedFilter,
+        onSelected = onFilterSelected,
+        modifier = Modifier.fillMaxWidth()
+    )
 }
 
 @Composable
@@ -241,8 +378,8 @@ fun GoalMessageState(
         Text(
             text = title,
             style = MaterialTheme.typography.titleMedium.copy(
-                fontFamily = Poppins,
-                fontWeight = FontWeight.Bold,
+                fontFamily = Inter,
+                fontWeight = FontWeight.W800,
                 color = Black
             ),
             textAlign = TextAlign.Center
@@ -260,7 +397,7 @@ fun GoalMessageState(
         Spacer(modifier = Modifier.height(18.dp))
         Button(
             onClick = onAction,
-            shape = RoundedCornerShape(8.dp),
+            shape = RoundedCornerShape(10.dp),
             colors = ButtonDefaults.buttonColors(containerColor = Green)
         ) {
             Text(
@@ -282,52 +419,102 @@ fun GoalItem(
     onDelete: () -> Unit,
     onEdit: () -> Unit
 ) {
+    val statusColor = if (goal.isActive) Green else Color(0xFF8A8A8A)
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .border(1.dp, SecondaryGreen, RoundedCornerShape(8.dp))
+            .border(
+                1.dp,
+                if (goal.isActive) Color(0xFFBFDDBF) else Color(0xFFE0E0E0),
+                RoundedCornerShape(10.dp)
+            )
             .clickable { onEdit() },
-        color = if (goal.isActive) Color(0xFFF8FFF8) else Color(0xFFF5F5F5),
-        shape = RoundedCornerShape(8.dp)
+        color = Color(0xFFF5F5F5),
+        shape = RoundedCornerShape(10.dp)
     ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = goal.title,
-                    style = MaterialTheme.typography.titleMedium.copy(
-                        fontFamily = Poppins,
-                        fontWeight = FontWeight.SemiBold,
-                        color = if (goal.isActive) Black else Color.Gray
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.Top
+            ) {
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(5.dp)
+                ) {
+                    Text(
+                        text = goal.title,
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontFamily = Inter,
+                            fontWeight = FontWeight.W800,
+                            color = if (goal.isActive) Black else Color(0xFF6F6F6F)
+                        )
                     )
-                )
-                Text(
-                    text = "${goal.targetValue} ${getUnitForMetric(goal.metric)} • ${goal.period.replaceFirstChar { it.uppercase() }}",
-                    style = MaterialTheme.typography.bodyMedium.copy(
-                        fontFamily = Inter,
-                        color = if (goal.isActive) Color(0xFF606060) else Color.Gray
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        GoalChip(text = goalMetricLabel(goal.metric), color = statusColor)
+                        GoalChip(text = goalPeriodLabel(goal.period), color = Color(0xFF536057))
+                    }
+                }
+                IconButton(onClick = onDelete, modifier = Modifier.size(40.dp)) {
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = "Excluir",
+                        tint = Color(0xFF9B2D20).copy(alpha = 0.7f)
                     )
-                )
+                }
             }
-            Row(verticalAlignment = Alignment.CenterVertically) {
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(
+                        text = "Alvo",
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            fontFamily = Inter,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF667066)
+                        )
+                    )
+                    Text(
+                        text = formatGoalTarget(goal),
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            fontFamily = Inter,
+                            fontWeight = FontWeight.W800,
+                            color = if (goal.isActive) Green else Color(0xFF777777)
+                        )
+                    )
+                }
                 Switch(
                     checked = goal.isActive,
                     onCheckedChange = onToggleActive,
                     colors = zenithSwitchColors()
                 )
-                Spacer(modifier = Modifier.width(8.dp))
-                IconButton(onClick = onDelete) {
-                    Icon(
-                        imageVector = Icons.Default.Delete,
-                        contentDescription = "Excluir",
-                        tint = Color(0xFFB0B0B0)
-                    )
-                }
             }
         }
+    }
+}
+
+@Composable
+private fun GoalChip(text: String, color: Color) {
+    Box(
+        modifier = Modifier
+            .background(Color.White, RoundedCornerShape(999.dp))
+            .border(1.dp, color.copy(alpha = 0.2f), RoundedCornerShape(999.dp))
+            .padding(horizontal = 9.dp, vertical = 4.dp)
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelSmall.copy(
+                fontFamily = Inter,
+                fontWeight = FontWeight.Bold,
+                color = color
+            )
+        )
     }
 }
 
@@ -342,7 +529,7 @@ fun GoalFormBottomSheet(
     var title by rememberSaveable(formKey) { mutableStateOf(goal?.title ?: "") }
     var metric by rememberSaveable(formKey) { mutableStateOf(goal?.metric ?: "distance_km") }
     var period by rememberSaveable(formKey) { mutableStateOf(goal?.period ?: "weekly") }
-    var targetValue by rememberSaveable(formKey) { mutableStateOf(goal?.targetValue?.toString() ?: "") }
+    var targetValue by rememberSaveable(formKey) { mutableStateOf(goal?.let { formatGoalInputValue(it) } ?: "") }
     val cleanedTitle = title.trim()
     val targetVal = targetValue.toDoubleOrNull()
     val canSave = cleanedTitle.isNotBlank() && targetVal != null && targetVal > 0.0
@@ -352,7 +539,8 @@ fun GoalFormBottomSheet(
         onDismissRequest = onDismiss,
         containerColor = Color.White,
         scrimColor = Color.Transparent,
-        shape = RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)
+        shape = RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp),
+        dragHandle = { ZenithSheetDragHandle() }
     ) {
         Column(
             modifier = Modifier
@@ -645,25 +833,12 @@ fun GoalMetricSelector(
         "activities" to "Atividades",
         "sleep_hours" to "Sono (horas)"
     )
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        metrics.forEach { (metric, label) ->
-            FilterChip(
-                selected = selectedMetric == metric,
-                onClick = { onMetricSelected(metric) },
-                label = { Text(label, style = MaterialTheme.typography.labelSmall.copy(fontFamily = Inter)) },
-                shape = RoundedCornerShape(16.dp),
-                colors = FilterChipDefaults.filterChipColors(
-                    labelColor = MaterialTheme.colorScheme.onSurface,
-                    selectedLabelColor = Color.White,
-                    containerColor = Color(0xFFF5F5F5),
-                    selectedContainerColor = Green
-                )
-            )
-        }
-    }
+    ZenithFilterBar(
+        options = metrics.map { (metric, label) -> ZenithFilterOption(metric, label) },
+        selectedValue = selectedMetric,
+        onSelected = onMetricSelected,
+        modifier = Modifier.fillMaxWidth()
+    )
 }
 
 @Composable
@@ -672,25 +847,12 @@ fun GoalPeriodSelector(
     onPeriodSelected: (String) -> Unit
 ) {
     val periods = listOf("weekly" to "Semanal", "monthly" to "Mensal")
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        periods.forEach { (period, label) ->
-            FilterChip(
-                selected = selectedPeriod == period,
-                onClick = { onPeriodSelected(period) },
-                label = { Text(label, style = MaterialTheme.typography.labelSmall.copy(fontFamily = Inter)) },
-                shape = RoundedCornerShape(16.dp),
-                colors = FilterChipDefaults.filterChipColors(
-                    labelColor = MaterialTheme.colorScheme.onSurface,
-                    selectedLabelColor = Color.White,
-                    containerColor = Color(0xFFF5F5F5),
-                    selectedContainerColor = Green
-                )
-            )
-        }
-    }
+    ZenithFilterBar(
+        options = periods.map { (period, label) -> ZenithFilterOption(period, label) },
+        selectedValue = selectedPeriod,
+        onSelected = onPeriodSelected,
+        modifier = Modifier.fillMaxWidth()
+    )
 }
 
 fun getUnitForMetric(metric: String): String {
@@ -702,4 +864,33 @@ fun getUnitForMetric(metric: String): String {
         "sleep_hours" -> "horas"
         else -> ""
     }
+}
+
+private fun goalMetricLabel(metric: String): String = when (metric) {
+    "distance_km" -> "Distância"
+    "steps" -> "Passos"
+    "active_minutes" -> "Minutos ativos"
+    "activities" -> "Atividades"
+    "sleep_hours" -> "Sono"
+    else -> "Meta"
+}
+
+private fun goalPeriodLabel(period: String): String = when (period) {
+    "weekly" -> "Semanal"
+    "monthly" -> "Mensal"
+    else -> period.replaceFirstChar { it.uppercase() }
+}
+
+private fun formatGoalTarget(goal: PersonalGoal): String {
+    val value = formatGoalNumber(goal.targetValue)
+    val unit = getUnitForMetric(goal.metric)
+    return if (unit.isBlank()) value else "$value $unit"
+}
+
+private fun formatGoalInputValue(goal: PersonalGoal): String {
+    return formatGoalNumber(goal.targetValue)
+}
+
+private fun formatGoalNumber(value: Double): String {
+    return UnitFormatters.compactNumber(value)
 }

@@ -136,22 +136,12 @@ class HomeFeedViewModel : ViewModel() {
                 val userId = client.auth.currentUserOrNull()?.id
                     ?: throw Exception("Usuario nao autenticado")
                 val postId = UUID.randomUUID().toString()
-                val entryId = UUID.randomUUID().toString()
 
                 client.postgrest.from("posts").insert(
                     buildJsonObject {
                         put("id", postId)
                         put("author_id", userId)
                         if (trimmedContent.isNotBlank()) put("content", trimmedContent)
-                    }
-                )
-
-                client.postgrest.from("feed_entries").insert(
-                    buildJsonObject {
-                        put("id", entryId)
-                        put("author_id", userId)
-                        put("entry_type", "post")
-                        put("post_id", postId)
                     }
                 )
 
@@ -233,11 +223,7 @@ class HomeFeedViewModel : ViewModel() {
 
         val entries = runCatching {
             client.postgrest.from("feed_entries")
-                .select {
-                    filter {
-                        eq("entry_type", "activity")
-                    }
-                }
+                .select()
                 .decodeList<ChallengeForumEntry>()
         }.getOrDefault(emptyList())
             .filter { it.activityId != null || it.postId != null }

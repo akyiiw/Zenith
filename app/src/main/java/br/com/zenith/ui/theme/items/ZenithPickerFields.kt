@@ -35,6 +35,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -42,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import br.com.zenith.ui.theme.Black
 import br.com.zenith.ui.theme.Green
+import br.com.zenith.ui.theme.Inter
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
@@ -53,7 +55,7 @@ import kotlinx.coroutines.launch
 private val dateFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy")
 private val dateTimeFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")
 private val monthFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("MMMM yyyy", Locale.forLanguageTag("pt-BR"))
-private val pickerShape = RoundedCornerShape(8.dp)
+private val pickerShape = RoundedCornerShape(10.dp)
 private val pickerError = Color(0xFFB3261E)
 private val pickerMuted = Color(0xFF666666)
 private val pickerBorder = Color(0xFFE0E0E0)
@@ -149,7 +151,7 @@ fun ZenithDateTimeField(
     if (open && step == 0) {
         PickerDialog(
             title = "Selecionar data",
-            confirmLabel = "Proximo",
+            confirmLabel = "Próximo",
             onDismiss = { open = false },
             onConfirm = {
                 dialogError = null
@@ -165,7 +167,7 @@ fun ZenithDateTimeField(
 
     if (open && step == 1) {
         TimeSelectionDialog(
-            title = "Selecionar horario",
+            title = "Selecionar horário",
             hour = selectedHour,
             minute = selectedMinute,
             onHourChange = { selectedHour = it },
@@ -378,12 +380,13 @@ private fun PickerDialog(
                     .heightIn(max = maxHeight - 32.dp)
                     .background(Color.White, pickerShape)
                     .border(1.dp, Green.copy(alpha = 0.55f), pickerShape)
-                    .padding(horizontal = 18.dp, vertical = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                    .padding(horizontal = 18.dp, vertical = 18.dp),
+                verticalArrangement = Arrangement.spacedBy(18.dp)
             ) {
                 Text(
                     text = title,
                     style = MaterialTheme.typography.titleMedium.copy(
+                        fontFamily = Inter,
                         fontWeight = FontWeight.Bold,
                         color = Black
                     )
@@ -431,6 +434,7 @@ private fun PickerTextField(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .clip(pickerShape)
                 .background(Color.White, pickerShape)
                 .border(1.dp, borderColor.copy(alpha = if (enabled) 0.8f else 0.45f), pickerShape)
                 .clickable(enabled = enabled, onClick = onClick)
@@ -440,6 +444,7 @@ private fun PickerTextField(
             Text(
                 text = label,
                 style = MaterialTheme.typography.bodyMedium.copy(
+                    fontFamily = Inter,
                     fontWeight = FontWeight.Bold,
                     color = if (isError) pickerError else Green
                 )
@@ -447,6 +452,7 @@ private fun PickerTextField(
             Text(
                 text = value.ifBlank { placeholder },
                 style = MaterialTheme.typography.titleMedium.copy(
+                    fontFamily = Inter,
                     color = if (value.isBlank()) Color(0xFF8A8A8A) else Black
                 )
             )
@@ -465,10 +471,11 @@ private fun PickerActionButton(
     filled: Boolean,
     onClick: () -> Unit
 ) {
-    val shape = RoundedCornerShape(8.dp)
+    val shape = RoundedCornerShape(10.dp)
     Box(
         modifier = Modifier
             .padding(start = 8.dp)
+            .clip(shape)
             .background(if (filled) Green else Color.White, shape)
             .border(1.dp, Green, shape)
             .clickable(onClick = onClick)
@@ -478,6 +485,7 @@ private fun PickerActionButton(
         Text(
             text = text,
             style = MaterialTheme.typography.bodyMedium.copy(
+                fontFamily = Inter,
                 fontWeight = FontWeight.Bold,
                 color = if (filled) Color.White else Green
             )
@@ -512,6 +520,7 @@ private fun ZenithCalendarPicker(
             Text(
                 text = visibleMonth.format(monthFormatter).replaceFirstChar { it.uppercase() },
                 style = MaterialTheme.typography.titleSmall.copy(
+                    fontFamily = Inter,
                     fontWeight = FontWeight.Bold,
                     color = Black
                 ),
@@ -526,6 +535,7 @@ private fun ZenithCalendarPicker(
                 Text(
                     text = day,
                     style = MaterialTheme.typography.bodySmall.copy(
+                        fontFamily = Inter,
                         fontWeight = FontWeight.Bold,
                         color = pickerMuted
                     ),
@@ -570,6 +580,7 @@ private fun CalendarArrow(
     Box(
         modifier = Modifier
             .size(36.dp)
+            .clip(pickerShape)
             .background(Color.White, pickerShape)
             .border(1.dp, pickerBorder, pickerShape)
             .clickable(onClick = onClick),
@@ -578,6 +589,7 @@ private fun CalendarArrow(
         Text(
             text = text,
             style = MaterialTheme.typography.titleMedium.copy(
+                fontFamily = Inter,
                 fontWeight = FontWeight.Bold,
                 color = Green
             )
@@ -592,10 +604,11 @@ private fun CalendarDay(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val shape = RoundedCornerShape(8.dp)
+    val shape = RoundedCornerShape(10.dp)
     Box(
         modifier = modifier
             .height(38.dp)
+            .clip(shape)
             .background(
                 color = if (selected) Green else Color.White,
                 shape = shape
@@ -611,6 +624,7 @@ private fun CalendarDay(
         Text(
             text = date?.dayOfMonth?.toString().orEmpty(),
             style = MaterialTheme.typography.bodyMedium.copy(
+                fontFamily = Inter,
                 fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
                 color = if (selected) Color.White else Black
             )
@@ -624,7 +638,7 @@ private fun PickerError(errorText: String?) {
         Text(
             text = it,
             color = pickerError,
-            style = MaterialTheme.typography.bodySmall,
+            style = MaterialTheme.typography.bodySmall.copy(fontFamily = Inter),
             modifier = Modifier.padding(horizontal = 4.dp)
         )
     }
@@ -690,30 +704,31 @@ private fun WheelPicker(
         Text(
             text = label,
             style = MaterialTheme.typography.bodyMedium.copy(
+                fontFamily = Inter,
                 fontWeight = FontWeight.Bold,
                 color = Green
             )
         )
         Box(
             modifier = Modifier
-                .width(112.dp)
-                .height(176.dp)
+                .width(124.dp)
+                .height(196.dp)
                 .background(Color.White, pickerShape)
-                .border(1.dp, pickerBorder, pickerShape)
+                .border(1.2.dp, Green.copy(alpha = 0.32f), pickerShape)
         ) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(44.dp)
+                    .height(48.dp)
                     .align(Alignment.Center)
                     .background(pickerSoftGreen, pickerShape)
-                    .border(1.dp, Green.copy(alpha = 0.55f), pickerShape)
+                    .border(1.2.dp, Green.copy(alpha = 0.6f), pickerShape)
             )
             LazyColumn(
                 state = state,
                 modifier = Modifier.fillMaxSize(),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                contentPadding = PaddingValues(vertical = 66.dp)
+                contentPadding = PaddingValues(vertical = 74.dp)
             ) {
                 items(values.size) { index ->
                     val item = values[index]
@@ -721,12 +736,13 @@ private fun WheelPicker(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(44.dp),
+                            .height(48.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
                             text = item.toString().padStart(2, '0'),
                             style = MaterialTheme.typography.titleLarge.copy(
+                                fontFamily = Inter,
                                 fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
                                 color = if (selected) Green else Color(0xFF555555)
                             )

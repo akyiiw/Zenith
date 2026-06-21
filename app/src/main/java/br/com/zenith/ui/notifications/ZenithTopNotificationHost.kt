@@ -1,8 +1,11 @@
 package br.com.zenith.ui.notifications
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
@@ -72,8 +75,20 @@ fun ZenithTopNotificationHost(
     ) {
         AnimatedVisibility(
             visible = visible && currentNotification != null,
-            enter = slideInVertically(initialOffsetY = { -it }) + fadeIn(),
-            exit = slideOutVertically(targetOffsetY = { -it }) + fadeOut()
+            enter = slideInVertically(
+                animationSpec = tween(220),
+                initialOffsetY = { -it / 2 }
+            ) + fadeIn(animationSpec = tween(160)) + scaleIn(
+                animationSpec = tween(180),
+                initialScale = 0.98f
+            ),
+            exit = slideOutVertically(
+                animationSpec = tween(180),
+                targetOffsetY = { -it / 3 }
+            ) + fadeOut(animationSpec = tween(140)) + scaleOut(
+                animationSpec = tween(160),
+                targetScale = 0.98f
+            )
         ) {
             currentNotification?.let { notification ->
                 ZenithTopNotification(notification = notification)
@@ -88,7 +103,7 @@ private fun ZenithTopNotification(notification: ZenithNotification) {
     Surface(
         color = colors.background,
         shape = RoundedCornerShape(50),
-        shadowElevation = 10.dp,
+        shadowElevation = 0.dp,
         modifier = Modifier
             .widthIn(max = 340.dp)
             .border(1.dp, colors.border, RoundedCornerShape(50))

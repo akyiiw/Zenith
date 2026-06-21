@@ -6,6 +6,8 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
@@ -45,6 +47,7 @@ import br.com.zenith.ui.screens.app.RegisterScreen
 import br.com.zenith.ui.screens.app.VerifyEmailScreen
 import br.com.zenith.ui.screens.app.WelcomeScreen
 import br.com.zenith.ui.screens.home.HomeScreen
+import br.com.zenith.ui.screens.progress.ProgressReportsScreen
 import br.com.zenith.ui.screens.progress.ProgressScreen
 import br.com.zenith.ui.screens.goals.GoalsScreen
 import br.com.zenith.ui.screens.profile.EditProfileScreen
@@ -53,11 +56,19 @@ import br.com.zenith.ui.screens.profile.BadgeSelectScreen
 import br.com.zenith.ui.screens.profile.ChallengeAwardsScreen
 import br.com.zenith.ui.screens.profile.MedalsScreen
 import br.com.zenith.ui.screens.profile.ProfileActivitiesScreen
+import br.com.zenith.ui.screens.profile.ProfileFriendsScreen
 import br.com.zenith.ui.screens.profile.ProfileScreen
+import br.com.zenith.ui.screens.profile.StreakScreen
 import br.com.zenith.ui.screens.profile.TitleSelectScreen
+import br.com.zenith.viewmodels.progress.ProgressPeriod
 import br.com.zenith.ui.screens.challenge.CreateChallengeScreen
 import br.com.zenith.ui.screens.challenge.ChallengeScreen
+import br.com.zenith.ui.screens.settings.AboutSettingsScreen
 import br.com.zenith.ui.screens.settings.AppBlockSettingsScreen
+import br.com.zenith.ui.screens.settings.EmailSettingsScreen
+import br.com.zenith.ui.screens.settings.PasswordSettingsScreen
+import br.com.zenith.ui.screens.settings.PrivacySettingsScreen
+import br.com.zenith.ui.screens.settings.SecuritySettingsScreen
 import br.com.zenith.ui.screens.settings.SettingsScreen
 import br.com.zenith.ui.screens.profile.PublicProfileScreen
 import br.com.zenith.ui.screens.social.SocialScreen
@@ -90,12 +101,21 @@ private fun bottomTabDirection(initialRoute: String, targetRoute: String): Int {
 
 private fun isVerticalForwardRoute(route: String): Boolean =
         route == "sleep_settings" ||
+        route == "app_blocks" ||
         route == "create_challenge" ||
+        route.startsWith("settings_") ||
         route.startsWith("achievements") ||
         route.startsWith("challenge_awards") ||
-        route.startsWith("new_activity") ||
+        route.startsWith("new_activity")
+
+private fun isActivityFlowRoute(route: String): Boolean =
         route.startsWith("start_activity") ||
-        route.startsWith("register_activity")
+        route.startsWith("register_activity") ||
+        route.startsWith("activity_registered")
+
+private fun isDetailForwardRoute(route: String): Boolean =
+        route.startsWith("challenge/") ||
+        route.startsWith("activity_detail/")
 
 private fun isSameTabReload(initialRoute: String, targetRoute: String): Boolean =
     initialRoute == targetRoute &&
@@ -187,16 +207,30 @@ class MainActivity : ComponentActivity() {
                                         animationSpec = tween(260),
                                         initialOffsetX = { if (tabDirection > 0) it else -it }
                                     )
+                                } else if (isActivityFlowRoute(target)) {
+                                    fadeIn(animationSpec = tween(180)) +
+                                        slideInVertically(
+                                            animationSpec = tween(300),
+                                            initialOffsetY = { it / 5 }
+                                        )
+                                } else if (isDetailForwardRoute(target)) {
+                                    fadeIn(animationSpec = tween(180)) +
+                                        slideInHorizontally(
+                                            animationSpec = tween(280),
+                                            initialOffsetX = { it / 4 }
+                                        )
                                 } else if (isVerticalForwardRoute(target)) {
-                                    slideInVertically(
-                                        animationSpec = tween(320),
-                                        initialOffsetY = { it }
-                                    )
+                                    fadeIn(animationSpec = tween(180)) +
+                                        slideInVertically(
+                                            animationSpec = tween(300),
+                                            initialOffsetY = { it / 4 }
+                                        )
                                 } else {
-                                    slideInHorizontally(
-                                        animationSpec = tween(260),
-                                        initialOffsetX = { it }
-                                    )
+                                    fadeIn(animationSpec = tween(170)) +
+                                        slideInHorizontally(
+                                            animationSpec = tween(260),
+                                            initialOffsetX = { it / 3 }
+                                        )
                                 }
                             },
                             exitTransition = {
@@ -214,44 +248,68 @@ class MainActivity : ComponentActivity() {
                                         animationSpec = tween(240),
                                         targetOffsetX = { if (tabDirection > 0) -it else it }
                                     )
-                                } else if (isVerticalForwardRoute(target)) {
-                                    slideOutVertically(
-                                        animationSpec = tween(260),
-                                        targetOffsetY = { -it / 4 }
-                                    )
+                                } else if (isActivityFlowRoute(target) || isVerticalForwardRoute(target)) {
+                                    fadeOut(animationSpec = tween(140)) +
+                                        slideOutVertically(
+                                            animationSpec = tween(240),
+                                            targetOffsetY = { -it / 10 }
+                                        )
+                                } else if (isDetailForwardRoute(target)) {
+                                    fadeOut(animationSpec = tween(140)) +
+                                        slideOutHorizontally(
+                                            animationSpec = tween(240),
+                                            targetOffsetX = { -it / 8 }
+                                        )
                                 } else {
-                                    slideOutHorizontally(
-                                        animationSpec = tween(240),
-                                        targetOffsetX = { -it / 3 }
-                                    )
+                                    fadeOut(animationSpec = tween(130)) +
+                                        slideOutHorizontally(
+                                            animationSpec = tween(240),
+                                            targetOffsetX = { -it / 8 }
+                                        )
                                 }
                             },
                             popEnterTransition = {
                                 val target = targetState.destination.route.orEmpty()
-                                if (isVerticalForwardRoute(target)) {
-                                    slideInVertically(
-                                        animationSpec = tween(260),
-                                        initialOffsetY = { -it / 4 }
-                                    )
+                                if (isActivityFlowRoute(target) || isVerticalForwardRoute(target)) {
+                                    fadeIn(animationSpec = tween(160)) +
+                                        slideInVertically(
+                                            animationSpec = tween(260),
+                                            initialOffsetY = { -it / 8 }
+                                        )
+                                } else if (isDetailForwardRoute(target)) {
+                                    fadeIn(animationSpec = tween(160)) +
+                                        slideInHorizontally(
+                                            animationSpec = tween(240),
+                                            initialOffsetX = { -it / 8 }
+                                        )
                                 } else {
-                                    slideInHorizontally(
-                                        animationSpec = tween(240),
-                                        initialOffsetX = { -it / 3 }
-                                    )
+                                    fadeIn(animationSpec = tween(150)) +
+                                        slideInHorizontally(
+                                            animationSpec = tween(240),
+                                            initialOffsetX = { -it / 4 }
+                                        )
                                 }
                             },
                             popExitTransition = {
                                 val initial = initialState.destination.route.orEmpty()
-                                if (isVerticalForwardRoute(initial)) {
-                                    slideOutVertically(
-                                        animationSpec = tween(280),
-                                        targetOffsetY = { it }
-                                    )
+                                if (isActivityFlowRoute(initial) || isVerticalForwardRoute(initial)) {
+                                    fadeOut(animationSpec = tween(140)) +
+                                        slideOutVertically(
+                                            animationSpec = tween(260),
+                                            targetOffsetY = { it / 4 }
+                                        )
+                                } else if (isDetailForwardRoute(initial)) {
+                                    fadeOut(animationSpec = tween(130)) +
+                                        slideOutHorizontally(
+                                            animationSpec = tween(240),
+                                            targetOffsetX = { it / 4 }
+                                        )
                                 } else {
-                                    slideOutHorizontally(
-                                        animationSpec = tween(240),
-                                        targetOffsetX = { it }
-                                    )
+                                    fadeOut(animationSpec = tween(130)) +
+                                        slideOutHorizontally(
+                                            animationSpec = tween(240),
+                                            targetOffsetX = { it / 3 }
+                                        )
                                 }
                             }
                         ) {
@@ -312,8 +370,24 @@ class MainActivity : ComponentActivity() {
                             )
                         }
 
+                        composable("profile_friends/{userId}") { back ->
+                            ProfileFriendsScreen(
+                                navController = navController,
+                                userId = back.arguments?.getString("userId") ?: ""
+                            )
+                        }
+
                         composable("progress") {
                             ProgressScreen(navController)
+                        }
+
+                        composable("progress_reports/{period}") { back ->
+                            ProgressReportsScreen(
+                                navController = navController,
+                                initialPeriod = runCatching {
+                                    ProgressPeriod.valueOf(back.arguments?.getString("period") ?: ProgressPeriod.Weekly.name)
+                                }.getOrDefault(ProgressPeriod.Weekly)
+                            )
                         }
 
                         composable("goals") {
@@ -322,6 +396,26 @@ class MainActivity : ComponentActivity() {
 
                         composable("settings") {
                             SettingsScreen(navController)
+                        }
+
+                        composable("settings_email") {
+                            EmailSettingsScreen(navController)
+                        }
+
+                        composable("settings_password") {
+                            PasswordSettingsScreen(navController)
+                        }
+
+                        composable("settings_security") {
+                            SecuritySettingsScreen(navController)
+                        }
+
+                        composable("settings_privacy") {
+                            PrivacySettingsScreen(navController)
+                        }
+
+                        composable("settings_about") {
+                            AboutSettingsScreen(navController)
                         }
 
                         composable("profile") {
@@ -346,6 +440,13 @@ class MainActivity : ComponentActivity() {
 
                         composable("challenge_awards/{userId}") { back ->
                             ChallengeAwardsScreen(
+                                navController = navController,
+                                userId = back.arguments?.getString("userId") ?: ""
+                            )
+                        }
+
+                        composable("streak/{userId}") { back ->
+                            StreakScreen(
                                 navController = navController,
                                 userId = back.arguments?.getString("userId") ?: ""
                             )

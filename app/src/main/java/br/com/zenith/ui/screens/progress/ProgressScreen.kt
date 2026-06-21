@@ -1,5 +1,7 @@
 package br.com.zenith.ui.screens.progress
 
+import android.graphics.Paint
+import android.graphics.RectF
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -19,9 +21,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.DirectionsRun
 import androidx.compose.material.icons.filled.Bedtime
 import androidx.compose.material.icons.filled.Lock
@@ -30,7 +34,6 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Route
 import androidx.compose.material.icons.filled.SelfImprovement
 import androidx.compose.material.icons.filled.Timeline
-import androidx.compose.material.icons.filled.Whatshot
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -55,21 +58,29 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import br.com.zenith.R
+import br.com.zenith.ui.animations.CenteredZenithLoading
+import br.com.zenith.ui.components.common.ZenithSheetDragHandle
 import br.com.zenith.ui.theme.Green
 import br.com.zenith.ui.theme.Inter
-import br.com.zenith.ui.theme.Poppins
 import br.com.zenith.ui.theme.SecondaryGreen
 import br.com.zenith.ui.theme.ZenithTheme
 import br.com.zenith.ui.components.common.BottomNavListPadding
 import br.com.zenith.ui.components.common.ScreenHeader
+import br.com.zenith.ui.components.common.ZenithFilterBar
+import br.com.zenith.ui.components.common.ZenithFilterOption
 import br.com.zenith.viewmodels.progress.ProgressDay
 import br.com.zenith.viewmodels.progress.ProgressPeriod
 import br.com.zenith.viewmodels.progress.ProgressSummary
@@ -102,7 +113,7 @@ fun ProgressScreen(navController: NavController) {
                     .padding(padding)
                     .statusBarsPadding()
                     .padding(horizontal = 20.dp),
-                contentPadding = PaddingValues(top = 19.dp, bottom = BottomNavListPadding),
+                contentPadding = PaddingValues(top = 14.dp, bottom = BottomNavListPadding),
                 verticalArrangement = Arrangement.spacedBy(18.dp)
             ) {
                 item {
@@ -159,7 +170,11 @@ fun ProgressScreen(navController: NavController) {
                     }
 
                     item {
-                        ReportCharts(days = days, period = period)
+                        ReportCharts(
+                            days = days,
+                            period = period,
+                            onViewAll = { navController.navigate("progress_reports/${period.name}") }
+                        )
                     }
 
                     item {
@@ -191,32 +206,17 @@ private fun ProgressHeader(
             icon = Icons.Default.Timeline
         )
 
-        Row(
-            modifier = Modifier
-                .clickable { onTogglePeriod() }
-                .padding(vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = if (period == ProgressPeriod.Monthly) "ver semanal" else "ver mensal",
-                style = MaterialTheme.typography.titleMedium.copy(
-                    fontFamily = Inter,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF666666)
-                )
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Icon(
-                imageVector = if (isPremium || period == ProgressPeriod.Monthly) {
-                    Icons.Default.MilitaryTech
-                } else {
-                    Icons.Default.Lock
-                },
-                contentDescription = null,
-                tint = if (isPremium) Green else Color(0xFF2F9B3A),
-                modifier = Modifier.size(22.dp)
-            )
-        }
+        ZenithFilterBar(
+            options = listOf(
+                ZenithFilterOption(ProgressPeriod.Weekly, "Semanal"),
+                ZenithFilterOption(ProgressPeriod.Monthly, if (isPremium) "Mensal" else "Mensal Premium")
+            ),
+            selectedValue = period,
+            onSelected = { selected ->
+                if (selected != period) onTogglePeriod()
+            },
+            modifier = Modifier.fillMaxWidth()
+        )
     }
 }
 
@@ -244,7 +244,11 @@ private fun PremiumReportCard(onClick: () -> Unit) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = "Desbloqueie o relatório mensal",
-                    style = MaterialTheme.typography.titleMedium.copy(fontFamily = Poppins)
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontFamily = Inter,
+                        fontWeight = FontWeight.W800,
+                        fontSize = 18.sp
+                    )
                 )
                 Text(
                     text = "Premium mostra 30 dias, tendências completas e mais detalhes da sua evolução.",
@@ -281,7 +285,11 @@ private fun GoalsSection(
             ) {
                 Text(
                     text = "Minhas Metas",
-                    style = MaterialTheme.typography.titleLarge.copy(fontFamily = Poppins)
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontFamily = Inter,
+                        fontWeight = FontWeight.W800,
+                        fontSize = 19.sp
+                    )
                 )
                 TextButton(onClick = onManageGoals) {
                     Text(
@@ -313,7 +321,10 @@ private fun GoalItem(goal: ProgressGoal) {
         ) {
             Text(
                 text = goal.title,
-                style = MaterialTheme.typography.titleMedium.copy(fontFamily = Poppins)
+                style = MaterialTheme.typography.titleSmall.copy(
+                    fontFamily = Inter,
+                    fontWeight = FontWeight.W800
+                )
             )
             Text(
                 text = "${formatOneDecimal(goal.currentValue)} / ${formatOneDecimal(goal.targetValue)} ${goal.unit}",
@@ -353,7 +364,10 @@ private fun EmptyGoalsCard(onManageGoals: () -> Unit) {
         ) {
             Text(
                 text = "Crie sua primeira meta",
-                style = MaterialTheme.typography.titleMedium.copy(fontFamily = Poppins)
+                style = MaterialTheme.typography.titleMedium.copy(
+                    fontFamily = Inter,
+                    fontWeight = FontWeight.W800
+                )
             )
             Text(
                 text = "Defina objetivos semanais ou mensais para acompanhar sua evolução.",
@@ -387,7 +401,7 @@ private fun SummaryGrid(summary: ProgressSummary) {
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             MetricCard(
                 modifier = Modifier.weight(1f),
-                icon = Icons.Default.Whatshot,
+                iconRes = R.drawable.firestreak,
                 label = "Sequência",
                 value = "${summary.streak}d"
             )
@@ -404,7 +418,8 @@ private fun SummaryGrid(summary: ProgressSummary) {
 @Composable
 private fun MetricCard(
     modifier: Modifier,
-    icon: ImageVector,
+    icon: ImageVector? = null,
+    iconRes: Int? = null,
     label: String,
     value: String
 ) {
@@ -417,25 +432,37 @@ private fun MetricCard(
             modifier = Modifier.padding(14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = Green,
-                modifier = Modifier.size(28.dp)
-            )
+            if (iconRes != null) {
+                Icon(
+                    painter = painterResource(id = iconRes),
+                    contentDescription = null,
+                    tint = Green,
+                    modifier = Modifier.size(24.dp)
+                )
+            } else if (icon != null) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = Green,
+                    modifier = Modifier.size(28.dp)
+                )
+            }
             Spacer(modifier = Modifier.width(10.dp))
             Column {
                 Text(
                     text = value,
-                    style = MaterialTheme.typography.titleMedium.copy(
-                        fontFamily = Poppins,
-                        color = Color.Black
+                    style = MaterialTheme.typography.titleLarge.copy(
+                        fontFamily = Inter,
+                        fontWeight = FontWeight.W800,
+                        fontSize = 21.sp,
+                        color = Color(0xFF111111)
                     )
                 )
                 Text(
                     text = label,
                     style = MaterialTheme.typography.bodySmall.copy(
                         fontFamily = Inter,
+                        fontWeight = FontWeight.SemiBold,
                         color = Color(0xFF666666)
                     )
                 )
@@ -445,7 +472,11 @@ private fun MetricCard(
 }
 
 @Composable
-private fun ReportCharts(days: List<ProgressDay>, period: ProgressPeriod) {
+private fun ReportCharts(
+    days: List<ProgressDay>,
+    period: ProgressPeriod,
+    onViewAll: () -> Unit
+) {
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -464,7 +495,11 @@ private fun ReportCharts(days: List<ProgressDay>, period: ProgressPeriod) {
             ) {
                 Text(
                     text = if (period == ProgressPeriod.Monthly) "Relatório de 30 dias" else "Relatório de 7 dias",
-                    style = MaterialTheme.typography.titleMedium.copy(fontFamily = Poppins)
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontFamily = Inter,
+                        fontWeight = FontWeight.W800,
+                        fontSize = 19.sp
+                    )
                 )
                 Text(
                     text = "Ver todos",
@@ -472,7 +507,8 @@ private fun ReportCharts(days: List<ProgressDay>, period: ProgressPeriod) {
                         fontFamily = Inter,
                         color = Color(0xFF777777),
                         fontWeight = FontWeight.Bold
-                    )
+                    ),
+                    modifier = Modifier.clickable { onViewAll() }
                 )
             }
 
@@ -511,7 +547,8 @@ private fun LineChart(
     valueLabel: (Float) -> String,
     lineColor: Color
 ) {
-    val maxValue = max(values.maxOrNull() ?: 0f, 1f)
+    val rawMaxValue = values.maxOrNull() ?: 0f
+    val maxValue = max(rawMaxValue, 1f)
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
@@ -520,7 +557,9 @@ private fun LineChart(
             textAlign = TextAlign.Center,
             style = MaterialTheme.typography.titleLarge.copy(
                 fontFamily = Inter,
-                fontWeight = FontWeight.W500
+                fontWeight = FontWeight.W800,
+                fontSize = 18.sp,
+                color = Color(0xFF1B1B1B)
             )
         )
 
@@ -529,16 +568,39 @@ private fun LineChart(
                 .fillMaxWidth()
                 .height(150.dp)
         ) {
-            val left = 42f
-            val right = size.width - 4f
-            val top = 12f
-            val bottom = size.height - 32f
+            val left = 44.dp.toPx()
+            val right = size.width - 4.dp.toPx()
+            val top = 18.dp.toPx()
+            val bottom = size.height - 32.dp.toPx()
             val chartHeight = bottom - top
             val chartWidth = right - left
             val gridColor = Color(0xFFD7DDD7)
+            val axisPaint = Paint().apply {
+                isAntiAlias = true
+                textSize = 10.sp.toPx()
+                color = Color(0xFF556255).toArgb()
+                textAlign = Paint.Align.RIGHT
+            }
+            val pointLabelPaint = Paint().apply {
+                isAntiAlias = true
+                textSize = 10.sp.toPx()
+                color = Color(0xFF263026).toArgb()
+                textAlign = Paint.Align.CENTER
+            }
+            val pointLabelBackgroundPaint = Paint().apply {
+                isAntiAlias = true
+                color = Color(0xFFF8FFF8).toArgb()
+            }
 
             repeat(4) { index ->
                 val y = top + chartHeight * index / 3f
+                val axisValue = maxValue * (3 - index) / 3f
+                drawContext.canvas.nativeCanvas.drawText(
+                    valueLabel(axisValue),
+                    left - 7.dp.toPx(),
+                    y + 4.dp.toPx(),
+                    axisPaint
+                )
                 drawLine(
                     color = gridColor,
                     start = Offset(left, y),
@@ -571,11 +633,46 @@ private fun LineChart(
                 points.forEach {
                     drawCircle(color = lineColor, radius = 4f, center = it)
                 }
+
+                val peak = rawMaxValue
+                val shouldLabelAll = values.size <= 10
+                points.forEachIndexed { index, point ->
+                    val value = values[index]
+                    if (value > 0f && value != peak && (shouldLabelAll || index % 3 == 0)) {
+                        val label = valueLabel(value)
+                        val labelWidth = pointLabelPaint.measureText(label)
+                        val labelX = point.x.coerceIn(
+                            left + labelWidth / 2f + 4.dp.toPx(),
+                            right - labelWidth / 2f - 4.dp.toPx()
+                        )
+                        val labelY = (point.y - 8.dp.toPx()).coerceAtLeast(10.dp.toPx())
+                        val rect = RectF(
+                            labelX - labelWidth / 2f - 4.dp.toPx(),
+                            labelY - 11.dp.toPx(),
+                            labelX + labelWidth / 2f + 4.dp.toPx(),
+                            labelY + 4.dp.toPx()
+                        )
+                        drawContext.canvas.nativeCanvas.drawRoundRect(
+                            rect,
+                            5.dp.toPx(),
+                            5.dp.toPx(),
+                            pointLabelBackgroundPaint
+                        )
+                        drawContext.canvas.nativeCanvas.drawText(
+                            label,
+                            labelX,
+                            labelY,
+                            pointLabelPaint
+                        )
+                    }
+                }
             }
         }
 
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 44.dp, end = 4.dp),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             labels.forEach {
@@ -583,7 +680,8 @@ private fun LineChart(
                     text = it,
                     style = MaterialTheme.typography.labelSmall.copy(
                         fontFamily = Inter,
-                        color = Color.Black
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color(0xFF3F473F)
                     )
                 )
             }
@@ -626,7 +724,11 @@ private fun InsightCard(
                 Spacer(modifier = Modifier.width(10.dp))
                 Text(
                     text = "Destaque do período",
-                    style = MaterialTheme.typography.titleMedium.copy(fontFamily = Poppins)
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontFamily = Inter,
+                        fontWeight = FontWeight.W800,
+                        fontSize = 18.sp
+                    )
                 )
             }
             Text(
@@ -687,7 +789,8 @@ private fun PremiumDialog(onDismiss: () -> Unit) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         containerColor = Color.White,
-        scrimColor = Color.Transparent
+        scrimColor = Color.Transparent,
+        dragHandle = { ZenithSheetDragHandle() }
     ) {
         Column(
             modifier = Modifier
@@ -728,5 +831,141 @@ private fun chartLabels(days: List<ProgressDay>): List<String> {
 }
 
 private fun formatOneDecimal(value: Double): String {
-    return String.format(java.util.Locale.forLanguageTag("pt-BR"), "%.1f", value)
+    return UnitFormatters.compactNumber(value)
+}
+
+@Composable
+fun ProgressReportsScreen(
+    navController: NavController,
+    initialPeriod: ProgressPeriod
+) {
+    val context = LocalContext.current
+    val viewModel: ProgressViewModel = viewModel()
+    val state by viewModel.uiState.collectAsState()
+
+    LaunchedEffect(Unit) {
+        viewModel.load(context)
+    }
+
+    val days = if (initialPeriod == ProgressPeriod.Monthly) state.monthlyDays else state.weeklyDays
+    ZenithTheme {
+        Scaffold(containerColor = Color.White) { padding ->
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .statusBarsPadding(),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                contentPadding = PaddingValues(bottom = BottomNavListPadding)
+            ) {
+                item {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 11.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        androidx.compose.material3.IconButton(onClick = { navController.popBackStack() }) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Voltar",
+                                tint = Green
+                            )
+                        }
+                        Icon(
+                            Icons.Default.Timeline,
+                            contentDescription = null,
+                            tint = Green,
+                            modifier = Modifier.padding(start = 4.dp)
+                        )
+                        Column(modifier = Modifier.padding(start = 10.dp)) {
+                            Text(
+                                text = "Relatórios",
+                                style = MaterialTheme.typography.titleLarge.copy(
+                                    fontFamily = Inter,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.Black
+                                )
+                            )
+                            Text(
+                                text = if (initialPeriod == ProgressPeriod.Monthly) "Últimos 30 dias" else "Últimos 7 dias",
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    fontFamily = Inter,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Color(0xFF667066)
+                                )
+                            )
+                        }
+                    }
+                }
+
+                if (state.isLoading) {
+                    item { CenteredZenithLoading() }
+                } else {
+                    items(days, key = { it.date.toString() }) { day ->
+                        ProgressDayRow(
+                            day = day,
+                            modifier = Modifier.padding(horizontal = 20.dp)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProgressDayRow(day: ProgressDay, modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier
+            .fillMaxWidth()
+            .border(1.dp, Color(0xFFE1E7DD), RoundedCornerShape(10.dp)),
+        color = Color(0xFFF8F8F8),
+        shape = RoundedCornerShape(10.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                text = day.label,
+                style = MaterialTheme.typography.titleMedium.copy(
+                    fontFamily = Inter,
+                    fontWeight = FontWeight.W800,
+                    color = Color(0xFF111111)
+                )
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                ReportMiniValue("Sono", "${formatOneDecimal(day.sleepHours.toDouble())}h")
+                ReportMiniValue("Passos", UnitFormatters.steps(day.steps))
+                ReportMiniValue("Distância", UnitFormatters.kilometersWithSpace(day.distanceKm))
+                ReportMiniValue("Tempo", UnitFormatters.minutes(day.durationMin))
+            }
+        }
+    }
+}
+
+@Composable
+private fun ReportMiniValue(label: String, value: String) {
+    Column {
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyMedium.copy(
+                fontFamily = Inter,
+                fontWeight = FontWeight.W800,
+                color = Color(0xFF238D25)
+            )
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall.copy(
+                fontFamily = Inter,
+                fontWeight = FontWeight.SemiBold,
+                color = Color(0xFF667066)
+            )
+        )
+    }
 }

@@ -42,6 +42,7 @@ import br.com.zenith.data.models.Profile
 import br.com.zenith.ui.animations.CenteredZenithLoading
 import br.com.zenith.ui.components.common.BottomNavListPadding
 import br.com.zenith.ui.components.common.ScreenHeader
+import br.com.zenith.ui.components.common.ZenithConfirmSheet
 import br.com.zenith.ui.components.social.SocialEmptyState
 import br.com.zenith.ui.components.social.SocialSectionTitle
 import br.com.zenith.ui.components.social.SocialUserRow
@@ -60,6 +61,7 @@ fun SocialScreen(navController: NavController) {
         val isLoading by viewModel.isLoading.collectAsState()
         val isSaving by viewModel.isSaving.collectAsState()
         var query by remember { mutableStateOf("") }
+        var pendingRemoveFriend by remember { mutableStateOf<Profile?>(null) }
 
         LaunchedEffect(Unit) { viewModel.fetchSocial(context) }
 
@@ -72,7 +74,7 @@ fun SocialScreen(navController: NavController) {
             onSendInvite = { viewModel.enviarConvite(it.id, context) },
             onAccept = { viewModel.aceitarConvite(it.id, context) },
             onReject = { viewModel.recusarConvite(it.id, context) },
-            onRemove = { viewModel.removerAmizade(it.id, context) },
+            onRemove = { pendingRemoveFriend = it },
             onAcceptMention = { mention, showOnProfile ->
                 viewModel.aceitarMencao(mention.id, showOnProfile, context)
             },
@@ -80,6 +82,19 @@ fun SocialScreen(navController: NavController) {
             onOpenProfile = { navController.navigate("user_profile/${it.id}") },
             navController = navController
         )
+
+        pendingRemoveFriend?.let { profile ->
+            ZenithConfirmSheet(
+                title = "Remover amizade?",
+                message = "${profile.displayName} sairá da sua lista de amigos.",
+                confirmLabel = "Remover",
+                onDismiss = { pendingRemoveFriend = null },
+                onConfirm = {
+                    pendingRemoveFriend = null
+                    viewModel.removerAmizade(profile.id, context)
+                }
+            )
+        }
     }
 }
 
@@ -137,7 +152,7 @@ private fun SocialContent(
                 .padding(padding)
                 .statusBarsPadding()
                 .padding(horizontal = 20.dp),
-            contentPadding = PaddingValues(top = 19.dp, bottom = BottomNavListPadding),
+            contentPadding = PaddingValues(top = 14.dp, bottom = BottomNavListPadding),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             item {

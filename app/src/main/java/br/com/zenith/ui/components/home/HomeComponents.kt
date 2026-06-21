@@ -3,6 +3,7 @@ package br.com.zenith.ui.components.home
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -56,6 +57,7 @@ import br.com.zenith.data.SupabaseConfig
 import br.com.zenith.data.models.Atividade
 import br.com.zenith.data.models.ProgressGoal
 import br.com.zenith.data.models.Profile
+import br.com.zenith.ui.components.common.ZenithSheetDragHandle
 import br.com.zenith.ui.components.profile.formattedActivityValue
 import br.com.zenith.ui.components.profile.formattedDuration
 import br.com.zenith.ui.components.profile.mentionLabel
@@ -64,6 +66,7 @@ import br.com.zenith.ui.theme.Green
 import br.com.zenith.ui.theme.Inter
 import br.com.zenith.ui.theme.SecondaryGreen
 import br.com.zenith.ui.theme.items.ZenithTextField
+import br.com.zenith.utils.UnitFormatters
 import br.com.zenith.viewmodels.home.HomeFeedItem
 import br.com.zenith.viewmodels.home.HomeNotificationItem
 import br.com.zenith.viewmodels.home.HomeNotificationType
@@ -325,7 +328,7 @@ private fun NotificationRow(
             Button(
                 onClick = onMarkAsRead,
                 colors = ButtonDefaults.buttonColors(containerColor = Green),
-                shape = RoundedCornerShape(8.dp),
+                shape = RoundedCornerShape(10.dp),
                 contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
             ) {
                 Text(
@@ -581,12 +584,7 @@ fun ActivitySection(
 }
 
 private fun formatGoalValue(value: Double): String {
-    val locale = Locale.forLanguageTag("pt-BR")
-    return if (value >= 10) {
-        "%,.0f".format(locale, value)
-    } else {
-        "%.1f".format(locale, value)
-    }
+    return UnitFormatters.compactNumber(value)
 }
 
 @Composable
@@ -615,7 +613,7 @@ fun FeedSection(
             Button(
                 onClick = onPublishClick,
                 colors = ButtonDefaults.buttonColors(containerColor = Green),
-                shape = RoundedCornerShape(8.dp)
+                shape = RoundedCornerShape(10.dp)
             ) {
                 Text("Publicar", color = Color.White, fontFamily = Inter)
             }
@@ -841,7 +839,8 @@ fun PublishActivitySheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         containerColor = Color.White,
-        scrimColor = Color.Transparent
+        scrimColor = Color.Transparent,
+        dragHandle = { ZenithSheetDragHandle() }
     ) {
         Column(
             modifier = Modifier
@@ -904,8 +903,9 @@ fun PublishActivitySheet(
                 Button(
                     onClick = { imageLauncher.launch("image/*") },
                     enabled = !isPublishing && imageUris.size < 4,
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEAF3DE)),
-                    shape = RoundedCornerShape(8.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.White),
+                    border = BorderStroke(1.2.dp, Green.copy(alpha = 0.58f)),
+                    shape = RoundedCornerShape(10.dp),
                     modifier = Modifier.weight(1f)
                 ) {
                     Icon(
@@ -925,7 +925,7 @@ fun PublishActivitySheet(
                     },
                     enabled = canPublishPost,
                     colors = ButtonDefaults.buttonColors(containerColor = Green),
-                    shape = RoundedCornerShape(8.dp),
+                    shape = RoundedCornerShape(10.dp),
                     modifier = Modifier.weight(1f)
                 ) {
                     Text("Publicar", color = Color.White, fontFamily = Inter)

@@ -27,6 +27,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -44,7 +45,8 @@ fun MedalsScreen(navController: NavController) {
         val viewModel: UserViewModel = viewModel()
         val medalhas by viewModel.medalhas.collectAsState()
         val isLoading by viewModel.isLoading.collectAsState()
-        val context = androidx.compose.ui.platform.LocalContext.current
+
+        val context = LocalContext.current
 
         LaunchedEffect(Unit) {
             viewModel.fetchMedalhas(context)
@@ -69,14 +71,16 @@ fun MedalsScreen(navController: NavController) {
                         tint = Color(0xFF238D25)
                     )
                 }
-                Text(
-                    text = "Medalhas",
-                    style = MaterialTheme.typography.titleLarge.copy(
-                        fontFamily = Inter,
-                        fontWeight = FontWeight.Bold
-                    ),
-                    modifier = Modifier.padding(start = 8.dp)
-                )
+                Column(modifier = Modifier.padding(start = 10.dp)) {
+                    Text(
+                        text = "Medalhas",
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            fontFamily = Inter,
+                            fontWeight = FontWeight.W800,
+                            color = Color(0xFF111111)
+                        )
+                    )
+                }
             }
 
             when {

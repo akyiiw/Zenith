@@ -4,6 +4,7 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -38,6 +39,9 @@ import androidx.compose.material.icons.filled.AddAPhoto
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Groups
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -52,6 +56,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRowDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -59,7 +64,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
@@ -76,8 +83,11 @@ import br.com.zenith.ui.animations.CenteredZenithLoading
 import br.com.zenith.ui.animations.ZenithLoading
 import br.com.zenith.ui.components.common.BottomNavListPadding
 import br.com.zenith.ui.components.common.ScreenHeader
+import br.com.zenith.ui.components.common.ZenithFilterBar
+import br.com.zenith.ui.components.common.ZenithFilterOption
 import br.com.zenith.ui.theme.Green
 import br.com.zenith.ui.theme.Inter
+import br.com.zenith.ui.theme.Poppins
 import br.com.zenith.utils.UnitFormatters
 import br.com.zenith.ui.theme.TextFieldGreen
 import br.com.zenith.ui.theme.items.ZenithTextField
@@ -101,9 +111,12 @@ fun ChallengeContent(
     onJoinChallenge: (Challenge) -> Unit,
     onCreateForumPost: (String, String, List<Uri>) -> Unit,
     onCreateForumComment: (String, String, String) -> Unit,
+    onSetChallengeClosed: (String, Boolean) -> Unit,
+    onDeleteForumPost: (String, String) -> Unit,
     onOpenProfile: (Profile) -> Unit
 ) {
     var selectedTab by remember { mutableStateOf(ChallengeTab.Ativos) }
+    var selectedFilter by remember { mutableStateOf(ChallengeListFilter.Todos) }
     val selectedChallengeDetails = uiState.selectedChallengeDetails
     var selectedDetailTab by remember(selectedChallengeDetails?.challenge?.id) {
         mutableStateOf(ChallengeDetailTab.Participantes)
@@ -120,40 +133,52 @@ fun ChallengeContent(
             return@Scaffold
         }
 
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.White)
-                .padding(padding)
-                .statusBarsPadding()
-                .padding(horizontal = 20.dp),
-            contentPadding = PaddingValues(top = 19.dp, bottom = BottomNavListPadding),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
-            if (selectedChallengeDetails == null) {
+        if (selectedChallengeDetails == null) {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.White)
+                    .padding(padding)
+                    .statusBarsPadding()
+                    .padding(horizontal = 20.dp),
+                contentPadding = PaddingValues(top = 14.dp, bottom = BottomNavListPadding),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
                 item {
                     ScreenHeader(
                         title = "Desafios",
-                        icon = Icons.Default.EmojiEvents
+                        trailingContent = {
+                            CreateChallengeAction(
+                                isPremium = uiState.currentUserIsPremium(),
+                                onCreateClick = onCreateClick
+                            )
+                        }
                     )
                 }
-                item { CreateChallengeAction(onCreateClick = onCreateClick) }
                 item {
                     ChallengeTabs(
                         selectedTab = selectedTab,
                         onTabSelected = { selectedTab = it }
                     )
                 }
-
-                val visibleChallenges = uiState.challenges.filter { challenge ->
-                    val finished = challenge.isFinished()
-                    val participating = uiState.isParticipating(challenge.id)
-                    when (selectedTab) {
-                        ChallengeTab.Ativos -> participating && !finished
-                        ChallengeTab.Explorar -> !participating && !finished
-                        ChallengeTab.Finalizados -> participating && finished
-                    }
+                item {
+                    ChallengeFilterBar(
+                        selectedFilter = selectedFilter,
+                        onFilterSelected = { selectedFilter = it }
+                    )
                 }
+
+                val visibleChallenges = uiState.challenges
+                    .filter { challenge ->
+                        val finished = challenge.isFinished()
+                        val participating = uiState.isParticipating(challenge.id)
+                        when (selectedTab) {
+                            ChallengeTab.Ativos -> participating && !finished
+                            ChallengeTab.Explorar -> !participating && !finished
+                            ChallengeTab.Finalizados -> participating && finished
+                        }
+                    }
+                    .filter { challenge -> challenge.matchesFilter(selectedFilter) }
 
                 if (visibleChallenges.isEmpty()) {
                     val emptyText = when (selectedTab) {
@@ -175,84 +200,114 @@ fun ChallengeContent(
                         )
                     }
                 }
-            } else {
-                val challenge = selectedChallengeDetails.challenge
-                item {
+            }
+        } else {
+            val challenge = selectedChallengeDetails.challenge
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.White)
+                    .padding(padding)
+                    .statusBarsPadding()
+                    .padding(horizontal = 20.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 14.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
                     ChallengeHeader(
                         challenge = challenge,
-                        isParticipating = uiState.isParticipating(challenge.id),
-                        isSaving = isSaving,
-                        onBack = onBackToChallenges,
-                        onJoin = { onJoinChallenge(challenge) }
+                        creatorName = uiState.creatorName(challenge.criadorId),
+                        onBack = onBackToChallenges
                     )
-                }
-                item {
                     ChallengeDetailTabs(
                         selectedTab = selectedDetailTab,
                         onTabSelected = { selectedDetailTab = it }
                     )
                 }
 
-                when (selectedDetailTab) {
-                    ChallengeDetailTab.Participantes -> {
-                        selectedChallengeDetails.userEntry(uiState.currentUserId)?.let { entry ->
-                            item {
-                                MyPositionCard(
-                                    position = selectedChallengeDetails.userPosition(uiState.currentUserId) ?: 0,
-                                    entry = entry,
-                                    challenge = challenge
-                                )
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    contentPadding = PaddingValues(top = 14.dp, bottom = BottomNavListPadding),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    when (selectedDetailTab) {
+                        ChallengeDetailTab.Participantes -> {
+                            selectedChallengeDetails.userEntry(uiState.currentUserId)?.let { entry ->
+                                item {
+                                    MyPositionCard(
+                                        position = selectedChallengeDetails.userPosition(uiState.currentUserId) ?: 0,
+                                        entry = entry,
+                                        challenge = challenge
+                                    )
+                                }
+                            }
+
+                            item { RankingHeader(challenge = challenge) }
+
+                            if (selectedChallengeDetails.entries.isEmpty()) {
+                                item { EmptyState("Nenhuma atividade vinculada a este desafio ainda") }
+                            } else {
+                                items(selectedChallengeDetails.entries, key = { it.profile.id }) { entry ->
+                                    ChallengeDetailsRow(
+                                        position = selectedChallengeDetails.entries.indexOf(entry) + 1,
+                                        entry = entry,
+                                        challenge = challenge,
+                                        isCurrentUser = entry.profile.id == uiState.currentUserId,
+                                        onClick = { onOpenProfile(entry.profile) }
+                                    )
+                                }
                             }
                         }
-
-                        item { RankingHeader(challenge = challenge) }
-
-                        if (selectedChallengeDetails.entries.isEmpty()) {
-                            item { EmptyState("Nenhuma atividade vinculada a este desafio ainda") }
-                        } else {
-                            items(selectedChallengeDetails.entries, key = { it.profile.id }) { entry ->
-                                ChallengeDetailsRow(
-                                    position = selectedChallengeDetails.entries.indexOf(entry) + 1,
-                                    entry = entry,
+                        ChallengeDetailTab.Informacoes -> {
+                            val isCreator = challenge.criadorId == uiState.currentUserId
+                            item {
+                                ChallengeInformation(
                                     challenge = challenge,
-                                    isCurrentUser = entry.profile.id == uiState.currentUserId,
-                                    onClick = { onOpenProfile(entry.profile) }
+                                    creatorName = uiState.creatorName(challenge.criadorId),
+                                    participantCount = uiState.participantCount(challenge.id)
                                 )
                             }
-                        }
-                    }
-                    ChallengeDetailTab.Informacoes -> {
-                        item {
-                            ChallengeInformation(
-                                challenge = challenge,
-                                creatorName = uiState.creatorName(challenge.criadorId),
-                                participantCount = uiState.participantCount(challenge.id)
-                            )
-                        }
-                        item { SectionTitle("Fórum") }
-                        if (uiState.isParticipating(challenge.id)) {
-                            item {
-                                ChallengeForumComposer(
-                                    isSaving = isSaving,
-                                    onPost = { content, images ->
-                                        onCreateForumPost(challenge.id, content, images)
-                                    }
-                                )
+                            if (isCreator) {
+                                item {
+                                    ChallengeModerationCard(
+                                        challenge = challenge,
+                                        isSaving = isSaving,
+                                        onSetClosed = { closed -> onSetChallengeClosed(challenge.id, closed) }
+                                    )
+                                }
                             }
-                        }
-                        if (uiState.selectedForumPosts.isEmpty()) {
-                            item { EmptyState("Nenhuma publicação neste desafio ainda") }
-                        } else {
-                            items(uiState.selectedForumPosts, key = { it.post.id }) { item ->
-                                ChallengeForumPostCard(
-                                    item = item,
-                                    currentUserParticipating = uiState.isParticipating(challenge.id),
-                                    isSaving = isSaving,
-                                    onOpenProfile = { profile -> onOpenProfile(profile) },
-                                    onComment = { entryId, content ->
-                                        onCreateForumComment(challenge.id, entryId, content)
-                                    }
-                                )
+                            item { SectionTitle("Fórum") }
+                            if (uiState.isParticipating(challenge.id)) {
+                                item {
+                                    ChallengeForumComposer(
+                                        isSaving = isSaving,
+                                        onPost = { content, images ->
+                                            onCreateForumPost(challenge.id, content, images)
+                                        }
+                                    )
+                                }
+                            }
+                            if (uiState.selectedForumPosts.isEmpty()) {
+                                item { EmptyState("Nenhuma publicação neste desafio ainda") }
+                            } else {
+                                items(uiState.selectedForumPosts, key = { it.post.id }) { item ->
+                                    ChallengeForumPostCard(
+                                        item = item,
+                                        currentUserParticipating = uiState.isParticipating(challenge.id),
+                                        isCreator = isCreator,
+                                        isSaving = isSaving,
+                                        onOpenProfile = { profile -> onOpenProfile(profile) },
+                                        onDelete = { onDeleteForumPost(challenge.id, item.post.id) },
+                                        onComment = { entryId, content ->
+                                            onCreateForumComment(challenge.id, entryId, content)
+                                        }
+                                    )
+                                }
                             }
                         }
                     }
@@ -266,6 +321,15 @@ private enum class ChallengeTab(val label: String) {
     Ativos("Ativos"),
     Explorar("Explorar"),
     Finalizados("Finalizados")
+}
+
+private enum class ChallengeListFilter(val label: String) {
+    Todos("Todos"),
+    Premium("Apenas Premium"),
+    Caminhada("Caminhada"),
+    Corrida("Corrida"),
+    Ciclismo("Ciclismo"),
+    NaoIniciados("Não iniciados")
 }
 
 private enum class ChallengeDetailTab(val label: String) {
@@ -283,11 +347,10 @@ private fun ChallengeTabs(
         containerColor = Color.White,
         contentColor = TextFieldGreen,
         divider = {},
-        // Adicione o indicator aqui
         indicator = {
             TabRowDefaults.PrimaryIndicator(
                 modifier = Modifier.tabIndicatorOffset(ChallengeTab.entries.indexOf(selectedTab)),
-                color = TextFieldGreen // Coloque a cor que você deseja para o seletor aqui
+                color = TextFieldGreen
             )
         }
     ) {
@@ -312,6 +375,19 @@ private fun ChallengeTabs(
 }
 
 @Composable
+private fun ChallengeFilterBar(
+    selectedFilter: ChallengeListFilter,
+    onFilterSelected: (ChallengeListFilter) -> Unit
+) {
+    ZenithFilterBar(
+        options = ChallengeListFilter.entries.map { ZenithFilterOption(it, it.label) },
+        selectedValue = selectedFilter,
+        onSelected = onFilterSelected,
+        modifier = Modifier.fillMaxWidth()
+    )
+}
+
+@Composable
 private fun ChallengeDetailTabs(
     selectedTab: ChallengeDetailTab,
     onTabSelected: (ChallengeDetailTab) -> Unit
@@ -319,7 +395,14 @@ private fun ChallengeDetailTabs(
     PrimaryTabRow(
         selectedTabIndex = ChallengeDetailTab.entries.indexOf(selectedTab),
         containerColor = Color.White,
-        contentColor = TextFieldGreen
+        contentColor = TextFieldGreen,
+        divider = {},
+        indicator = {
+            TabRowDefaults.PrimaryIndicator(
+                modifier = Modifier.tabIndicatorOffset(ChallengeDetailTab.entries.indexOf(selectedTab)),
+                color = TextFieldGreen
+            )
+        }
     ) {
         ChallengeDetailTab.entries.forEach { tab ->
             Tab(
@@ -342,30 +425,63 @@ private fun ChallengeDetailTabs(
 }
 
 @Composable
-private fun CreateChallengeAction(onCreateClick: () -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.End,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Button(
-            onClick = onCreateClick,
-            colors = ButtonDefaults.buttonColors(containerColor = Green),
-            shape = RoundedCornerShape(8.dp),
-            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp)
+private fun CreateChallengeAction(
+    isPremium: Boolean,
+    onCreateClick: () -> Unit
+) {
+    var showPremiumInfo by remember { mutableStateOf(false) }
+
+    Box {
+        Box(
+            modifier = Modifier.clickable(enabled = !isPremium) {
+                showPremiumInfo = true
+            }
         ) {
-            Icon(
-                Icons.Default.Add,
-                contentDescription = "Criar desafio",
-                modifier = Modifier.size(20.dp)
-            )
-            Spacer(modifier = Modifier.width(6.dp))
-            Text(
-                text = "Criar desafio",
-                style = MaterialTheme.typography.bodyMedium.copy(
-                    fontFamily = Inter,
-                    fontWeight = FontWeight.Bold
+            Button(
+                onClick = onCreateClick,
+                enabled = isPremium,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Green,
+                    disabledContainerColor = Color(0xFFE5E5E5),
+                    disabledContentColor = Color(0xFF8A8A8A)
+                ),
+                shape = RoundedCornerShape(10.dp),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 9.dp)
+            ) {
+                Icon(
+                    Icons.Default.Add,
+                    contentDescription = "Criar desafio",
+                    modifier = Modifier.size(18.dp)
                 )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = "Criar",
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontFamily = Inter,
+                        fontWeight = FontWeight.Bold
+                    )
+                )
+            }
+        }
+        DropdownMenu(
+            expanded = showPremiumInfo,
+            onDismissRequest = { showPremiumInfo = false },
+            modifier = Modifier
+                .width(240.dp)
+                .background(Color.White)
+        ) {
+            DropdownMenuItem(
+                text = {
+                    Text(
+                        text = "Apenas usuários Premium podem criar desafios.",
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            fontFamily = Inter,
+                            fontWeight = FontWeight.Medium,
+                            color = Color(0xFF333333)
+                        )
+                    )
+                },
+                onClick = { showPremiumInfo = false }
             )
         }
     }
@@ -374,15 +490,19 @@ private fun CreateChallengeAction(onCreateClick: () -> Unit) {
 @Composable
 private fun ChallengeHeader(
     challenge: Challenge,
-    isParticipating: Boolean,
-    isSaving: Boolean,
-    onBack: () -> Unit,
-    onJoin: () -> Unit
+    creatorName: String,
+    onBack: () -> Unit
 ) {
-    val finished = challenge.isFinished()
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color.White, RoundedCornerShape(12.dp))
+            .border(1.dp, Color(0xFFE1E8E1), RoundedCornerShape(12.dp))
+    ) {
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 4.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(onClick = onBack) {
@@ -391,19 +511,21 @@ private fun ChallengeHeader(
                     contentDescription = "Voltar"
                 )
             }
-            Column(modifier = Modifier.weight(1f)) {
-                ChallengeActivityLabel(challenge.atividadeDesignada)
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
                 Text(
                     text = challenge.titulo.ifBlank { "Desafio" },
                     style = MaterialTheme.typography.titleLarge.copy(
-                        fontFamily = Inter,
+                        fontFamily = Poppins,
                         fontWeight = FontWeight.Bold
                     ),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    text = "${formatChallengeDate(challenge.inicioEm)} - ${formatChallengeDate(challenge.fimEm)}",
+                    text = creatorName,
                     style = MaterialTheme.typography.bodySmall.copy(
                         fontFamily = Inter,
                         fontWeight = FontWeight.Medium,
@@ -413,26 +535,38 @@ private fun ChallengeHeader(
                     overflow = TextOverflow.Ellipsis
                 )
             }
-            ChallengeBanner(challenge = challenge)
         }
+    }
+}
 
-        if (!isParticipating && !finished) {
-            OutlinedButton(
-                onClick = onJoin,
-                enabled = !isSaving && challenge.id.isNotBlank(),
-                shape = RoundedCornerShape(8.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Entrar no desafio", fontFamily = Inter, color = Green)
-            }
-        } else if (finished) {
-            Text(
-                text = "Desafio finalizado",
-                style = MaterialTheme.typography.bodyMedium.copy(
-                    fontFamily = Inter,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF6F6C6C)
-                )
+@Composable
+private fun ChallengeHeaderBackground(challenge: Challenge) {
+    val bannerModel = challenge.bannerHash?.let { hash ->
+        SupabaseConfig.getClient().storage.from("challenge-banners").publicUrl(hash)
+    }
+
+    if (bannerModel != null) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            AsyncImage(
+                model = bannerModel,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .alpha(0.18f)
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                Color.White.copy(alpha = 0.58f),
+                                Color.White.copy(alpha = 0.90f),
+                                Color.White
+                            )
+                        )
+                    )
             )
         }
     }
@@ -500,58 +634,296 @@ private fun ChallengeRow(
     onJoin: () -> Unit
 ) {
     val finished = challenge.isFinished()
-    Row(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Color(0xFFF8F8F8), RoundedCornerShape(8.dp))
-            .border(1.dp, Color(0xAA515151), RoundedCornerShape(8.dp))
+            .clip(RoundedCornerShape(12.dp))
+            .background(challengeCardBrush(challenge), RoundedCornerShape(12.dp))
+            .border(1.4.dp, challengeAccentColor(challenge), RoundedCornerShape(12.dp))
             .clickable { onOpen() }
-            .padding(14.dp),
-        verticalAlignment = Alignment.Top
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        ChallengeHeroBanner(challenge = challenge)
+
         Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            ChallengeActivityLabel(challenge.atividadeDesignada)
+            ChallengeActivityChip(challenge.atividadeDesignada)
             Text(
                 text = challenge.titulo.ifBlank { "Desafio" },
-                style = MaterialTheme.typography.bodyLarge.copy(
-                    fontFamily = Inter,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color(0xEE515151)
+                style = MaterialTheme.typography.headlineSmall.copy(
+                    fontFamily = Poppins,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF1F1F1F)
                 ),
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
             )
-            ChallengeInfoBlock(
-                challenge = challenge,
-                creatorName = creatorName,
-                participantCount = participantCount
-            )
 
-            if (!isParticipating && !finished) {
-                OutlinedButton(
-                    onClick = onJoin,
-                    enabled = !isSaving && challenge.id.isNotBlank(),
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.padding(top = 2.dp)
-                ) {
-                    Text("Entrar", fontFamily = Inter, color = TextFieldGreen)
+            ChallengeGoalHighlight(challenge = challenge)
+
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ChallengeInfoPill(
+                        icon = Icons.Default.Person,
+                        value = creatorName,
+                        modifier = Modifier.weight(1f)
+                    )
+                    ChallengeInfoPill(
+                        icon = Icons.Default.Groups,
+                        value = "$participantCount participantes",
+                        modifier = Modifier.weight(1f)
+                    )
                 }
-            } else if (finished) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ChallengeInfoPill(
+                        icon = if (challenge.apenasPremium) Icons.Default.Lock else Icons.Default.Public,
+                        value = if (challenge.apenasPremium) "Apenas Premium" else "Casual e Premium",
+                        modifier = Modifier.weight(1f)
+                    )
+                    ChallengeInfoPill(
+                        icon = Icons.Default.Public,
+                        value = challengeVisibilityLabel(challenge),
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                ChallengeDateRangeRow(challenge = challenge)
+            }
+
+            when {
+                !isParticipating && !finished -> {
+                    OutlinedButton(
+                        onClick = onJoin,
+                        enabled = !isSaving && challenge.id.isNotBlank(),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(containerColor = Color.White),
+                        border = BorderStroke(1.2.dp, TextFieldGreen.copy(alpha = 0.68f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Entrar no desafio", fontFamily = Inter, color = TextFieldGreen)
+                    }
+                }
+                finished -> {
+                    Text(
+                        text = "Finalizado",
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontFamily = Inter,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF6F6C6C)
+                        )
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ChallengeHeroBanner(challenge: Challenge) {
+    val bannerModel = challenge.bannerHash?.let { hash ->
+        SupabaseConfig.getClient().storage.from("challenge-banners").publicUrl(hash)
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(168.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(Color(0xFFEAF5EA)),
+        contentAlignment = Alignment.Center
+    ) {
+        if (bannerModel != null) {
+            AsyncImage(
+                model = bannerModel,
+                contentDescription = "Banner do desafio",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+        } else {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    Icons.Default.EmojiEvents,
+                    contentDescription = null,
+                    tint = TextFieldGreen,
+                    modifier = Modifier.size(42.dp)
+                )
                 Text(
-                    text = "Finalizado",
-                    style = MaterialTheme.typography.bodySmall.copy(
+                    text = "Desafio Zenith",
+                    style = MaterialTheme.typography.titleMedium.copy(
                         fontFamily = Inter,
                         fontWeight = FontWeight.Bold,
-                        color = Color(0xFF6F6C6C)
+                        color = TextFieldGreen
                     )
                 )
             }
         }
-        Spacer(modifier = Modifier.width(12.dp))
-        ChallengeBanner(challenge = challenge)
+    }
+}
+
+@Composable
+private fun ChallengeGoalHighlight(challenge: Challenge) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color(0xFFF1F8F1), RoundedCornerShape(10.dp))
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = Icons.Default.EmojiEvents,
+            contentDescription = null,
+            tint = TextFieldGreen,
+            modifier = Modifier.size(22.dp)
+        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = "Meta do desafio",
+                style = MaterialTheme.typography.bodySmall.copy(
+                    fontFamily = Inter,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFF5F765F)
+                )
+            )
+            Text(
+                text = challengeGoalLabel(challenge),
+                style = MaterialTheme.typography.bodyLarge.copy(
+                    fontFamily = Inter,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF1F1F1F)
+                ),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+@Composable
+private fun ChallengeInfoPill(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    value: String,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .heightIn(min = 34.dp)
+            .background(Color(0xFFF7F9F7), RoundedCornerShape(8.dp))
+            .padding(horizontal = 10.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = TextFieldGreen,
+            modifier = Modifier.size(15.dp)
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodySmall.copy(
+                fontFamily = Inter,
+                fontWeight = FontWeight.Medium,
+                color = Color(0xFF4E4E4E)
+            ),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+@Composable
+private fun ChallengeActivityChip(activity: String) {
+    Row(
+        modifier = Modifier
+            .background(Color(0xFFEAF5EA), RoundedCornerShape(999.dp))
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = challengeActivityIcon(activity),
+            contentDescription = null,
+            tint = TextFieldGreen,
+            modifier = Modifier.size(18.dp)
+        )
+        Text(
+            text = challengeActivityName(activity),
+            style = MaterialTheme.typography.bodySmall.copy(
+                fontFamily = Inter,
+                fontWeight = FontWeight.Bold,
+                color = TextFieldGreen
+            )
+        )
+    }
+}
+
+private fun challengeAccentColor(challenge: Challenge): Color {
+    return when (challenge.atividadeDesignada.lowercase(Locale.ROOT)) {
+        "corrida" -> Color(0xFF2F8C5A)
+        "ciclismo" -> Color(0xFF2F7C9B)
+        else -> Color(0xFF238D25)
+    }
+}
+
+private fun challengeCardBrush(challenge: Challenge): Brush {
+    val accent = challengeAccentColor(challenge)
+    return Brush.verticalGradient(
+        colors = listOf(
+            Color.White,
+            accent.copy(alpha = 0.16f)
+        )
+    )
+}
+
+@Composable
+private fun ChallengeDateRangeRow(
+    challenge: Challenge,
+    compact: Boolean = false
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = if (compact) 34.dp else 42.dp)
+            .background(Color.White.copy(alpha = 0.72f), RoundedCornerShape(8.dp))
+            .border(1.dp, Color(0xFFE0E8E0), RoundedCornerShape(8.dp))
+            .padding(horizontal = 10.dp, vertical = if (compact) 6.dp else 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = Icons.Default.CalendarMonth,
+            contentDescription = null,
+            tint = TextFieldGreen,
+            modifier = Modifier.size(17.dp)
+        )
+        Text(
+            text = "Início ${formatChallengeDate(challenge.inicioEm)}",
+            style = MaterialTheme.typography.bodySmall.copy(
+                fontFamily = Inter,
+                fontWeight = FontWeight.Medium,
+                color = Color(0xFF4E4E4E)
+            ),
+            modifier = Modifier.weight(1f),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        Text(
+            text = "Fim ${formatChallengeDate(challenge.fimEm)}",
+            style = MaterialTheme.typography.bodySmall.copy(
+                fontFamily = Inter,
+                fontWeight = FontWeight.Medium,
+                color = Color(0xFF4E4E4E)
+            ),
+            modifier = Modifier.weight(1f),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
 
@@ -577,6 +949,7 @@ private fun ChallengeActivityLabel(activity: String) {
         )
     }
 }
+
 
 @Composable
 private fun ChallengeInfoBlock(
@@ -640,35 +1013,102 @@ private fun ChallengeMetadataIcon(icon: androidx.compose.ui.graphics.vector.Imag
 }
 
 @Composable
+private fun ChallengeModerationCard(
+    challenge: Challenge,
+    isSaving: Boolean,
+    onSetClosed: (Boolean) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color(0xFFF8F8F8), RoundedCornerShape(8.dp))
+            .border(1.dp, Color(0xFFE1E7DD), RoundedCornerShape(8.dp))
+            .padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Text(
+            text = "Moderação",
+            style = MaterialTheme.typography.titleMedium.copy(
+                fontFamily = Inter,
+                fontWeight = FontWeight.W800,
+                color = Color(0xFF111111)
+            )
+        )
+        Text(
+            text = if (challenge.inscricoesFechadas) {
+                "Novos participantes não podem entrar neste desafio."
+            } else {
+                "Novos participantes ainda podem entrar neste desafio."
+            },
+            style = MaterialTheme.typography.bodySmall.copy(
+                fontFamily = Inter,
+                color = Color(0xFF667066)
+            )
+        )
+        OutlinedButton(
+            onClick = { onSetClosed(!challenge.inscricoesFechadas) },
+            enabled = !isSaving,
+            shape = RoundedCornerShape(10.dp),
+            colors = ButtonDefaults.outlinedButtonColors(containerColor = Color.White),
+            border = BorderStroke(1.dp, Color(0xFF238D25).copy(alpha = 0.45f))
+        ) {
+            Text(
+                text = if (challenge.inscricoesFechadas) "Reabrir inscrições" else "Fechar inscrições",
+                fontFamily = Inter,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF238D25)
+            )
+        }
+    }
+}
+
+@Composable
 private fun ChallengeInformation(
     challenge: Challenge,
     creatorName: String,
     participantCount: Int
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        ChallengeBannerLarge(challenge = challenge)
+    ChallengeInformationCardBackground(challenge = challenge) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(Color(0xFFF8F8F8), RoundedCornerShape(8.dp))
-                .border(1.dp, Color(0xAA515151), RoundedCornerShape(8.dp))
-                .padding(14.dp),
+                .padding(top = 112.dp, start = 14.dp, end = 14.dp, bottom = 14.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            ChallengeActivityLabel(challenge.atividadeDesignada)
+            ChallengeActivityChip(challenge.atividadeDesignada)
             Text(
                 text = challenge.titulo.ifBlank { "Desafio" },
-                style = MaterialTheme.typography.titleLarge.copy(
-                    fontFamily = Inter,
+                style = MaterialTheme.typography.headlineSmall.copy(
+                    fontFamily = Poppins,
                     fontWeight = FontWeight.Bold,
                     color = Color(0xEE1F1F1F)
                 )
             )
-            ChallengeInfoBlock(
-                challenge = challenge,
-                creatorName = creatorName,
-                participantCount = participantCount
-            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ChallengeInfoPill(
+                    icon = Icons.Default.Person,
+                    value = creatorName,
+                    modifier = Modifier.weight(1f)
+                )
+                ChallengeInfoPill(
+                    icon = Icons.Default.Groups,
+                    value = "$participantCount participantes",
+                    modifier = Modifier.weight(1f)
+                )
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ChallengeInfoPill(
+                    icon = if (challenge.apenasPremium) Icons.Default.Lock else Icons.Default.Public,
+                    value = if (challenge.apenasPremium) "Apenas Premium" else "Casual e Premium",
+                    modifier = Modifier.weight(1f)
+                )
+                ChallengeInfoPill(
+                    icon = Icons.Default.Public,
+                    value = challengeVisibilityLabel(challenge),
+                    modifier = Modifier.weight(1f)
+                )
+            }
+            ChallengeDateRangeRow(challenge = challenge)
             ChallengeMetadataIcon(
                 icon = Icons.Default.EmojiEvents,
                 value = challengeGoalLabel(challenge)
@@ -687,6 +1127,79 @@ private fun ChallengeInformation(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun ChallengeInformationCardBackground(
+    challenge: Challenge,
+    content: @Composable () -> Unit
+) {
+    val bannerModel = challenge.bannerHash?.let { hash ->
+        SupabaseConfig.getClient().storage.from("challenge-banners").publicUrl(hash)
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(challengeCardBrush(challenge), RoundedCornerShape(12.dp))
+            .border(1.4.dp, challengeAccentColor(challenge), RoundedCornerShape(12.dp))
+    ) {
+        if (bannerModel != null) {
+            AsyncImage(
+                model = bannerModel,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(180.dp)
+                    .align(Alignment.TopCenter)
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(190.dp)
+                    .align(Alignment.TopCenter)
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                Color.White.copy(alpha = 0.08f),
+                                Color.White.copy(alpha = 0.45f),
+                                Color.White.copy(alpha = 0.88f),
+                                Color.White
+                            )
+                        )
+                    )
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(132.dp)
+                    .align(Alignment.TopCenter)
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                Color(0xFFEAF5EA),
+                                Color.White.copy(alpha = 0.92f),
+                                Color.White
+                            )
+                        )
+                    ),
+                contentAlignment = Alignment.TopCenter
+            ) {
+                Icon(
+                    Icons.Default.EmojiEvents,
+                    contentDescription = null,
+                    tint = TextFieldGreen,
+                    modifier = Modifier
+                        .padding(top = 24.dp)
+                        .size(42.dp)
+                )
+            }
+        }
+        content()
     }
 }
 
@@ -738,8 +1251,8 @@ private fun ChallengeForumComposer(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Color(0xFFF8F8F8), RoundedCornerShape(8.dp))
-            .border(1.dp, Color(0xFFE6E6E6), RoundedCornerShape(8.dp))
+            .background(Color(0xFFF8F8F8), RoundedCornerShape(10.dp))
+            .border(1.dp, Color(0xFFE0E8E0), RoundedCornerShape(10.dp))
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
@@ -760,7 +1273,7 @@ private fun ChallengeForumComposer(
                         contentScale = ContentScale.Crop,
                         modifier = Modifier
                             .size(72.dp)
-                            .clip(RoundedCornerShape(8.dp))
+                            .clip(RoundedCornerShape(10.dp))
                     )
                 }
             }
@@ -772,7 +1285,9 @@ private fun ChallengeForumComposer(
             OutlinedButton(
                 onClick = { imageLauncher.launch("image/*") },
                 enabled = !isSaving,
-                shape = RoundedCornerShape(8.dp)
+                shape = RoundedCornerShape(10.dp),
+                colors = ButtonDefaults.outlinedButtonColors(containerColor = Color.White),
+                border = BorderStroke(1.2.dp, TextFieldGreen.copy(alpha = 0.62f))
             ) {
                 Icon(Icons.Default.AddAPhoto, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(modifier = Modifier.width(6.dp))
@@ -786,7 +1301,7 @@ private fun ChallengeForumComposer(
                 },
                 enabled = canPost,
                 colors = ButtonDefaults.buttonColors(containerColor = TextFieldGreen),
-                shape = RoundedCornerShape(8.dp)
+                shape = RoundedCornerShape(10.dp)
             ) {
                 Text("Publicar", fontFamily = Inter, color = Color.White)
             }
@@ -798,8 +1313,10 @@ private fun ChallengeForumComposer(
 private fun ChallengeForumPostCard(
     item: ChallengeForumItem,
     currentUserParticipating: Boolean,
+    isCreator: Boolean,
     isSaving: Boolean,
     onOpenProfile: (Profile) -> Unit,
+    onDelete: () -> Unit,
     onComment: (String, String) -> Unit
 ) {
     var commentText by remember(item.post.id) { mutableStateOf("") }
@@ -835,6 +1352,19 @@ private fun ChallengeForumPostCard(
                         color = Color(0xFF6F6C6C)
                     )
                 )
+            }
+            if (isCreator) {
+                TextButton(
+                    onClick = onDelete,
+                    enabled = !isSaving
+                ) {
+                    Text(
+                        text = "Apagar",
+                        fontFamily = Inter,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFFE14949)
+                    )
+                }
             }
         }
         item.post.content?.takeIf { it.isNotBlank() }?.let {
@@ -907,7 +1437,7 @@ private fun ChallengeForumPostCard(
                     },
                     enabled = !isSaving && commentText.isNotBlank(),
                     colors = ButtonDefaults.buttonColors(containerColor = TextFieldGreen),
-                    shape = RoundedCornerShape(8.dp)
+                    shape = RoundedCornerShape(10.dp)
                 ) {
                     Text("Enviar", fontFamily = Inter, color = Color.White)
                 }
@@ -928,11 +1458,31 @@ private fun challengeActivityName(activity: String) = when (activity.lowercase(L
     else -> "Caminhada"
 }
 
+private fun Challenge.matchesFilter(filter: ChallengeListFilter): Boolean {
+    return when (filter) {
+        ChallengeListFilter.Todos -> true
+        ChallengeListFilter.Premium -> apenasPremium
+        ChallengeListFilter.Caminhada -> atividadeDesignada.equals("caminhada", ignoreCase = true)
+        ChallengeListFilter.Corrida -> atividadeDesignada.equals("corrida", ignoreCase = true)
+        ChallengeListFilter.Ciclismo -> atividadeDesignada.equals("ciclismo", ignoreCase = true)
+        ChallengeListFilter.NaoIniciados -> inicioEm
+            ?.let { runCatching { OffsetDateTime.parse(it).isAfter(OffsetDateTime.now()) }.getOrDefault(false) }
+            ?: false
+    }
+}
+
 private fun profileUsername(profile: Profile?): String {
     return profile?.name
         ?.takeIf { it.isNotBlank() }
         ?.let { "@$it" }
         ?: "@usuario"
+}
+
+private fun profileDisplayName(profile: Profile?): String {
+    return profile?.displayName
+        ?.takeIf { it.isNotBlank() }
+        ?: profile?.name?.takeIf { it.isNotBlank() }
+        ?: "Usuário"
 }
 
 private fun challengeVisibilityLabel(challenge: Challenge): String {
@@ -1034,8 +1584,8 @@ private fun ChallengeDetailsRow(
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = 66.dp)
-            .background(if (isCurrentUser) Color(0xFFFFFBED) else Color.White, RoundedCornerShape(5.dp))
-            .border(1.dp, if (isCurrentUser) Color(0xFF9A894C) else Color(0xFF3E3E3E), RoundedCornerShape(5.dp))
+            .background(if (isCurrentUser) Color(0xFFFFFBED) else Color.White, RoundedCornerShape(8.dp))
+            .border(1.dp, if (isCurrentUser) Color(0xFFE2D194) else Color(0xFFE1E8E1), RoundedCornerShape(8.dp))
             .clickable { onClick() }
             .padding(horizontal = 14.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -1050,7 +1600,7 @@ private fun ChallengeDetailsRow(
         Spacer(modifier = Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = if (isCurrentUser) "${profileUsername(entry.profile)} (voc\u00ea)" else profileUsername(entry.profile),
+                text = if (isCurrentUser) "${profileDisplayName(entry.profile)} (voc\u00ea)" else profileDisplayName(entry.profile),
                 style = MaterialTheme.typography.bodyLarge.copy(fontFamily = Inter, fontWeight = FontWeight.SemiBold),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -1267,7 +1817,9 @@ private fun ChallengeSelectionDropdown(
     Box {
         OutlinedButton(
             onClick = { expanded = true },
-            shape = RoundedCornerShape(8.dp)
+            shape = RoundedCornerShape(10.dp),
+            colors = ButtonDefaults.outlinedButtonColors(containerColor = Color.White),
+            border = BorderStroke(1.2.dp, TextFieldGreen.copy(alpha = 0.62f))
         ) {
             Text("$label: $selectedLabel", fontFamily = Inter, color = TextFieldGreen)
         }
@@ -1301,7 +1853,9 @@ private fun ChallengeBooleanDropdown(
     Box {
         OutlinedButton(
             onClick = { expanded = true },
-            shape = RoundedCornerShape(8.dp)
+            shape = RoundedCornerShape(10.dp),
+            colors = ButtonDefaults.outlinedButtonColors(containerColor = Color.White),
+            border = BorderStroke(1.2.dp, TextFieldGreen.copy(alpha = 0.62f))
         ) {
             Text("$label: $selectedLabel", fontFamily = Inter, color = TextFieldGreen)
         }

@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -305,26 +306,31 @@ private fun StepChallengeGoal(
         SelectButton("Meta livre", goalMode == "livre") { onGoalModeChange("livre") }
         Spacer(modifier = Modifier.height(10.dp))
         if (goalMode == "fixa") {
-            SelectButton(
-                "Tempo: distância alvo, menor tempo vence",
-                rankingType == "menor_tempo"
+            SelectOptionCard(
+                title = "Tempo",
+                subtitle = "Defina uma distância alvo. Vence quem completar em menor tempo.",
+                selected = rankingType == "menor_tempo"
             ) { onRankingTypeChange("menor_tempo") }
-            SelectButton(
-                "Distância: tempo alvo, maior distância vence",
-                rankingType == "maior_distancia"
+            SelectOptionCard(
+                title = "Distância",
+                subtitle = "Defina um tempo alvo. Vence quem fizer a maior distância.",
+                selected = rankingType == "maior_distancia"
             ) { onRankingTypeChange("maior_distancia") }
-            SelectButton(
-                "Pace: distância alvo, menor pace vence",
-                rankingType == "menor_pace"
+            SelectOptionCard(
+                title = "Pace",
+                subtitle = "Defina uma distância alvo. Vence quem tiver o menor pace.",
+                selected = rankingType == "menor_pace"
             ) { onRankingTypeChange("menor_pace") }
         } else {
-            SelectButton(
-                "Tempo total: soma duração das atividades",
-                rankingType == "tempo_total"
+            SelectOptionCard(
+                title = "Tempo total",
+                subtitle = "Soma a duração de todas as atividades do participante.",
+                selected = rankingType == "tempo_total"
             ) { onRankingTypeChange("tempo_total") }
-            SelectButton(
-                "Distância total: soma distância das atividades",
-                rankingType == "distancia_total"
+            SelectOptionCard(
+                title = "Distância total",
+                subtitle = "Soma a distância de todas as atividades do participante.",
+                selected = rankingType == "distancia_total"
             ) { onRankingTypeChange("distancia_total") }
         }
         if (goalMode == "fixa") {
@@ -569,17 +575,65 @@ private fun StepChallengeBannerAndRules(
 private fun SelectButton(label: String, selected: Boolean, onClick: () -> Unit) {
     Button(
         onClick = onClick,
-        shape = RoundedCornerShape(11.dp),
+        shape = RoundedCornerShape(10.dp),
         colors = ButtonDefaults.buttonColors(
-            containerColor = if (selected) Color(0xFF238D25) else Color.Transparent,
-            contentColor = if (selected) White else Black
+            containerColor = if (selected) Color(0xFFEAF3DE) else Color(0xFFF5F5F5),
+            contentColor = if (selected) Color(0xFF238D25) else Color(0xFF1A1A1A)
         ),
-        border = BorderStroke(1.dp, if (selected) Color(0xFF238D25) else Black),
+        border = BorderStroke(1.dp, if (selected) Color(0xFF238D25) else Color(0xFFE0E0E0)),
         modifier = Modifier
             .fillMaxWidth()
-            .height(50.dp)
+            .heightIn(min = 52.dp),
+        contentPadding = ButtonDefaults.ContentPadding
     ) {
-        Text(text = label)
+        Text(
+            text = label,
+            fontFamily = Inter,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold,
+            textAlign = TextAlign.Center
+        )
+    }
+}
+
+@Composable
+private fun SelectOptionCard(
+    title: String,
+    subtitle: String,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(
+                if (selected) Color(0xFFEAF3DE) else Color(0xFFF5F5F5),
+                RoundedCornerShape(10.dp)
+            )
+            .border(
+                width = if (selected) 1.5.dp else 1.dp,
+                color = if (selected) Color(0xFF238D25) else Color(0xFFE0E0E0),
+                shape = RoundedCornerShape(10.dp)
+            )
+            .clickable { onClick() }
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(3.dp)
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleMedium.copy(
+                fontFamily = Inter,
+                fontWeight = FontWeight.W800,
+                color = if (selected) Color(0xFF238D25) else Color(0xFF1A1A1A)
+            )
+        )
+        Text(
+            text = subtitle,
+            style = MaterialTheme.typography.bodySmall.copy(
+                fontFamily = Inter,
+                fontWeight = FontWeight.Medium,
+                color = Color(0xFF667066)
+            )
+        )
     }
 }
 
@@ -654,9 +708,19 @@ private fun CreateChallengeScaffold(
                     .weight(0.36f)
                     .height(52.dp),
                 shape = RoundedCornerShape(10.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEDEDED))
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color.White,
+                    contentColor = Black
+                ),
+                border = BorderStroke(1.dp, Color(0xFFE0E0E0))
             ) {
-                Text("Voltar", color = Color.Black, textAlign = TextAlign.Center)
+                Text(
+                    "Voltar",
+                    color = Black,
+                    fontFamily = Inter,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center
+                )
             }
             Button(
                 onClick = onNext,
@@ -665,7 +729,11 @@ private fun CreateChallengeScaffold(
                     .weight(0.64f)
                     .height(52.dp),
                 shape = RoundedCornerShape(10.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF238D25))
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFF238D25),
+                    disabledContainerColor = Color(0xFFC7D8C7)
+                ),
+                border = BorderStroke(1.dp, Color(0xFF238D25))
             ) {
                 bottomContent?.invoke() ?: Text(
                     text = nextLabel,

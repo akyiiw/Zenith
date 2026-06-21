@@ -18,6 +18,8 @@ import br.com.zenith.data.models.UsuarioTitulo
 import br.com.zenith.data.models.UsuarioMedalha
 import br.com.zenith.data.models.UserBadgeEntitlement
 import br.com.zenith.ui.notifications.ZenithNotifier
+import coil.annotation.ExperimentalCoilApi
+import coil.imageLoader
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Columns
@@ -70,6 +72,7 @@ class UserViewModel : ViewModel() {
     private val _titulosDisponiveis = MutableStateFlow<List<Titulo>>(emptyList())
     val titulosDisponiveis: StateFlow<List<Titulo>> = _titulosDisponiveis.asStateFlow()
 
+    @OptIn(ExperimentalCoilApi::class)
     fun atualizarPerfil(
         name: String,
         displayName: String,
@@ -79,8 +82,10 @@ class UserViewModel : ViewModel() {
         bannerBlurRadius: Int,
         pictureFocusX: Float,
         pictureFocusY: Float,
+        pictureZoom: Float,
         bannerFocusX: Float,
         bannerFocusY: Float,
+        bannerZoom: Float,
         context: Context,
         onSucesso: () -> Unit
     ) {
@@ -104,15 +109,17 @@ class UserViewModel : ViewModel() {
                         }
                 }
 
+                val uploadVersion = System.currentTimeMillis()
                 val pictureHash = pictureUri?.let { uri ->
                     uploadProfileImage(
                         context = context,
                         uri = uri,
-                        path = "avatars/$userId.jpg",
+                        path = "avatars/$userId-$uploadVersion.jpg",
                         maxDimension = 400,
                         aspectRatio = 1f,
                         focusX = pictureFocusX,
-                        focusY = pictureFocusY
+                        focusY = pictureFocusY,
+                        zoom = pictureZoom
                     )
                 }
 
@@ -120,11 +127,12 @@ class UserViewModel : ViewModel() {
                     uploadProfileImage(
                         context = context,
                         uri = uri,
-                        path = "banners/$userId.jpg",
+                        path = "banners/$userId-$uploadVersion.jpg",
                         maxDimension = 1440,
                         aspectRatio = PROFILE_BANNER_ASPECT_RATIO,
                         focusX = bannerFocusX,
-                        focusY = bannerFocusY
+                        focusY = bannerFocusY,
+                        zoom = bannerZoom
                     )
                 }
 
@@ -152,12 +160,27 @@ class UserViewModel : ViewModel() {
                     bannerBlurRadius = bannerBlurRadius.coerceIn(0, 24)
                 )
 
+                deleteProfileImageIfReplaced(currentProfile?.pictureHash, pictureHash)
+                deleteProfileImageIfReplaced(currentProfile?.bannerHash, bannerHash)
+
+                if (pictureHash != null || bannerHash != null) {
+                    context.imageLoader.memoryCache?.clear()
+                    context.imageLoader.diskCache?.clear()
+                }
+
                 onSucesso()
             } catch (e: Exception) {
                 ZenithNotifier.error("Erro ao salvar: ${e.localizedMessage}")
             } finally {
                 _isSaving.value = false
             }
+        }
+    }
+
+    private suspend fun deleteProfileImageIfReplaced(oldPath: String?, newPath: String?) {
+        if (oldPath.isNullOrBlank() || newPath.isNullOrBlank() || oldPath == newPath) return
+        runCatching {
+            SupabaseConfig.getClient().storage.from("profiles").delete(oldPath)
         }
     }
 
@@ -225,7 +248,8 @@ class UserViewModel : ViewModel() {
         maxDimension: Int,
         aspectRatio: Float,
         focusX: Float,
-        focusY: Float
+        focusY: Float,
+        zoom: Float
     ): String {
         val originalFile = copyUriToCacheFile(context, uri)
         val compressedFile = ImageUtils.recortarEComprimirImagem(
@@ -234,7 +258,8 @@ class UserViewModel : ViewModel() {
             maxDimensao = maxDimension,
             aspectRatio = aspectRatio,
             focusX = focusX,
-            focusY = focusY
+            focusY = focusY,
+            zoom = zoom
         )
         val bytes = compressedFile.readBytes()
 

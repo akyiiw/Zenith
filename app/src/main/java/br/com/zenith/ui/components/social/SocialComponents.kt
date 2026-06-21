@@ -1,6 +1,7 @@
 package br.com.zenith.ui.components.social
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -176,7 +177,7 @@ private fun SocialFriendshipAction(
                 onClick = onSendInvite,
                 enabled = !isSaving,
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF238D25)),
-                shape = RoundedCornerShape(8.dp)
+                shape = RoundedCornerShape(10.dp)
             ) {
                 Icon(Icons.Default.PersonAdd, contentDescription = null, modifier = Modifier.size(18.dp))
             }
@@ -205,7 +206,9 @@ private fun SocialFriendshipAction(
             OutlinedButton(
                 onClick = onRemove,
                 enabled = !isSaving,
-                shape = RoundedCornerShape(8.dp)
+                shape = RoundedCornerShape(10.dp),
+                colors = ButtonDefaults.outlinedButtonColors(containerColor = Color.White),
+                border = BorderStroke(1.2.dp, Color(0xFF238D25).copy(alpha = 0.62f))
             ) {
                 Text("Amigos", fontFamily = Inter, color = Color(0xFF238D25))
             }

@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -82,6 +83,7 @@ private fun BadgeSelectContent(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.White)
+            .statusBarsPadding()
     ) {
         Row(
             modifier = Modifier
@@ -113,7 +115,7 @@ private fun BadgeSelectContent(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(top = 72.dp),
-                contentPadding = PaddingValues(start = 24.dp, top = 16.dp, end = 24.dp, bottom = BottomNavListPadding),
+                contentPadding = PaddingValues(start = 24.dp, top = 8.dp, end = 24.dp, bottom = BottomNavListPadding),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 if (badges.isEmpty()) {

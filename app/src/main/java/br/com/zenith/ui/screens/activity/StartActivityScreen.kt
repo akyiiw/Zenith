@@ -1,5 +1,8 @@
 package br.com.zenith.ui.screens.activity
 
+import android.app.Activity
+import android.content.Context
+import android.content.IntentSender
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
 import androidx.compose.animation.AnimatedVisibility
@@ -29,10 +32,17 @@ import br.com.zenith.data.TrackingResultHolder
 import br.com.zenith.data.models.Desafio
 import br.com.zenith.service.ActivityTrackingService
 import br.com.zenith.service.TrackingStatus
+import br.com.zenith.ui.components.common.ZenithSheetDragHandle
 import br.com.zenith.ui.theme.Inter
 import br.com.zenith.ui.theme.ZenithTheme
+import br.com.zenith.utils.UnitFormatters
 import br.com.zenith.viewmodels.activity.ActiveActivityViewModel
 import br.com.zenith.viewmodels.challenge.ChallengeViewModel
+import com.google.android.gms.common.api.ResolvableApiException
+import com.google.android.gms.location.LocationRequest
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.LocationSettingsRequest
+import com.google.android.gms.location.Priority
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
@@ -62,6 +72,7 @@ fun StartActivityScreen(
         val challengeState by challengeViewModel.uiState.collectAsState()
         val challenge = challengeState.challenges.firstOrNull { it.id == desafioId }
         var started by remember { mutableStateOf(false) }
+        var locationSettingsChecked by remember { mutableStateOf(false) }
 
         // Permissões necessárias
         val permissions = rememberMultiplePermissionsState(
@@ -84,6 +95,10 @@ fun StartActivityScreen(
         LaunchedEffect(permissions.allPermissionsGranted, challenge?.id, status) {
             val challengeReady = desafioId.isNullOrBlank() || challenge != null
             if (permissions.allPermissionsGranted && status == TrackingStatus.IDLE && !started && challengeReady) {
+                if (!locationSettingsChecked) {
+                    locationSettingsChecked = true
+                    requestHighAccuracyLocationSettings(context)
+                }
                 started = true
                 viewModel.bindAndStart(
                     context = context,
@@ -101,7 +116,7 @@ fun StartActivityScreen(
                 val duracaoMin = (result.duracaoSeconds / 60).coerceAtLeast(1)
                 val nome = URLEncoder.encode(exercicioNome, "UTF-8")
                 val unidade = URLEncoder.encode(exercicioUnidade, "UTF-8")
-                val submitChallengeId = desafioId?.takeIf { result.gpsQuality != "ruim" }
+                val submitChallengeId = desafioId
                 val route = if (submitChallengeId.isNullOrBlank()) {
                     "register_activity/$exercicioId/$nome/$unidade/$duracaoMin/true"
                 } else {
@@ -208,7 +223,8 @@ fun StartActivityContent(
         ModalBottomSheet(
             onDismissRequest = { showStopDialog = false },
             containerColor = Color.White,
-            scrimColor = Color.Transparent
+            scrimColor = Color.Transparent,
+            dragHandle = { ZenithSheetDragHandle() }
         ) {
             Column(
                 modifier = Modifier
@@ -336,7 +352,7 @@ fun StartActivityContent(
             ) {
                 StatItem(
                     label = "Distância",
-                    value = "%.2f km".format(distanceMeters / 1000f)
+                    value = UnitFormatters.kilometersWithSpace(distanceMeters / 1000.0)
                 )
                 StatItem(
                     label = "Passos",
@@ -440,3 +456,29 @@ private fun inferExerciseKind(name: String): String {
         else -> "corrida"
     }
 }
+
+private fun requestHighAccuracyLocationSettings(context: Context) {
+    val activity = context as? Activity ?: return
+    val locationRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 2000L)
+        .setMinUpdateIntervalMillis(1000L)
+        .setMaxUpdateDelayMillis(0L)
+        .setMinUpdateDistanceMeters(2f)
+        .setWaitForAccurateLocation(false)
+        .build()
+    val settingsRequest = LocationSettingsRequest.Builder()
+        .addLocationRequest(locationRequest)
+        .setAlwaysShow(true)
+        .build()
+
+    LocationServices.getSettingsClient(activity)
+        .checkLocationSettings(settingsRequest)
+        .addOnFailureListener { exception ->
+            val resolvable = exception as? ResolvableApiException ?: return@addOnFailureListener
+            try {
+                resolvable.startResolutionForResult(activity, LOCATION_SETTINGS_REQUEST_CODE)
+            } catch (_: IntentSender.SendIntentException) {
+            }
+        }
+}
+
+private const val LOCATION_SETTINGS_REQUEST_CODE = 4401

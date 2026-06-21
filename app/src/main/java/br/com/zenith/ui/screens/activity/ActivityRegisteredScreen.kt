@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import br.com.zenith.ui.theme.Inter
 import br.com.zenith.ui.theme.ZenithTheme
+import br.com.zenith.utils.UnitFormatters
 
 @Composable
 fun ActivityRegisteredScreen(
@@ -42,6 +43,8 @@ fun ActivityRegisteredScreen(
     duracaoMin: Int,
     verificada: Boolean
 ) {
+    val displayValue = formatActivityRegisteredValue(valor)
+
     ZenithTheme {
         Box(
             modifier = Modifier
@@ -106,7 +109,7 @@ fun ActivityRegisteredScreen(
                         )
                     )
                     Text(
-                        text = "$valor $unidade",
+                        text = "$displayValue $unidade",
                         style = MaterialTheme.typography.displaySmall.copy(
                             fontFamily = Inter,
                             fontWeight = FontWeight.Bold,
@@ -147,6 +150,11 @@ fun ActivityRegisteredScreen(
             }
         }
     }
+}
+
+private fun formatActivityRegisteredValue(value: String): String {
+    val normalized = value.replace(",", ".")
+    return normalized.toDoubleOrNull()?.let { UnitFormatters.compactNumber(it) } ?: value
 }
 
 @Composable

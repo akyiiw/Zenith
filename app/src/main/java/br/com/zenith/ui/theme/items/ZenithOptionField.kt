@@ -25,6 +25,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -49,6 +50,7 @@ fun ZenithOptionField(
     val density = LocalDensity.current
     val selectedLabel = options.firstOrNull { it.first == selectedValue }?.second ?: placeholder
     val green = Color(0xFF238D25)
+    val shape = RoundedCornerShape(10.dp)
 
     Box(modifier = modifier) {
         Row(
@@ -56,8 +58,9 @@ fun ZenithOptionField(
                 .fillMaxWidth()
                 .heightIn(min = 54.dp)
                 .onGloballyPositioned { fieldSize = it.size.let { size -> Size(size.width.toFloat(), size.height.toFloat()) } }
-                .background(Color.White, RoundedCornerShape(8.dp))
-                .border(1.5.dp, green, RoundedCornerShape(8.dp))
+                .clip(shape)
+                .background(Color.White, shape)
+                .border(1.5.dp, green, shape)
                 .clickable { expanded = !expanded }
                 .padding(horizontal = 14.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -87,8 +90,8 @@ fun ZenithOptionField(
                 Column(
                     modifier = Modifier
                         .width(with(density) { fieldSize.width.toDp() })
-                        .background(Color.White, RoundedCornerShape(8.dp))
-                        .border(1.dp, green.copy(alpha = 0.45f), RoundedCornerShape(8.dp))
+                        .background(Color.White, RoundedCornerShape(10.dp))
+                        .border(1.dp, green.copy(alpha = 0.45f), RoundedCornerShape(10.dp))
                         .padding(vertical = 6.dp)
                 ) {
                     ZenithOptionItem(

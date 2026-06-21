@@ -22,10 +22,13 @@ import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Columns
 import io.github.jan.supabase.postgrest.query.Count
+import java.time.OffsetDateTime
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
@@ -248,9 +251,13 @@ class SocialViewModel : ViewModel() {
 
     private suspend fun aceitarConviteInterno(currentUserId: String, profileId: String) {
         val client = SupabaseConfig.getClient()
+        val acceptedAt = OffsetDateTime.now().toString()
 
         client.postgrest.from("amizades").update(
-            buildJsonObject { put("status", SocialUiState.STATUS_ACEITO) }
+            buildJsonObject {
+                put("status", SocialUiState.STATUS_ACEITO)
+                put("accepted_at", acceptedAt)
+            }
         ) {
             filter {
                 eq("user_id", profileId)
@@ -266,7 +273,8 @@ class SocialViewModel : ViewModel() {
                 AmizadeInsert(
                     userId = currentUserId,
                     friendId = profileId,
-                    status = SocialUiState.STATUS_ACEITO
+                    status = SocialUiState.STATUS_ACEITO,
+                    acceptedAt = acceptedAt
                 )
             )
         }
@@ -295,10 +303,30 @@ data class PublicProfileUiState(
     val stats: br.com.zenith.viewmodels.profile.UserStats = br.com.zenith.viewmodels.profile.UserStats(),
     val challengeAwards: ChallengeAwardSummary = ChallengeAwardSummary(),
     val atividades: List<Atividade> = emptyList(),
+    val friends: List<ProfileFriendItem> = emptyList(),
+    val friendshipLabel: String? = null,
     val activityGroups: List<ActivityGroup> = emptyList(),
     val activityGroupItems: List<ActivityGroupItem> = emptyList(),
     val acceptedMentionsByActivityId: Map<String, List<Profile>> = emptyMap(),
     val canViewActivities: Boolean = true
+)
+
+data class ProfileFriendItem(
+    val profile: Profile,
+    val acceptedAt: String?
+)
+
+@Serializable
+private data class ProfileFriendCount(
+    @SerialName("profile_id") val profileId: String,
+    @SerialName("friend_count") val friendCount: Int = 0
+)
+
+@Serializable
+private data class ProfileFriendLink(
+    @SerialName("profile_id") val profileId: String,
+    @SerialName("friend_id") val friendId: String,
+    @SerialName("accepted_at") val acceptedAt: String? = null
 )
 
 class PublicProfileViewModel : ViewModel() {
@@ -360,6 +388,21 @@ class PublicProfileViewModel : ViewModel() {
                     it.status == SocialUiState.STATUS_ACEITO &&
                         ((it.userId == currentUserId && it.friendId == userId) ||
                             (it.friendId == currentUserId && it.userId == userId))
+                }
+                val friendshipLabel = when {
+                    currentUserId == userId -> null
+                    isFriend -> "Amigos"
+                    friendships.any {
+                        it.status == SocialUiState.STATUS_PENDENTE &&
+                            it.userId == currentUserId &&
+                            it.friendId == userId
+                    } -> "Convite enviado"
+                    friendships.any {
+                        it.status == SocialUiState.STATUS_PENDENTE &&
+                            it.userId == userId &&
+                            it.friendId == currentUserId
+                    } -> "Solicitou amizade"
+                    else -> null
                 }
                 val canViewActivities = profile.profileVisibility != "privado" || isFriend || currentUserId == userId
                 val publishedActivityIds = if (profile.profileVisibility == "privado" && isFriend) {
@@ -436,7 +479,7 @@ class PublicProfileViewModel : ViewModel() {
                         }
                 }
 
-                val amigos = friendships
+                val visibleFriendCount = friendships
                     .filter {
                         it.status == SocialUiState.STATUS_ACEITO &&
                             (it.userId == userId || it.friendId == userId)
@@ -444,6 +487,50 @@ class PublicProfileViewModel : ViewModel() {
                     .map { if (it.userId == userId) it.friendId else it.userId }
                     .distinct()
                     .size
+                val amigos = runCatching {
+                    client.postgrest.from("profile_friend_counts")
+                        .select { filter { eq("profile_id", userId) } }
+                        .decodeList<ProfileFriendCount>()
+                        .firstOrNull()
+                        ?.friendCount
+                }.getOrNull() ?: visibleFriendCount
+                val friendLinks = runCatching {
+                    client.postgrest.from("profile_friend_links")
+                        .select { filter { eq("profile_id", userId) } }
+                        .decodeList<ProfileFriendLink>()
+                }.getOrDefault(emptyList())
+                val fallbackFriendIds =
+                    friendships
+                        .filter {
+                            it.status == SocialUiState.STATUS_ACEITO &&
+                                (it.userId == userId || it.friendId == userId)
+                        }
+                        .map { if (it.userId == userId) it.friendId else it.userId }
+                        .toSet()
+                val friendIds = friendLinks.map { it.friendId }.toSet().ifEmpty { fallbackFriendIds }
+                val acceptedAtByFriendId = friendLinks
+                    .associate { it.friendId to it.acceptedAt }
+                    .ifEmpty {
+                        friendships
+                            .filter {
+                                it.status == SocialUiState.STATUS_ACEITO &&
+                                    (it.userId == userId || it.friendId == userId)
+                            }
+                            .associate {
+                                val friendId = if (it.userId == userId) it.friendId else it.userId
+                                friendId to it.acceptedAt
+                            }
+                    }
+                val friends = if (friendIds.isEmpty()) {
+                    emptyList()
+                } else {
+                    client.postgrest.from("profiles")
+                        .select()
+                        .decodeList<Profile>()
+                        .filter { it.id in friendIds }
+                        .map { ProfileFriendItem(it, acceptedAtByFriendId[it.id]) }
+                        .sortedBy { it.profile.displayName.lowercase() }
+                }
                 val desafios = runCatching {
                     client.postgrest.from("desafio_participacoes")
                         .select {
@@ -491,6 +578,8 @@ class PublicProfileViewModel : ViewModel() {
                     ),
                     challengeAwards = challengeAwards,
                     atividades = visibleActivities,
+                    friends = friends,
+                    friendshipLabel = friendshipLabel,
                     activityGroups = activityGroups,
                     activityGroupItems = groupItems,
                     acceptedMentionsByActivityId = acceptedMentionsByActivityId,

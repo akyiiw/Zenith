@@ -25,7 +25,8 @@ data class Desafio(
     @SerialName("aceita_registro_manual") val aceitaRegistroManual: Boolean = false,
     @SerialName("ranking_tipo") val rankingTipo: String = "menor_tempo",
     @SerialName("objetivo_metrica") val objetivoMetrica: String? = "distancia",
-    @SerialName("objetivo_valor") val objetivoValor: Double? = null
+    @SerialName("objetivo_valor") val objetivoValor: Double? = null,
+    @SerialName("inscricoes_fechadas") val inscricoesFechadas: Boolean = false
 )
 
 @Serializable

@@ -7,12 +7,14 @@ import kotlinx.serialization.Serializable
 data class Amizade(
     @SerialName("user_id") val userId: String,
     @SerialName("amigo_id") val friendId: String,
-    val status: String
+    val status: String,
+    @SerialName("accepted_at") val acceptedAt: String? = null
 )
 
 @Serializable
 data class AmizadeInsert(
     @SerialName("user_id") val userId: String,
     @SerialName("amigo_id") val friendId: String,
-    val status: String
+    val status: String,
+    @SerialName("accepted_at") val acceptedAt: String? = null
 )

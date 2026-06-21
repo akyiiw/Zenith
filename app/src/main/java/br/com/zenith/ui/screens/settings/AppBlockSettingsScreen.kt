@@ -45,6 +45,7 @@ import androidx.navigation.NavController
 import br.com.zenith.data.models.AppBlock
 import br.com.zenith.ui.animations.CenteredZenithLoading
 import br.com.zenith.ui.components.common.BottomNavListPadding
+import br.com.zenith.ui.components.common.ZenithConfirmSheet
 import br.com.zenith.ui.components.common.zenithSwitchColors
 import br.com.zenith.ui.notifications.ZenithNotifier
 import br.com.zenith.ui.theme.Inter
@@ -66,6 +67,7 @@ fun AppBlockSettingsScreen(navController: NavController) {
         var endTime by rememberSaveable { mutableStateOf("07:00") }
         var blockedDays by rememberSaveable { mutableStateOf("Todos os dias") }
         var reminder by rememberSaveable { mutableStateOf(true) }
+        var blockPendingDelete by androidx.compose.runtime.remember { mutableStateOf<AppBlock?>(null) }
 
         LaunchedEffect(Unit) {
             viewModel.load(context)
@@ -214,10 +216,23 @@ fun AppBlockSettingsScreen(navController: NavController) {
                             block = block,
                             enabled = !isSaving,
                             onActiveChange = { viewModel.setActive(block, it, context) },
-                            onDelete = { viewModel.delete(block, context) }
+                            onDelete = { blockPendingDelete = block }
                         )
                     }
                 }
+            }
+
+            blockPendingDelete?.let { block ->
+                ZenithConfirmSheet(
+                    title = "Remover bloqueio?",
+                    message = "O bloqueio de ${block.appName} será apagado.",
+                    confirmLabel = "Remover",
+                    onDismiss = { blockPendingDelete = null },
+                    onConfirm = {
+                        blockPendingDelete = null
+                        viewModel.delete(block, context)
+                    }
+                )
             }
         }
     }

@@ -1,9 +1,15 @@
 package br.com.zenith.ui.screens.activity
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -71,6 +77,7 @@ import br.com.zenith.data.models.ChallengeAwardCalculator.isFinished
 import br.com.zenith.data.models.Desafio
 import br.com.zenith.data.models.Exercicio
 import br.com.zenith.ui.animations.CenteredZenithLoading
+import br.com.zenith.ui.components.common.ZenithSheetDragHandle
 import br.com.zenith.ui.notifications.ZenithNotifier
 import br.com.zenith.ui.theme.Inter
 import br.com.zenith.ui.theme.ZenithTheme
@@ -79,6 +86,7 @@ import br.com.zenith.ui.theme.items.ZenithTextField
 import br.com.zenith.viewmodels.activity.ActivityViewModel
 import br.com.zenith.viewmodels.challenge.ChallengeViewModel
 import br.com.zenith.viewmodels.sleep.SleepRecordViewModel
+import br.com.zenith.utils.UnitFormatters
 import java.net.URLEncoder
 import java.util.Locale
 
@@ -226,7 +234,13 @@ fun NewActivityContent(
                 )
             }
 
-            if (mode == ActivityMode.Start || mode == ActivityMode.Register) {
+            AnimatedVisibility(
+                visible = mode == ActivityMode.Start || mode == ActivityMode.Register,
+                enter = fadeIn(animationSpec = tween(160)) +
+                    slideInVertically(animationSpec = tween(220), initialOffsetY = { -it / 2 }),
+                exit = fadeOut(animationSpec = tween(120)) +
+                    slideOutVertically(animationSpec = tween(180), targetOffsetY = { -it / 2 })
+            ) {
                 ZenithTextField(
                     value = query,
                     onValueChange = { query = it },
@@ -245,122 +259,140 @@ fun NewActivityContent(
             if (isLoading) {
                 CenteredZenithLoading()
             } else {
-                LazyColumn(
-                    contentPadding = PaddingValues(horizontal = 24.dp, vertical = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    when {
-                        mode == null -> {
-                            item {
-                                FeaturedActivityCard(
-                                    title = "Iniciar atividade",
-                                    subtitle = "Monitorar distância, tempo e passos",
-                                    icon = Icons.AutoMirrored.Filled.DirectionsRun,
-                                    containerColor = Color(0xFFEAF3DE),
-                                    iconColor = Color(0xFF238D25),
-                                    onClick = { mode = ActivityMode.Start }
-                                )
-                            }
-                            item {
-                                FeaturedActivityCard(
-                                    title = "Registrar atividade",
-                                    subtitle = "Adicionar um registro manual",
-                                    icon = Icons.Default.Edit,
-                                    containerColor = Color(0xFFF5F5F5),
-                                    iconColor = Color(0xFF555555),
-                                    onClick = { mode = ActivityMode.Register }
-                                )
-                            }
-                            item {
-                                FeaturedActivityCard(
-                                    title = "Desafios",
-                                    subtitle = "Iniciar atividade vinculada ao ranking",
-                                    icon = Icons.Default.EmojiEvents,
-                                    containerColor = Color(0xFFFFF7E6),
-                                    iconColor = Color(0xFFC78911),
-                                    onClick = { mode = ActivityMode.Challenges }
-                                )
-                            }
-                        }
-                        mode == ActivityMode.Challenges -> {
-                            if (participatingChallenges.isEmpty()) {
-                                item { Text("Você ainda não participa de desafios.", color = Color.Gray, fontFamily = Inter) }
-                            } else {
-                                items(participatingChallenges, key = { it.id }) { challenge ->
-                                    ChallengeStartItem(challenge = challenge, onClick = { onIniciarDesafio(challenge) })
+                AnimatedContent(
+                    targetState = mode,
+                    transitionSpec = {
+                        val direction = if (targetState == null) -1 else 1
+                        (fadeIn(animationSpec = tween(170)) +
+                            slideInHorizontally(
+                                animationSpec = tween(240),
+                                initialOffsetX = { direction * it / 7 }
+                            )) togetherWith
+                            (fadeOut(animationSpec = tween(120)) +
+                                slideOutHorizontally(
+                                    animationSpec = tween(200),
+                                    targetOffsetX = { -direction * it / 9 }
+                                ))
+                    },
+                    label = "new_activity_mode"
+                ) { animatedMode ->
+                    LazyColumn(
+                        contentPadding = PaddingValues(horizontal = 24.dp, vertical = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        when {
+                            animatedMode == null -> {
+                                item {
+                                    FeaturedActivityCard(
+                                        title = "Iniciar atividade",
+                                        subtitle = "Monitorar distância, tempo e passos",
+                                        icon = Icons.AutoMirrored.Filled.DirectionsRun,
+                                        containerColor = Color(0xFFEAF3DE),
+                                        iconColor = Color(0xFF238D25),
+                                        onClick = { mode = ActivityMode.Start }
+                                    )
+                                }
+                                item {
+                                    FeaturedActivityCard(
+                                        title = "Registrar atividade",
+                                        subtitle = "Adicionar um registro manual",
+                                        icon = Icons.Default.Edit,
+                                        containerColor = Color(0xFFF5F5F5),
+                                        iconColor = Color(0xFF555555),
+                                        onClick = { mode = ActivityMode.Register }
+                                    )
+                                }
+                                item {
+                                    FeaturedActivityCard(
+                                        title = "Desafios",
+                                        subtitle = "Iniciar atividade vinculada ao ranking",
+                                        icon = Icons.Default.EmojiEvents,
+                                        containerColor = Color(0xFFFFF7E6),
+                                        iconColor = Color(0xFFC78911),
+                                        onClick = { mode = ActivityMode.Challenges }
+                                    )
                                 }
                             }
-                        }
-                        query.isBlank() -> {
-                            item {
-                                FeaturedActivityCard(
-                                    title = "Sono",
-                                    subtitle = null,
-                                    icon = Icons.Default.Bedtime,
-                                    containerColor = Color(0xFFEAF1FF),
-                                    iconColor = Color(0xFF2F5FBA),
-                                    enabled = mode == ActivityMode.Register,
-                                    onClick = { selecionarSono() }
-                                )
+                            animatedMode == ActivityMode.Challenges -> {
+                                if (participatingChallenges.isEmpty()) {
+                                    item { Text("Você ainda não participa de desafios.", color = Color.Gray, fontFamily = Inter) }
+                                } else {
+                                    items(participatingChallenges, key = { it.id }) { challenge ->
+                                        ChallengeStartItem(challenge = challenge, onClick = { onIniciarDesafio(challenge) })
+                                    }
+                                }
                             }
-                            item {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(vertical = 6.dp)
-                                        .height(1.dp)
-                                        .background(Color(0xFFE0E0E0))
-                                )
+                            query.isBlank() -> {
+                                item {
+                                    FeaturedActivityCard(
+                                        title = "Sono",
+                                        subtitle = null,
+                                        icon = Icons.Default.Bedtime,
+                                        containerColor = Color(0xFFEAF1FF),
+                                        iconColor = Color(0xFF2F5FBA),
+                                        enabled = animatedMode == ActivityMode.Register,
+                                        onClick = { selecionarSono() }
+                                    )
+                                }
+                                item {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 6.dp)
+                                            .height(1.dp)
+                                            .background(Color(0xFFE0E0E0))
+                                    )
+                                }
+                                item {
+                                    FeaturedActivityCard(
+                                        title = "Caminhada",
+                                        subtitle = destaqueCaminhada?.unidade ?: "Health Connect",
+                                        icon = Icons.AutoMirrored.Filled.DirectionsWalk,
+                                        containerColor = Color(0xFFEAF3DE),
+                                        iconColor = Color(0xFF238D25),
+                                        enabled = destaqueCaminhada != null,
+                                        onClick = { destaqueCaminhada?.let(::selecionarExercicio) }
+                                    )
+                                }
+                                item {
+                                    FeaturedActivityCard(
+                                        title = "Corrida",
+                                        subtitle = destaqueCorrida?.unidade ?: "Health Connect",
+                                        icon = Icons.AutoMirrored.Filled.DirectionsRun,
+                                        containerColor = Color(0xFFFFEFE6),
+                                        iconColor = Color(0xFFC65418),
+                                        enabled = destaqueCorrida != null,
+                                        onClick = { destaqueCorrida?.let(::selecionarExercicio) }
+                                    )
+                                }
+                                item {
+                                    FeaturedActivityCard(
+                                        title = "Ciclismo",
+                                        subtitle = destaqueCiclismo?.unidade ?: "Health Connect",
+                                        icon = Icons.AutoMirrored.Filled.DirectionsBike,
+                                        containerColor = Color(0xFFE7F6F3),
+                                        iconColor = Color(0xFF08756A),
+                                        enabled = destaqueCiclismo != null,
+                                        onClick = { destaqueCiclismo?.let(::selecionarExercicio) }
+                                    )
+                                }
+                                item {
+                                    OtherActivitiesCard(
+                                        expanded = outrasExpanded,
+                                        count = outrosExercicios.size,
+                                        onClick = { outrasExpanded = !outrasExpanded }
+                                    )
+                                }
+                                if (outrasExpanded) {
+                                    items(outrosExercicios) { exercicio ->
+                                        ExercicioItem(exercicio = exercicio, onClick = { selecionarExercicio(exercicio) })
+                                    }
+                                }
                             }
-                            item {
-                                FeaturedActivityCard(
-                                    title = "Caminhada",
-                                    subtitle = destaqueCaminhada?.unidade ?: "Health Connect",
-                                    icon = Icons.AutoMirrored.Filled.DirectionsWalk,
-                                    containerColor = Color(0xFFEAF3DE),
-                                    iconColor = Color(0xFF238D25),
-                                    enabled = destaqueCaminhada != null,
-                                    onClick = { destaqueCaminhada?.let(::selecionarExercicio) }
-                                )
-                            }
-                            item {
-                                FeaturedActivityCard(
-                                    title = "Corrida",
-                                    subtitle = destaqueCorrida?.unidade ?: "Health Connect",
-                                    icon = Icons.AutoMirrored.Filled.DirectionsRun,
-                                    containerColor = Color(0xFFFFEFE6),
-                                    iconColor = Color(0xFFC65418),
-                                    enabled = destaqueCorrida != null,
-                                    onClick = { destaqueCorrida?.let(::selecionarExercicio) }
-                                )
-                            }
-                            item {
-                                FeaturedActivityCard(
-                                    title = "Ciclismo",
-                                    subtitle = destaqueCiclismo?.unidade ?: "Health Connect",
-                                    icon = Icons.AutoMirrored.Filled.DirectionsBike,
-                                    containerColor = Color(0xFFE7F6F3),
-                                    iconColor = Color(0xFF08756A),
-                                    enabled = destaqueCiclismo != null,
-                                    onClick = { destaqueCiclismo?.let(::selecionarExercicio) }
-                                )
-                            }
-                            item {
-                                OtherActivitiesCard(
-                                    expanded = outrasExpanded,
-                                    count = outrosExercicios.size,
-                                    onClick = { outrasExpanded = !outrasExpanded }
-                                )
-                            }
-                            if (outrasExpanded) {
-                                items(outrosExercicios) { exercicio ->
+                            else -> {
+                                items(filtrados) { exercicio ->
                                     ExercicioItem(exercicio = exercicio, onClick = { selecionarExercicio(exercicio) })
                                 }
-                            }
-                        }
-                        else -> {
-                            items(filtrados) { exercicio ->
-                                ExercicioItem(exercicio = exercicio, onClick = { selecionarExercicio(exercicio) })
                             }
                         }
                     }
@@ -428,6 +460,7 @@ fun NewActivityContent(
                         onClick = { onRegistrar(exercise) },
                         modifier = Modifier.fillMaxWidth().height(52.dp),
                         shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(containerColor = Color.White),
                         border = androidx.compose.foundation.BorderStroke(2.dp, Color(0xFF238D25))
                     ) {
                         Text(
@@ -445,6 +478,7 @@ fun NewActivityContent(
                         },
                         modifier = Modifier.fillMaxWidth().height(52.dp),
                         shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(containerColor = Color.White),
                         border = androidx.compose.foundation.BorderStroke(2.dp, Color(0xFF238D25))
                     ) {
                         Text(
@@ -484,7 +518,8 @@ private fun ManualSleepSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         containerColor = Color.White,
-        scrimColor = Color.Transparent
+        scrimColor = Color.Transparent,
+        dragHandle = { ZenithSheetDragHandle() }
     ) {
         Column(
             modifier = Modifier
@@ -760,5 +795,5 @@ private fun challengeModeLabel(challenge: Desafio): String {
 }
 
 private fun Double.cleanNumber(): String {
-    return if (this % 1.0 == 0.0) toInt().toString() else "%.1f".format(this)
+    return UnitFormatters.compactNumber(this)
 }

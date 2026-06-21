@@ -76,7 +76,7 @@ fun ZenithTextField(
                 backgroundColor = TextFieldGreen.copy(alpha = 0.3f) // Cor do fundo do texto selecionado
             )
         ),
-        shape = RoundedCornerShape(size = 8.dp),
+        shape = RoundedCornerShape(size = 10.dp),
         leadingIcon = leadingIcon,
         trailingIcon = trailingIcon
     )

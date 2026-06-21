@@ -9,13 +9,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -38,6 +35,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import br.com.zenith.ui.animations.CenteredZenithLoading
 import br.com.zenith.ui.components.common.BottomNavListPadding
+import br.com.zenith.ui.components.common.ZenithFilterBar
+import br.com.zenith.ui.components.common.ZenithFilterOption
 import br.com.zenith.ui.components.profile.RecentActivityCard
 import br.com.zenith.ui.components.profile.groupNamesByActivityId
 import br.com.zenith.ui.theme.Inter
@@ -204,69 +203,32 @@ private fun ActivityFilterRow(
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         Column(modifier = Modifier.padding(horizontal = 24.dp)) {
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(VerificationFilter.entries.toList()) { filter ->
-                    FilterChip(
-                        selected = verificationFilter == filter,
-                        onClick = { onVerificationFilterChange(filter) },
-                        label = { Text(filter.label, fontFamily = Inter) },
-                        colors = zenithFilterChipColors()
-                    )
-                }
-            }
+            ZenithFilterBar(
+                options = VerificationFilter.entries.map { ZenithFilterOption(it, it.label) },
+                selectedValue = verificationFilter,
+                onSelected = onVerificationFilterChange
+            )
         }
         Column(modifier = Modifier.padding(horizontal = 24.dp)) {
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                item {
-                    FilterChip(
-                        selected = exerciseFilter == null,
-                        onClick = { onExerciseFilterChange(null) },
-                        label = { Text("Todos", fontFamily = Inter) },
-                        colors = zenithFilterChipColors()
-                    )
-                }
-                items(exercises) { exercise ->
-                    FilterChip(
-                        selected = exerciseFilter == exercise,
-                        onClick = { onExerciseFilterChange(exercise) },
-                        label = { Text(exercise, fontFamily = Inter) },
-                        colors = zenithFilterChipColors()
-                    )
-                }
-            }
+            ZenithFilterBar(
+                options = listOf(ZenithFilterOption<String?>(null, "Todos")) +
+                    exercises.map { ZenithFilterOption<String?>(it, it) },
+                selectedValue = exerciseFilter,
+                onSelected = onExerciseFilterChange
+            )
         }
         if (groups.isNotEmpty()) {
             Column(modifier = Modifier.padding(horizontal = 24.dp)) {
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    item {
-                        FilterChip(
-                            selected = groupFilter == null,
-                            onClick = { onGroupFilterChange(null) },
-                            label = { Text("Todos os grupos", fontFamily = Inter) },
-                            colors = zenithFilterChipColors()
-                        )
-                    }
-                    items(groups) { group ->
-                        FilterChip(
-                            selected = groupFilter == group,
-                            onClick = { onGroupFilterChange(group) },
-                            label = { Text(group, fontFamily = Inter) },
-                            colors = zenithFilterChipColors()
-                        )
-                    }
-                }
+                ZenithFilterBar(
+                    options = listOf(ZenithFilterOption<String?>(null, "Todos os grupos")) +
+                        groups.map { ZenithFilterOption<String?>(it, it) },
+                    selectedValue = groupFilter,
+                    onSelected = onGroupFilterChange
+                )
             }
         }
     }
 }
-
-@Composable
-private fun zenithFilterChipColors() = FilterChipDefaults.filterChipColors(
-    selectedContainerColor = Color(0xFFEAF3DE),
-    selectedLabelColor = Color(0xFF238D25),
-    containerColor = Color.White,
-    labelColor = Color(0xFF4E5D4F)
-)
 
 @Composable
 private fun EmptyActivitiesMessage(text: String) {

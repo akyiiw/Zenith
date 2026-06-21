@@ -44,10 +44,11 @@ fun PublicProfileScreen(
     userId: String
 ) {
     ZenithTheme {
-        val context = LocalContext.current
         val viewModel: PublicProfileViewModel = viewModel()
         val uiState by viewModel.uiState.collectAsState()
         val isLoading by viewModel.isLoading.collectAsState()
+
+        val context = LocalContext.current
 
         LaunchedEffect(userId) {
             viewModel.fetchProfile(userId, context)
@@ -88,9 +89,12 @@ fun PublicProfileScreen(
                             stats = uiState.stats,
                             badge = uiState.badge,
                             onBack = { navController.popBackStack() },
+                            friendshipLabel = uiState.friendshipLabel,
+                            onStreakClick = { uiState.profile?.id?.let { navController.navigate("streak/$it") } },
                             onStatClick = { stat ->
                                 when (stat) {
                                     "Desafios" -> uiState.profile?.id?.let { navController.navigate("challenge_awards/$it") }
+                                    "Amigos" -> uiState.profile?.id?.let { navController.navigate("profile_friends/$it") }
                                     "Conquistas" -> uiState.profile?.id?.let { navController.navigate("achievements/$it") }
                                     else -> ZenithNotifier.info("$stat deste perfil ainda não tem lista dedicada")
                                 }
@@ -143,3 +147,5 @@ fun PublicProfileScreen(
         }
     }
 }
+
+

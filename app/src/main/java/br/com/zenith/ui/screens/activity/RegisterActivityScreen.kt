@@ -2,9 +2,18 @@
 
 import android.net.Uri
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -42,6 +51,7 @@ import br.com.zenith.data.models.Exercicio
 import br.com.zenith.data.models.Profile
 import br.com.zenith.ui.animations.CenteredZenithLoading
 import br.com.zenith.ui.animations.ZenithLoading
+import br.com.zenith.ui.components.common.ZenithSheetDragHandle
 import br.com.zenith.ui.components.common.zenithSwitchColors
 import br.com.zenith.ui.theme.Inter
 import br.com.zenith.ui.theme.ZenithTheme
@@ -49,6 +59,7 @@ import br.com.zenith.ui.theme.items.ZenithDateTimeField
 import br.com.zenith.ui.theme.items.ZenithDurationField
 import br.com.zenith.ui.theme.items.ZenithOptionField
 import br.com.zenith.ui.theme.items.ZenithTextField
+import br.com.zenith.utils.UnitFormatters
 import br.com.zenith.viewmodels.activity.ActivityViewModel
 import java.net.URLEncoder
 import java.time.LocalDateTime
@@ -121,7 +132,7 @@ fun RegisterActivityScreen(
                     TrackingResultHolder.result = null
                     val nomeEncoded = URLEncoder.encode(nome, "UTF-8")
                     val unidadeEncoded = URLEncoder.encode(unidade, "UTF-8")
-                    val valorEncoded = URLEncoder.encode(valor.toString(), "UTF-8")
+                    val valorEncoded = URLEncoder.encode(UnitFormatters.compactNumber(valor), "UTF-8")
                     val duracao = dur ?: 0
                     navController.navigate(
                         "activity_registered/$verificada/$nomeEncoded/$valorEncoded/$unidadeEncoded/$duracao"
@@ -272,7 +283,7 @@ private fun StartedActivityReviewContent(
                                 color = Color(0xFF27500A)
                             )
                         )
-                        LockedReviewRow("Distância", "%.2f km".format(trackingResult.distanceMeters / 1000f))
+                        LockedReviewRow("Distância", UnitFormatters.kilometersWithSpace(trackingResult.distanceMeters / 1000.0))
                         LockedReviewRow("Duração", "${duracaoMin}min")
                         LockedReviewRow("Passos", trackingResult.steps.toString())
                         LockedReviewRow("GPS", trackingResult.gpsQuality.replaceFirstChar { it.uppercase() })
@@ -462,7 +473,8 @@ private fun StartedActivityReviewContent(
             ModalBottomSheet(
                 onDismissRequest = { showSubmitDialog = false },
                 containerColor = Color.White,
-                scrimColor = Color.Transparent
+                scrimColor = Color.Transparent,
+                dragHandle = { ZenithSheetDragHandle() }
             ) {
                 Column(
                     modifier = Modifier
@@ -502,40 +514,75 @@ private fun StartedActivityReviewContent(
         }
 
         if (showDiscardDialog) {
-            AlertDialog(
-                onDismissRequest = { showDiscardDialog = false },
-                containerColor = Color.White,
-                title = {
-                    Text(
-                        text = "Descartar alterações?",
-                        style = MaterialTheme.typography.titleLarge.copy(
-                            fontFamily = Inter,
-                            fontWeight = FontWeight.Bold
-                        )
-                    )
-                },
-                text = {
-                    Text(
-                        text = "As informações adicionadas nessa revisão serão perdidas.",
-                        fontFamily = Inter
-                    )
-                },
-                confirmButton = {
-                    TextButton(
-                        onClick = {
-                            showDiscardDialog = false
-                            onBack()
-                        }
-                    ) {
-                        Text("Descartar", color = Color(0xFF238D25), fontFamily = Inter)
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showDiscardDialog = false }) {
-                        Text("Continuar editando", color = Color.Gray, fontFamily = Inter)
-                    }
+            DiscardActivityChangesSheet(
+                onDismiss = { showDiscardDialog = false },
+                onConfirm = {
+                    showDiscardDialog = false
+                    onBack()
                 }
             )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DiscardActivityChangesSheet(
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = Color.White,
+        scrimColor = Color.Transparent,
+        dragHandle = { ZenithSheetDragHandle() }
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(horizontal = 24.dp, vertical = 12.dp)
+                .padding(bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Text(
+                text = "Descartar alterações?",
+                style = MaterialTheme.typography.titleLarge.copy(
+                    fontFamily = Inter,
+                    fontWeight = FontWeight.W800,
+                    color = Color(0xFF111111)
+                )
+            )
+            Text(
+                text = "As informações adicionadas nessa revisão serão perdidas.",
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    fontFamily = Inter,
+                    color = Color(0xFF667066)
+                )
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedButton(
+                    onClick = onDismiss,
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(52.dp),
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(containerColor = Color.White),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE0E0E0))
+                ) {
+                    Text("Continuar", color = Color(0xFF1A1A1A), fontFamily = Inter, fontWeight = FontWeight.Bold)
+                }
+                Button(
+                    onClick = onConfirm,
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(52.dp),
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF9B2D20))
+                ) {
+                    Text("Descartar", color = Color.White, fontFamily = Inter, fontWeight = FontWeight.Bold)
+                }
+            }
         }
     }
 }
@@ -612,7 +659,7 @@ fun RegisterActivityContent(
         mutableStateOf(
             when {
                 veioDeTracking && unidadeInicial.contains("pass") -> trackingResult.steps.toString()
-                veioDeTracking -> "%.2f".format(trackingResult.distanceMeters / 1000f).replace(",", ".")
+                veioDeTracking -> UnitFormatters.compactNumber(trackingResult.distanceMeters / 1000.0).replace(",", ".")
                 else -> ""
             }
         )
@@ -733,13 +780,30 @@ fun RegisterActivityContent(
             Spacer(modifier = Modifier.height(12.dp))
         }
 
-        when {
-            isLoading -> Box(
+        AnimatedContent(
+            targetState = if (isLoading) -1 else step,
+            transitionSpec = {
+                val direction = if (targetState > initialState) 1 else -1
+                (fadeIn(animationSpec = tween(170)) +
+                    slideInHorizontally(
+                        animationSpec = tween(240),
+                        initialOffsetX = { direction * it / 6 }
+                    )) togetherWith
+                    (fadeOut(animationSpec = tween(120)) +
+                        slideOutHorizontally(
+                            animationSpec = tween(200),
+                            targetOffsetX = { -direction * it / 8 }
+                        ))
+            },
+            label = "register_activity_step"
+        ) { animatedStep ->
+            when (animatedStep) {
+            -1 -> Box(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
             ) { CenteredZenithLoading() }
 
-            step == 0 -> {
+            0 -> {
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
@@ -775,7 +839,7 @@ fun RegisterActivityContent(
                 }
             }
 
-            step == 1 -> {
+            else -> {
                 val ex = exercicioSelecionado
                 if (ex == null) {
                     Box(
@@ -786,8 +850,7 @@ fun RegisterActivityContent(
                     ) {
                         CenteredZenithLoading()
                     }
-                    return@Box
-                }
+                } else {
                 val unidadeEhDuracao = remember(ex.unidade) {
                     val unidade = ex.unidade.lowercase()
                     unidade.contains("min") || unidade.contains("dura")
@@ -1061,15 +1124,23 @@ fun RegisterActivityContent(
 
                     item { Spacer(modifier = Modifier.height(80.dp)) }
                 }
+                }
             }
+        }
         }
 
         // Botão salvar
-        if (step == 1) {
+        AnimatedVisibility(
+            visible = step == 1 && !isLoading,
+            modifier = Modifier.align(Alignment.BottomCenter),
+            enter = fadeIn(animationSpec = tween(160)) +
+                slideInVertically(animationSpec = tween(220), initialOffsetY = { it / 2 }),
+            exit = fadeOut(animationSpec = tween(120)) +
+                slideOutVertically(animationSpec = tween(180), targetOffsetY = { it / 2 })
+        ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .align(Alignment.BottomCenter)
                     .background(Color.White)
                     .padding(horizontal = 24.dp, vertical = 16.dp)
             ) {
@@ -1161,7 +1232,8 @@ fun RegisterActivityContent(
             ModalBottomSheet(
                 onDismissRequest = { pendingSave = null },
                 containerColor = Color.White,
-                scrimColor = Color.Transparent
+                scrimColor = Color.Transparent,
+                dragHandle = { ZenithSheetDragHandle() }
             ) {
                 Column(
                     modifier = Modifier

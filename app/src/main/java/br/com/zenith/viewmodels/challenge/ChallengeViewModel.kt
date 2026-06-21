@@ -107,6 +107,10 @@ data class ChallengeUiState(
             ?.let { "@$it" }
             ?: "Criador desconhecido"
     }
+
+    fun currentUserIsPremium(): Boolean {
+        return profiles.firstOrNull { it.id == currentUserId }?.isPremium == true
+    }
 }
 
 class ChallengeViewModel : ViewModel() {
@@ -320,6 +324,9 @@ class ChallengeViewModel : ViewModel() {
                 if (challenge.maxParticipantes != null && participantCount >= challenge.maxParticipantes) {
                     throw Exception("Este desafio atingiu o limite de participantes")
                 }
+                if (challenge.inscricoesFechadas) {
+                    throw Exception("As inscrições deste desafio estão fechadas")
+                }
                 if (!canJoinChallenge(userId, challenge)) {
                     throw Exception("Você não tem acesso a este desafio")
                 }
@@ -336,6 +343,63 @@ class ChallengeViewModel : ViewModel() {
                 publishState(selectedChallengeId = challenge.id)
             } catch (e: Exception) {
                 ZenithNotifier.error("Erro ao entrar no desafio: ${e.localizedMessage}")
+            } finally {
+                _isSaving.value = false
+            }
+        }
+    }
+
+    fun setChallengeClosed(challengeId: String, closed: Boolean, context: Context) {
+        viewModelScope.launch {
+            _isSaving.value = true
+            try {
+                SupabaseConfig.init(context)
+                val client = SupabaseConfig.getClient()
+                val userId = client.auth.currentUserOrNull()?.id
+                    ?: throw Exception("Usuario nao autenticado")
+                val challenge = challengesCache.firstOrNull { it.id == challengeId }
+                    ?: throw Exception("Desafio não encontrado")
+                if (challenge.criadorId != userId) throw Exception("Apenas o criador pode moderar")
+
+                client.postgrest.from("desafios").update(
+                    buildJsonObject { put("inscricoes_fechadas", closed) }
+                ) { filter { eq("id", challengeId) } }
+
+                ZenithNotifier.success(if (closed) "Inscrições fechadas" else "Inscrições reabertas")
+                loadData(context)
+                publishState(selectedChallengeId = challengeId)
+            } catch (e: Exception) {
+                ZenithNotifier.error("Erro ao moderar desafio: ${e.localizedMessage}")
+            } finally {
+                _isSaving.value = false
+            }
+        }
+    }
+
+    fun deleteChallengeForumPost(challengeId: String, postId: String, context: Context) {
+        viewModelScope.launch {
+            _isSaving.value = true
+            try {
+                SupabaseConfig.init(context)
+                val client = SupabaseConfig.getClient()
+                val userId = client.auth.currentUserOrNull()?.id
+                    ?: throw Exception("Usuario nao autenticado")
+                val challenge = challengesCache.firstOrNull { it.id == challengeId }
+                    ?: throw Exception("Desafio não encontrado")
+                if (challenge.criadorId != userId) throw Exception("Apenas o criador pode moderar")
+
+                client.postgrest.from("posts").delete {
+                    filter {
+                        eq("id", postId)
+                        eq("desafio_id", challengeId)
+                    }
+                }
+
+                ZenithNotifier.success("Publicação removida")
+                loadData(context)
+                publishState(selectedChallengeId = challengeId)
+            } catch (e: Exception) {
+                ZenithNotifier.error("Erro ao apagar publicação: ${e.localizedMessage}")
             } finally {
                 _isSaving.value = false
             }
@@ -363,23 +427,12 @@ class ChallengeViewModel : ViewModel() {
                 }
 
                 val postId = UUID.randomUUID().toString()
-                val entryId = UUID.randomUUID().toString()
-
                 client.postgrest.from("posts").insert(
                     buildJsonObject {
                         put("id", postId)
                         put("author_id", userId)
                         put("desafio_id", challengeId)
                         if (trimmedContent.isNotBlank()) put("content", trimmedContent)
-                    }
-                )
-
-                client.postgrest.from("feed_entries").insert(
-                    buildJsonObject {
-                        put("id", entryId)
-                        put("author_id", userId)
-                        put("entry_type", "post")
-                        put("post_id", postId)
                     }
                 )
 
@@ -701,7 +754,7 @@ class ChallengeViewModel : ViewModel() {
 
     private fun areFriends(userId: String, otherUserId: String): Boolean {
         return friendshipsCache.any {
-            it.status == "aceita" &&
+            it.status == "aceito" &&
                 ((it.userId == userId && it.friendId == otherUserId) ||
                     (it.userId == otherUserId && it.friendId == userId))
         }

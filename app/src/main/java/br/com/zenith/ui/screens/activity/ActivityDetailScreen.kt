@@ -1,6 +1,8 @@
 ﻿package br.com.zenith.ui.screens.activity
 
+import android.view.MotionEvent
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -13,20 +15,27 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInteropFilter
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import br.com.zenith.data.SupabaseConfig
 import br.com.zenith.data.models.Atividade
+import br.com.zenith.data.models.Desafio
 import br.com.zenith.data.models.Exercicio
+import br.com.zenith.data.models.Profile
 import br.com.zenith.ui.animations.CenteredZenithLoading
 import br.com.zenith.ui.animations.ZenithLoading
+import br.com.zenith.ui.components.common.ZenithSheetDragHandle
 import br.com.zenith.ui.components.profile.activityType
 import br.com.zenith.ui.components.profile.ChallengeActivitySummary
 import br.com.zenith.ui.components.profile.challengeModeLabel
@@ -40,6 +49,7 @@ import br.com.zenith.ui.theme.items.ZenithDateTimeField
 import br.com.zenith.ui.theme.items.ZenithDurationField
 import br.com.zenith.ui.theme.items.ZenithOptionField
 import br.com.zenith.ui.theme.items.ZenithTextField
+import br.com.zenith.utils.UnitFormatters
 import br.com.zenith.viewmodels.activity.ActivityViewModel
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.CameraPosition
@@ -55,7 +65,13 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.doubleOrNull
+import java.util.Locale
 import kotlin.math.ceil
+
+private val ActivityDetailBackground = Color.White
+private val ActivityDetailSurface = Color(0xFFF5F5F5)
+private val ActivityDetailBorder = Color(0xFFE0E0E0)
+private const val ActivityDetailFloatingHeader = true
 
 @Composable
 fun ActivityDetailScreen(navController: NavController, atividadeId: String?) {
@@ -150,168 +166,66 @@ fun ActivityDetailScreen(navController: NavController, atividadeId: String?) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color(0xFFF8FAF8))
+                    .background(ActivityDetailBackground)
                     .statusBarsPadding()
             ) {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(bottom = 32.dp)
+                    contentPadding = PaddingValues(
+                        top = if (ActivityDetailFloatingHeader) 76.dp else 0.dp,
+                        bottom = 32.dp
+                    ),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    item {
-                        // Header
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 11.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            IconButton(onClick = { navController.popBackStack() }) {
-                                Icon(
-                                    Icons.AutoMirrored.Filled.ArrowBack,
-                                    contentDescription = "Voltar",
-                                    tint = Color(0xFF238D25)
-                                )
-                            }
-                            Text(
-                                text = atividade.titulo ?: atividade.exercicio?.nome ?: "Atividade",
-                                style = MaterialTheme.typography.titleLarge.copy(
-                                    fontFamily = Inter,
-                                    fontWeight = FontWeight.Bold
-                                ),
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .padding(start = 8.dp)
-                            )
-                            if (ownsActivity) {
-                                IconButton(onClick = { editando = true }) {
-                                    Icon(
-                                        Icons.Default.Edit,
-                                        contentDescription = "Editar",
-                                        tint = Color(0xFF238D25)
-                                    )
-                                }
-                                IconButton(onClick = { confirmarDelete = true }, enabled = !isSaving) {
-                                    Icon(
-                                        Icons.Default.Delete,
-                                        contentDescription = "Apagar",
-                                        tint = Color(0xFF9B2D20)
-                                    )
-                                }
-                            }
-                        }
-                        detailState.authorUsername?.takeIf { it.isNotBlank() }?.let { username ->
-                            Text(
-                                text = "Completada por @$username",
-                                style = MaterialTheme.typography.bodySmall.copy(
-                                    fontFamily = Inter,
-                                    fontWeight = FontWeight.Medium,
-                                    color = Color(0xFF536057)
-                                ),
-                                modifier = Modifier.padding(horizontal = 72.dp)
+                    if (!ActivityDetailFloatingHeader) {
+                        item {
+                            ActivityDetailHeader(
+                                atividade = atividade,
+                                authorUsername = detailState.authorUsername,
+                                ownsActivity = ownsActivity,
+                                isSaving = isSaving,
+                                onBack = { navController.popBackStack() },
+                                onEdit = { editando = true },
+                                onDelete = { confirmarDelete = true }
                             )
                         }
                     }
 
                     item {
-                        // Card principal â€” igual ao RecentActivityCard mas expandido
-                        Column(
-                            modifier = Modifier
-                                .padding(horizontal = 24.dp)
-                                .fillMaxWidth()
-                                .background(Color(0xFFF5F5F5), RoundedCornerShape(12.dp))
-                                .padding(16.dp)
-                        ) {
-                            Text(
-                                text = tempoRelativo(atividade.realizadaEm),
-                                style = MaterialTheme.typography.bodyMedium.copy(
-                                    fontStyle = FontStyle.Italic,
-                                    color = Color.Gray
-                                )
-                            )
-
-                            Spacer(modifier = Modifier.height(12.dp))
-
-                            Text(
-                                text = activityType(atividade),
-                                style = MaterialTheme.typography.bodyMedium.copy(
-                                    color = Color(0xFF238D25),
-                                    fontWeight = FontWeight.W600
-                                )
-                            )
-
-                            detailState.groupNames.takeIf { it.isNotEmpty() }?.let { groups ->
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = groups.joinToString(prefix = "Grupo: "),
-                                    style = MaterialTheme.typography.bodySmall.copy(
-                                        color = Color(0xFF238D25),
-                                        fontWeight = FontWeight.W600
-                                    )
-                                )
+                        ActivityOverviewCard(
+                            atividade = atividade,
+                            groupNames = detailState.groupNames,
+                            acceptedMentions = detailState.acceptedMentions,
+                            desafio = desafio,
+                            onChallengeClick = {
+                                atividade.desafioId?.let { navController.navigate("challenge/$it") }
                             }
-                            detailState.acceptedMentions.takeIf { it.isNotEmpty() }?.let { mentions ->
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = mentionLabel(mentions),
-                                    style = MaterialTheme.typography.bodySmall.copy(
-                                        fontFamily = Inter,
-                                        color = Color(0xFF536057)
-                                    )
-                                )
-                            }
-
-                            Spacer(modifier = Modifier.height(10.dp))
-
-                            Text(
-                                text = atividade.titulo ?: "Atividade registrada:",
-                                style = MaterialTheme.typography.bodyLarge.copy(
-                                    fontFamily = Inter,
-                                    fontWeight = FontWeight.W700
-                                )
-                            )
-
-                            Text(
-                                text = formattedActivityValue(atividade),
-                                style = MaterialTheme.typography.displayMedium.copy(
-                                    fontSize = 40.sp,
-                                    fontStyle = FontStyle.Italic,
-                                    fontWeight = FontWeight.W700,
-                                    color = Color(0xFF1B820E)
-                                )
-                            )
-
-                            Text(
-                                text = "Duracao: ${formattedDuration(atividade.duracaoMin)}",
-                                style = MaterialTheme.typography.bodyMedium.copy(color = Color.Gray)
-                            )
-
-                            Text(
-                                text = "Nota do usuario: ${atividade.nota?.let { "$it/10" } ?: "-"}",
-                                style = MaterialTheme.typography.bodyMedium.copy(color = Color.Gray)
-                            )
-
-                            Spacer(modifier = Modifier.height(8.dp))
-
-                            if (atividade.verificada) {
-                                DetailChip(
-                                    label = "Verificada",
-                                    color = Color(0xFF238D25)
-                                )
-                            }
-
-                            ChallengeActivitySummary(desafio = desafio, atividade = atividade)
-                        }
+                        )
                     }
 
                     item {
                         ActivityRouteMap(rota = atividade.rota)
                     }
 
-                    item { Spacer(modifier = Modifier.height(16.dp)) }
-
-                    // Informações detalhadas
                     item {
                         DetailSection(title = "Detalhes") {
+                            DetailRow(label = "Exercício", value = activityType(atividade))
+                            detailState.groupNames.takeIf { it.isNotEmpty() }?.let {
+                                DetailRow(label = "Grupo", value = it.joinToString())
+                            }
+                            DetailRow(label = "Valor", value = formattedActivityValue(atividade))
+                            DetailRow(label = "Duração", value = formattedDuration(atividade.duracaoMin))
+                            activityPaceLabel(atividade)?.let {
+                                DetailRow(label = "Pace", value = it)
+                            }
+                            DetailRow(
+                                label = "Nota do usuário",
+                                value = atividade.nota?.let { "$it/10" } ?: "-"
+                            )
+                            DetailRow(
+                                label = "Verificação",
+                                value = if (atividade.verificada) "Verificada" else "Manual"
+                            )
                             atividade.intensidade?.let {
                                 DetailRow(
                                     label = "Intensidade",
@@ -344,6 +258,24 @@ fun ActivityDetailScreen(navController: NavController, atividadeId: String?) {
                             atividade.realizadaEm?.let {
                                 DetailRow(label = "Data", value = formatarData(it))
                             }
+                            atividade.descricao?.takeIf { it.isNotBlank() }?.let {
+                                DetailRow(label = "Descrição", value = it)
+                            }
+                            detailState.acceptedMentions.takeIf { it.isNotEmpty() }?.let {
+                                DetailRow(label = "Completada com", value = mentionLabel(it))
+                            }
+                            atividade.gpsQualidade?.let {
+                                DetailRow(label = "Qualidade GPS", value = gpsQualityLabel(it))
+                            }
+                            atividade.gpsAccuracyMedia?.let {
+                                DetailRow(label = "Precisão média", value = "${formatCompact(it)} m")
+                            }
+                            atividade.gpsPontosAceitos?.let {
+                                DetailRow(label = "Pontos GPS aceitos", value = it.toString())
+                            }
+                            atividade.gpsPontosRejeitados?.let {
+                                DetailRow(label = "Pontos GPS rejeitados", value = it.toString())
+                            }
                             atividade.desafioId?.let { challengeId ->
                                 DetailRow(
                                     label = "Desafio vinculado",
@@ -356,42 +288,27 @@ fun ActivityDetailScreen(navController: NavController, atividadeId: String?) {
                         }
                     }
                 }
+                if (ActivityDetailFloatingHeader) {
+                    ActivityDetailHeader(
+                        atividade = atividade,
+                        authorUsername = detailState.authorUsername,
+                        ownsActivity = ownsActivity,
+                        isSaving = isSaving,
+                        onBack = { navController.popBackStack() },
+                        onEdit = { editando = true },
+                        onDelete = { confirmarDelete = true },
+                        modifier = Modifier.align(Alignment.TopCenter)
+                    )
+                }
             }
             if (confirmarDelete) {
-                AlertDialog(
-                    onDismissRequest = { confirmarDelete = false },
-                    containerColor = Color.White,
-                    title = {
-                        Text(
-                            "Apagar atividade?",
-                            style = MaterialTheme.typography.titleLarge.copy(
-                                fontFamily = Inter,
-                                fontWeight = FontWeight.Bold
-                            )
-                        )
-                    },
-                    text = {
-                        Text(
-                            "Essa ação remove a atividade do perfil, feed e vínculos relacionados.",
-                            fontFamily = Inter
-                        )
-                    },
-                    confirmButton = {
-                        TextButton(
-                            onClick = {
-                                confirmarDelete = false
-                                viewModel.apagarAtividade(atividade.id, context) {
-                                    navController.popBackStack()
-                                }
-                            },
-                            enabled = !isSaving
-                        ) {
-                            Text("Apagar", color = Color(0xFF9B2D20), fontFamily = Inter)
-                        }
-                    },
-                    dismissButton = {
-                        TextButton(onClick = { confirmarDelete = false }) {
-                            Text("Cancelar", color = Color.Gray, fontFamily = Inter)
+                DeleteActivitySheet(
+                    isSaving = isSaving,
+                    onDismiss = { confirmarDelete = false },
+                    onConfirm = {
+                        confirmarDelete = false
+                        viewModel.apagarAtividade(atividade.id, context) {
+                            navController.popBackStack()
                         }
                     }
                 )
@@ -400,11 +317,320 @@ fun ActivityDetailScreen(navController: NavController, atividadeId: String?) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DeleteActivitySheet(
+    isSaving: Boolean,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = Color.White,
+        scrimColor = Color.Transparent,
+        dragHandle = { ZenithSheetDragHandle() }
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(horizontal = 24.dp, vertical = 12.dp)
+                .padding(bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Text(
+                text = "Apagar atividade?",
+                style = MaterialTheme.typography.titleLarge.copy(
+                    fontFamily = Inter,
+                    fontWeight = FontWeight.W800,
+                    color = Color(0xFF111111)
+                )
+            )
+            Text(
+                text = "Essa ação remove a atividade do perfil, feed e vínculos relacionados.",
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    fontFamily = Inter,
+                    color = Color(0xFF667066)
+                )
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedButton(
+                    onClick = onDismiss,
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(52.dp),
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(containerColor = Color.White),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, ActivityDetailBorder)
+                ) {
+                    Text("Cancelar", color = Color(0xFF1A1A1A), fontFamily = Inter, fontWeight = FontWeight.Bold)
+                }
+                Button(
+                    onClick = onConfirm,
+                    enabled = !isSaving,
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(52.dp),
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF9B2D20),
+                        disabledContainerColor = Color(0xFFE2B6AF)
+                    )
+                ) {
+                    Text("Apagar", color = Color.White, fontFamily = Inter, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ActivityDetailHeader(
+    atividade: Atividade,
+    authorUsername: String?,
+    ownsActivity: Boolean,
+    isSaving: Boolean,
+    onBack: () -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .background(ActivityDetailBackground)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        IconButton(onClick = onBack) {
+            Icon(
+                Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = "Voltar",
+                tint = Color(0xFF238D25)
+            )
+        }
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(start = 6.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            Text(
+                text = atividade.titulo ?: atividade.exercicio?.nome ?: "Atividade",
+                style = MaterialTheme.typography.titleMedium.copy(
+                    fontFamily = Inter,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF172017)
+                ),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = authorUsername
+                    ?.takeIf { it.isNotBlank() }
+                    ?.let { "Completada por @$it" }
+                    ?: tempoRelativo(atividade.realizadaEm),
+                style = MaterialTheme.typography.bodySmall.copy(
+                    fontFamily = Inter,
+                    fontWeight = FontWeight.Medium,
+                    color = Color(0xFF536057)
+                ),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+        if (ownsActivity) {
+            IconButton(onClick = onEdit) {
+                Icon(Icons.Default.Edit, contentDescription = "Editar", tint = Color(0xFF238D25))
+            }
+            IconButton(onClick = onDelete, enabled = !isSaving) {
+                Icon(Icons.Default.Delete, contentDescription = "Apagar", tint = Color(0xFF9B2D20))
+            }
+        }
+    }
+}
+
+@Composable
+private fun ActivityOverviewCard(
+    atividade: Atividade,
+    groupNames: List<String>,
+    acceptedMentions: List<Profile>,
+    desafio: Desafio?,
+    onChallengeClick: () -> Unit = {}
+) {
+    Column(
+        modifier = Modifier
+            .padding(horizontal = 20.dp)
+            .fillMaxWidth()
+            .background(ActivityDetailSurface, RoundedCornerShape(12.dp))
+            .border(1.dp, ActivityDetailBorder, RoundedCornerShape(12.dp))
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.Top
+        ) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Text(
+                    text = tempoRelativo(atividade.realizadaEm),
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        fontFamily = Inter,
+                        fontStyle = FontStyle.Italic,
+                        color = Color(0xFF6A746A)
+                    )
+                )
+                Text(
+                    text = activityType(atividade),
+                    style = MaterialTheme.typography.titleSmall.copy(
+                        fontFamily = Inter,
+                        color = Color(0xFF238D25),
+                        fontWeight = FontWeight.W800
+                    ),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            groupNames.firstOrNull()?.let { group ->
+                ActivityInfoChip(
+                    label = group,
+                    background = Color(0xFFF2F5F2),
+                    content = Color(0xFF536057)
+                )
+            }
+        }
+
+        acceptedMentions.takeIf { it.isNotEmpty() }?.let {
+            Text(
+                text = mentionLabel(it),
+                style = MaterialTheme.typography.bodySmall.copy(
+                    fontFamily = Inter,
+                    color = Color(0xFF536057)
+                ),
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+
+        Text(
+            text = atividade.titulo ?: "Atividade registrada",
+            style = MaterialTheme.typography.bodyLarge.copy(
+                fontFamily = Inter,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF1D241D)
+            ),
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis
+        )
+
+        Text(
+            text = formattedActivityValue(atividade),
+            style = MaterialTheme.typography.displayMedium.copy(
+                fontFamily = Inter,
+                fontSize = 40.sp,
+                fontStyle = FontStyle.Italic,
+                fontWeight = FontWeight.W800,
+                color = Color(0xFF1B820E)
+            ),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            ActivityMetricTile(
+                label = "Duração",
+                value = formattedDuration(atividade.duracaoMin),
+                emphasized = true,
+                modifier = Modifier.weight(1.15f)
+            )
+            ActivityMetricTile(
+                label = "Pace",
+                value = activityPaceLabel(atividade) ?: "-",
+                modifier = Modifier.weight(1f)
+            )
+        }
+
+        ChallengeActivitySummary(desafio = desafio, atividade = atividade, onClick = onChallengeClick)
+    }
+}
+
+@Composable
+private fun ActivityMetricTile(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier,
+    emphasized: Boolean = false
+) {
+    Column(
+        modifier = modifier
+            .background(
+                if (emphasized) Color(0xFFEAF6EA) else Color.White,
+                RoundedCornerShape(10.dp)
+            )
+            .border(
+                1.dp,
+                if (emphasized) Color(0xFFB9DDBA) else Color(0xFFE1E8E1),
+                RoundedCornerShape(10.dp)
+            )
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(3.dp)
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium.copy(
+                fontFamily = Inter,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF536057)
+            )
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.titleMedium.copy(
+                fontFamily = Inter,
+                fontWeight = if (emphasized) FontWeight.W800 else FontWeight.Bold,
+                color = if (emphasized) Color(0xFF238D25) else Color(0xFF1D241D)
+            ),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+@Composable
+private fun ActivityInfoChip(
+    label: String,
+    background: Color,
+    content: Color
+) {
+    Box(
+        modifier = Modifier
+            .background(background, RoundedCornerShape(999.dp))
+            .border(1.dp, content.copy(alpha = 0.18f), RoundedCornerShape(999.dp))
+            .padding(horizontal = 10.dp, vertical = 5.dp)
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium.copy(
+                fontFamily = Inter,
+                fontWeight = FontWeight.Bold,
+                color = content
+            ),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
 @Composable
 private fun ActivityRouteMap(rota: String?) {
     val points = remember(rota) { parseRoutePoints(rota) }
     if (points.isEmpty()) return
 
+    val view = LocalView.current
     val initialPoint = points.first()
     val cameraPositionState = rememberCameraPositionState {
         position = CameraPosition.fromLatLngZoom(initialPoint, 16f)
@@ -425,34 +651,68 @@ private fun ActivityRouteMap(rota: String?) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 24.dp)
+            .padding(horizontal = 20.dp)
+            .background(ActivityDetailSurface, RoundedCornerShape(12.dp))
+            .border(1.dp, ActivityDetailBorder, RoundedCornerShape(12.dp))
+            .padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        Text(
-            text = "Rota realizada",
-            style = MaterialTheme.typography.titleMedium.copy(
-                fontFamily = Inter,
-                fontWeight = FontWeight.Bold
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Rota realizada",
+                style = MaterialTheme.typography.titleMedium.copy(
+                    fontFamily = Inter,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF172017)
+                )
             )
-        )
-        Spacer(modifier = Modifier.height(10.dp))
-        GoogleMap(
+            ActivityInfoChip(
+                label = "${points.size} pontos",
+                background = Color(0xFFEAF6EA),
+                content = Color(0xFF238D25)
+            )
+        }
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(280.dp)
-                .background(Color(0xFFEFEFEF), RoundedCornerShape(12.dp)),
-            cameraPositionState = cameraPositionState,
-            uiSettings = MapUiSettings(
-                zoomControlsEnabled = false,
-                myLocationButtonEnabled = false,
-                compassEnabled = false
-            )
+                .height(320.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .border(1.dp, Color(0xFFD8D8D8), RoundedCornerShape(10.dp))
+                .background(Color(0xFFEFEFEF), RoundedCornerShape(10.dp))
+                .pointerInteropFilter { event ->
+                    when (event.action) {
+                        MotionEvent.ACTION_DOWN,
+                        MotionEvent.ACTION_MOVE -> view.parent?.requestDisallowInterceptTouchEvent(true)
+                        MotionEvent.ACTION_UP,
+                        MotionEvent.ACTION_CANCEL -> view.parent?.requestDisallowInterceptTouchEvent(false)
+                    }
+                    false
+                }
         ) {
-            if (points.size >= 2) {
-                Polyline(
-                    points = points,
-                    color = Color(0xFF238D25),
-                    width = 12f
+            GoogleMap(
+                modifier = Modifier.fillMaxSize(),
+                cameraPositionState = cameraPositionState,
+                uiSettings = MapUiSettings(
+                    zoomControlsEnabled = true,
+                    myLocationButtonEnabled = false,
+                    compassEnabled = true,
+                    scrollGesturesEnabled = true,
+                    zoomGesturesEnabled = true,
+                    rotationGesturesEnabled = true,
+                    tiltGesturesEnabled = true
                 )
+            ) {
+                if (points.size >= 2) {
+                    Polyline(
+                        points = points,
+                        color = Color(0xFF238D25),
+                        width = 12f
+                    )
+                }
             }
         }
     }
@@ -826,21 +1086,22 @@ fun DetailSection(title: String, content: @Composable ColumnScope.() -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 24.dp)
+            .padding(horizontal = 20.dp)
     ) {
         Text(
             text = title,
             style = MaterialTheme.typography.labelLarge.copy(
                 fontFamily = Inter,
                 fontWeight = FontWeight.Bold,
-                color = Color.Gray
+                color = Color(0xFF536057)
             ),
             modifier = Modifier.padding(bottom = 8.dp)
         )
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(Color(0xFFF5F5F5), RoundedCornerShape(12.dp))
+                .background(ActivityDetailSurface, RoundedCornerShape(12.dp))
+                .border(1.dp, ActivityDetailBorder, RoundedCornerShape(12.dp))
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
             content = content
@@ -852,15 +1113,26 @@ fun DetailSection(title: String, content: @Composable ColumnScope.() -> Unit) {
 fun DetailRow(label: String, value: String) {
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.Top
     ) {
         Text(
             text = label,
-            style = MaterialTheme.typography.bodyMedium.copy(color = Color.Gray)
+            style = MaterialTheme.typography.bodyMedium.copy(
+                fontFamily = Inter,
+                color = Color(0xFF667066)
+            ),
+            modifier = Modifier.weight(0.85f)
         )
         Text(
             text = value,
-            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.W600)
+            style = MaterialTheme.typography.bodyMedium.copy(
+                fontFamily = Inter,
+                fontWeight = FontWeight.W700,
+                color = Color(0xFF1D241D)
+            ),
+            textAlign = androidx.compose.ui.text.style.TextAlign.End,
+            modifier = Modifier.weight(1.15f)
         )
     }
 }
@@ -874,9 +1146,47 @@ fun DetailChip(label: String, color: Color = Color(0xFF238D25)) {
     ) {
         Text(
             text = label,
-            style = MaterialTheme.typography.labelMedium.copy(color = color)
+            style = MaterialTheme.typography.labelMedium.copy(
+                fontFamily = Inter,
+                fontWeight = FontWeight.Bold,
+                color = color
+            )
         )
     }
+}
+
+private fun activityPaceLabel(atividade: Atividade): String? {
+    val minutes = atividade.duracaoMin?.takeIf { it > 0 } ?: return null
+    val distanceKm = activityDistanceKm(atividade)?.takeIf { it > 0.0 } ?: return null
+    val pace = minutes / distanceKm
+    val paceMinutes = pace.toInt()
+    val paceSeconds = ((pace - paceMinutes) * 60).toInt().coerceIn(0, 59)
+    return "%d:%02d min/km".format(Locale.US, paceMinutes, paceSeconds)
+}
+
+private fun activityDistanceKm(atividade: Atividade): Double? {
+    atividade.distanciaBruta?.let {
+        return if (it > 100) it / 1000.0 else it
+    }
+    val unit = atividade.exercicio?.unidade.orEmpty().lowercase(Locale.ROOT)
+    val slug = atividade.exercicio?.slug.orEmpty().lowercase(Locale.ROOT)
+    return if ("km" in unit || slug in listOf("caminhada", "corrida", "ciclismo")) {
+        atividade.valor
+    } else {
+        null
+    }
+}
+
+private fun gpsQualityLabel(value: String): String = when (value.lowercase(Locale.ROOT)) {
+    "otima", "ótima" -> "Ótima"
+    "boa" -> "Boa"
+    "regular" -> "Regular"
+    "ruim" -> "Ruim"
+    else -> value.replaceFirstChar { it.uppercase() }
+}
+
+private fun formatCompact(value: Double): String {
+    return UnitFormatters.compactNumber(value)
 }
 
 fun formatarData(isoDate: String): String {

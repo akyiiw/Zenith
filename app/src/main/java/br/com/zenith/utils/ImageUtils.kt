@@ -48,7 +48,8 @@ object ImageUtils {
         maxDimensao: Int,
         aspectRatio: Float,
         focusX: Float,
-        focusY: Float
+        focusY: Float,
+        zoom: Float = 1f
     ): File {
         val bitmapOriginal = BitmapFactory.decodeFile(fileOriginal.absolutePath)
             ?: throw IllegalArgumentException("Imagem inválida")
@@ -68,14 +69,18 @@ object ImageUtils {
             cropHeight = (sourceWidth / aspectRatio).roundToInt().coerceAtMost(sourceHeight)
         }
 
+        val normalizedZoom = zoom.coerceIn(1f, 4f)
+        val zoomedCropWidth = (cropWidth / normalizedZoom).roundToInt().coerceIn(1, sourceWidth)
+        val zoomedCropHeight = (cropHeight / normalizedZoom).roundToInt().coerceIn(1, sourceHeight)
+
         val normalizedFocusX = focusX.coerceIn(-1f, 1f)
         val normalizedFocusY = focusY.coerceIn(-1f, 1f)
-        val maxLeft = (sourceWidth - cropWidth).coerceAtLeast(0)
-        val maxTop = (sourceHeight - cropHeight).coerceAtLeast(0)
+        val maxLeft = (sourceWidth - zoomedCropWidth).coerceAtLeast(0)
+        val maxTop = (sourceHeight - zoomedCropHeight).coerceAtLeast(0)
         val left = ((normalizedFocusX + 1f) / 2f * maxLeft).roundToInt().coerceIn(0, maxLeft)
         val top = ((normalizedFocusY + 1f) / 2f * maxTop).roundToInt().coerceIn(0, maxTop)
 
-        val croppedBitmap = Bitmap.createBitmap(bitmapOriginal, left, top, cropWidth, cropHeight)
+        val croppedBitmap = Bitmap.createBitmap(bitmapOriginal, left, top, zoomedCropWidth, zoomedCropHeight)
         if (croppedBitmap != bitmapOriginal) {
             bitmapOriginal.recycle()
         }

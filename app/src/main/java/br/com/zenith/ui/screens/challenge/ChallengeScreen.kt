@@ -33,13 +33,25 @@ fun ChallengeScreen(
             isSaving = isSaving,
             onCreateClick = { navController.navigate("create_challenge") },
             onOpenChallenge = viewModel::openChallenge,
-            onBackToChallenges = viewModel::returnToChallenges,
+            onBackToChallenges = {
+                if (initialChallengeId != null) {
+                    if (!navController.popBackStack()) viewModel.returnToChallenges()
+                } else {
+                    viewModel.returnToChallenges()
+                }
+            },
             onJoinChallenge = { viewModel.joinChallenge(it, context) },
             onCreateForumPost = { challengeId, content, images ->
                 viewModel.createChallengeForumPost(challengeId, content, images, context)
             },
             onCreateForumComment = { challengeId, entryId, content ->
                 viewModel.createChallengeForumComment(challengeId, entryId, content, context)
+            },
+            onSetChallengeClosed = { challengeId, closed ->
+                viewModel.setChallengeClosed(challengeId, closed, context)
+            },
+            onDeleteForumPost = { challengeId, postId ->
+                viewModel.deleteChallengeForumPost(challengeId, postId, context)
             },
             onOpenProfile = { profile ->
                 if (profile.id == uiState.currentUserId) {

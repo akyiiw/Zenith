@@ -3,15 +3,18 @@ package br.com.zenith.ui.screens.profile
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -32,7 +35,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
@@ -50,10 +55,11 @@ fun AchievementsScreen(
     userId: String
 ) {
     ZenithTheme {
-        val context = androidx.compose.ui.platform.LocalContext.current
         val viewModel: AchievementsViewModel = viewModel()
         val uiState by viewModel.uiState.collectAsState()
         val isLoading by viewModel.isLoading.collectAsState()
+
+        val context = LocalContext.current
 
         LaunchedEffect(userId) {
             viewModel.fetchAchievements(userId, context)
@@ -65,6 +71,7 @@ fun AchievementsScreen(
                 .background(Color.White)
                 .statusBarsPadding()
         ) {
+            // Cabeçalho
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -78,18 +85,13 @@ fun AchievementsScreen(
                         tint = Color(0xFF238D25)
                     )
                 }
-                Icon(
-                    Icons.Default.EmojiEvents,
-                    contentDescription = null,
-                    tint = Color(0xFF238D25),
-                    modifier = Modifier.padding(start = 4.dp)
-                )
                 Column(modifier = Modifier.padding(start = 10.dp)) {
                     Text(
                         text = "Conquistas",
                         style = MaterialTheme.typography.titleLarge.copy(
                             fontFamily = Inter,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.W800,
+                            color = Color(0xFF111111)
                         )
                     )
                     uiState.profile?.name?.takeIf { !uiState.isOwnProfile && it.isNotBlank() }?.let { username ->
@@ -108,20 +110,22 @@ fun AchievementsScreen(
                 CenteredZenithLoading()
             } else {
                 val grouped = uiState.achievements.groupBy { it.definition.category }
+                val unlockedCount = uiState.achievements.count { it.unlocked }
+                val totalCount = uiState.achievements.size
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(start = 24.dp, top = 8.dp, end = 24.dp, bottom = BottomNavListPadding),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
                     if (uiState.achievements.isEmpty()) {
                         item {
-                            Text(
-                                text = "Nenhuma conquista desbloqueada ainda",
-                                style = MaterialTheme.typography.bodyMedium.copy(
-                                    fontFamily = Inter,
-                                    color = Color(0xFF6F6C6C)
-                                ),
-                                modifier = Modifier.padding(top = 16.dp)
+                            EmptyAchievementsCard()
+                        }
+                    } else {
+                        item {
+                            AchievementSummaryCard(
+                                unlockedCount = unlockedCount,
+                                totalCount = totalCount
                             )
                         }
                     }
@@ -129,17 +133,7 @@ fun AchievementsScreen(
                         val items = grouped[category].orEmpty()
                         if (items.isNotEmpty()) {
                             item {
-                                Text(
-                                    text = category.label,
-                                    style = MaterialTheme.typography.titleMedium.copy(
-                                        fontFamily = Inter,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color(0xFF151515)
-                                    )
-                                )
-                            }
-                            items(items, key = { it.definition.slug }) { item ->
-                                AchievementCard(item = item)
+                                AchievementCategoryBlock(category = category, items = items)
                             }
                         }
                     }
@@ -151,25 +145,145 @@ fun AchievementsScreen(
 }
 
 @Composable
+private fun AchievementSummaryCard(unlockedCount: Int, totalCount: Int) {
+    val progress = if (totalCount == 0) 0f else unlockedCount.toFloat() / totalCount
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color(0xFFF5F5F5), RoundedCornerShape(10.dp))
+            .border(1.dp, Color(0xFFE0E0E0), RoundedCornerShape(10.dp))
+            .padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(
+                    text = "Progresso",
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontFamily = Inter,
+                        fontWeight = FontWeight.W800,
+                        color = Color(0xFF111111)
+                    )
+                )
+                Text(
+                    text = "$unlockedCount de $totalCount desbloqueadas",
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontFamily = Inter,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color(0xFF667066)
+                    )
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .size(42.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFFEAF3DE)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Default.EmojiEvents, contentDescription = null, tint = Color(0xFF238D25))
+            }
+        }
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(8.dp)
+                .background(Color(0xFFE4E4E4), RoundedCornerShape(99.dp))
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(progress.coerceIn(0f, 1f))
+                    .height(8.dp)
+                    .background(Color(0xFF238D25), RoundedCornerShape(99.dp))
+            )
+        }
+    }
+}
+
+@Composable
+private fun EmptyAchievementsCard() {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color(0xFFF5F5F5), RoundedCornerShape(10.dp))
+            .border(1.dp, Color(0xFFE0E0E0), RoundedCornerShape(10.dp))
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Text(
+            text = "Nenhuma conquista desbloqueada ainda",
+            style = MaterialTheme.typography.titleMedium.copy(
+                fontFamily = Inter,
+                fontWeight = FontWeight.W800,
+                color = Color(0xFF111111)
+            )
+        )
+        Text(
+            text = "Continue registrando atividades para liberar novas marcas.",
+            style = MaterialTheme.typography.bodyMedium.copy(
+                fontFamily = Inter,
+                color = Color(0xFF6F6C6C)
+            )
+        )
+    }
+}
+
+@Composable
+private fun AchievementCategoryBlock(
+    category: AchievementCategory,
+    items: List<AchievementItem>
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = category.label,
+                style = MaterialTheme.typography.titleMedium.copy(
+                    fontFamily = Inter,
+                    fontWeight = FontWeight.W800,
+                    color = Color(0xFF151515)
+                )
+            )
+            Text(
+                text = "${items.count { it.unlocked }}/${items.size}",
+                style = MaterialTheme.typography.labelMedium.copy(
+                    fontFamily = Inter,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF667066)
+                )
+            )
+        }
+        items.forEach { item ->
+            AchievementCard(item = item)
+        }
+    }
+}
+
+@Composable
 private fun AchievementCard(item: AchievementItem) {
     val unlocked = item.unlocked
     val accent = if (unlocked) Color(0xFF238D25) else Color(0xFF9A9A9A)
+    val background = if (unlocked) Color(0xFFF5F5F5) else Color(0xFFFAFAFA)
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(
-                color = if (unlocked) Color(0xFFEAF3DE) else Color(0xFFF5F5F5),
-                shape = RoundedCornerShape(8.dp)
-            )
-            .border(1.dp, if (unlocked) Color(0xFFB7DEB8) else Color(0xFFE0E0E0), RoundedCornerShape(8.dp))
+            .background(background, RoundedCornerShape(10.dp))
+            .border(1.dp, if (unlocked) Color(0xFFD9DED8) else Color(0xFFE5E5E5), RoundedCornerShape(10.dp))
             .padding(14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        androidx.compose.foundation.layout.Box(
+        Box(
             modifier = Modifier
-                .size(44.dp)
-                .clip(CircleShape)
-                .background(Color.White),
+                .size(46.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(if (unlocked) Color(0xFFEAF3DE) else Color(0xFFEDEDED)),
             contentAlignment = Alignment.Center
         ) {
             Icon(
@@ -202,7 +316,23 @@ private fun AchievementCard(item: AchievementItem) {
                 style = MaterialTheme.typography.bodySmall.copy(
                     fontFamily = Inter,
                     color = Color(0xFF6F6C6C)
-                )
+                ),
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+        if (unlocked) {
+            Spacer(modifier = Modifier.width(10.dp))
+            Text(
+                text = "OK",
+                style = MaterialTheme.typography.labelSmall.copy(
+                    fontFamily = Inter,
+                    fontWeight = FontWeight.W800,
+                    color = Color(0xFF238D25)
+                ),
+                modifier = Modifier
+                    .background(Color(0xFFEAF3DE), RoundedCornerShape(99.dp))
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
             )
         }
     }

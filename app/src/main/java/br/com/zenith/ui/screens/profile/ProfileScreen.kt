@@ -2,6 +2,7 @@ package br.com.zenith.ui.screens.profile
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInVertically
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -29,6 +30,7 @@ import androidx.navigation.NavController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import br.com.zenith.ui.animations.CenteredZenithLoading
 import br.com.zenith.ui.components.common.BottomNavListPadding
+import br.com.zenith.ui.components.common.ZenithSheetDragHandle
 import br.com.zenith.ui.theme.ZenithTheme
 import br.com.zenith.ui.components.profile.AboutSection
 import br.com.zenith.ui.components.profile.ProfileHeader
@@ -81,17 +83,18 @@ fun ProfileScreen(
 
             AnimatedVisibility(
                 visible = contentVisible,
-                enter = slideInVertically(
-                    animationSpec = tween(280),
-                    initialOffsetY = { it / 8 }
-                )
+                enter = fadeIn(animationSpec = tween(180)) +
+                    slideInVertically(
+                        animationSpec = tween(280),
+                        initialOffsetY = { it / 8 }
+                    )
             ) {
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(paddingValues = padding),
                     verticalArrangement = Arrangement.spacedBy(11.dp),
-                    contentPadding = PaddingValues(top = 2.dp, bottom = BottomNavListPadding)
+                    contentPadding = PaddingValues(bottom = BottomNavListPadding)
                 ) {
                     item {
                         ProfileHeader(
@@ -102,6 +105,7 @@ fun ProfileScreen(
                             onEdit = { navController.navigate("edit_profile") },
                             onTitleClick = { navController.navigate("title_select") },
                             onBadgeClick = { navController.navigate("badge_select") },
+                            onStreakClick = { user?.id?.let { navController.navigate("streak/$it") } },
                             onStatusClick = {
                                 statusText = user?.status.orEmpty()
                                 showStatusDialog = true
@@ -144,7 +148,8 @@ fun ProfileScreen(
             ModalBottomSheet(
                 onDismissRequest = { showStatusDialog = false },
                 containerColor = Color.White,
-                scrimColor = Color.Transparent
+                scrimColor = Color.Transparent,
+                dragHandle = { ZenithSheetDragHandle() }
             ) {
                 Column(
                     modifier = Modifier

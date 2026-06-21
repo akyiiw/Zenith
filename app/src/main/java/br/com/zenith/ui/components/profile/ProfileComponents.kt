@@ -1,5 +1,9 @@
 package br.com.zenith.ui.components.profile
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -15,6 +19,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -54,6 +62,7 @@ import br.com.zenith.data.models.ChallengeAwardSummary
 import br.com.zenith.data.models.ChallengeMedalType
 import br.com.zenith.data.models.Desafio
 import br.com.zenith.utils.UnitFormatters
+import kotlinx.coroutines.delay
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.jsonArray
@@ -97,6 +106,8 @@ fun ProfileHeader(
     onTitleClick: () -> Unit = {},
     onStatusClick: (() -> Unit)? = null,
     onBadgeClick: (() -> Unit)? = null,
+    friendshipLabel: String? = null,
+    onStreakClick: (() -> Unit)? = null,
     onStatClick: (String) -> Unit = {}
 ) {
     ZenithTheme {
@@ -153,10 +164,11 @@ fun ProfileHeader(
                 user = user,
                 badge = badge,
                 onTitleClick = onTitleClick,
-                onBadgeClick = onBadgeClick
+                onBadgeClick = onBadgeClick,
+                friendshipLabel = friendshipLabel
             )
             Spacer(modifier = Modifier.height(8.dp))
-            Streak(streak = user?.streak ?: 0)
+            Streak(streak = user?.streak ?: 0, onClick = onStreakClick)
             Spacer(modifier = Modifier.height(8.dp))
             Stats(stats = stats, onStatClick = onStatClick)
         }
@@ -168,7 +180,8 @@ fun UserSection(
     user: Profile?,
     badge: Badge?,
     onTitleClick: () -> Unit,
-    onBadgeClick: (() -> Unit)? = null
+    onBadgeClick: (() -> Unit)? = null,
+    friendshipLabel: String? = null
 ) {
     fun formatDate(isoDate: String): String {
         return try {
@@ -189,10 +202,27 @@ fun UserSection(
             Spacer(modifier = Modifier.width(6.dp))
             Badge(badge = badge, onClick = onBadgeClick)
         }
-        Text(
-            text = "@${user?.name ?: "..."}",
-            style = MaterialTheme.typography.labelMedium
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = "@${user?.name ?: "..."}",
+                style = MaterialTheme.typography.labelMedium
+            )
+            friendshipLabel?.let { label ->
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontFamily = Inter,
+                        fontWeight = FontWeight.W800,
+                        color = Color(0xFF238D25)
+                    ),
+                    modifier = Modifier
+                        .background(Color(0xFFEAF3DE), RoundedCornerShape(50.dp))
+                        .border(1.dp, Color(0xFF238D25), RoundedCornerShape(50.dp))
+                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                )
+            }
+        }
         Spacer(modifier = Modifier.height(6.dp))
         Text(
             text = if (user?.registerDate != null) {
@@ -251,24 +281,28 @@ fun RecentHeader(onViewAll: (() -> Unit)? = null) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = 32.dp, top = 6.dp),
+            .padding(start = 24.dp, top = 4.dp, end = 24.dp),
         verticalArrangement = Arrangement.SpaceBetween,
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(end = 32.dp),
-            horizontalArrangement = Arrangement.SpaceBetween
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
                 text = "Atividades recentes",
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.W600
+                style = MaterialTheme.typography.titleMedium.copy(
+                    fontFamily = Inter,
+                    fontWeight = FontWeight.W800,
+                    color = Color(0xFF111111)
+                )
             )
             Text(
                 text = "Ver todas",
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.W600,
+                style = MaterialTheme.typography.labelMedium.copy(
+                    fontFamily = Inter,
+                    fontWeight = FontWeight.Bold
+                ),
                 color = Color(0x99111111),
                 modifier = Modifier.then(
                     if (onViewAll != null) Modifier.clickable { onViewAll() } else Modifier
@@ -393,15 +427,34 @@ fun RecentActivitySection(
     val recent = remember(atividades) {
         atividades.sortedByDescending { it.realizadaEm }.take(5)
     }
-    Column {
+    var visible by remember(recent) { mutableStateOf(false) }
+
+    LaunchedEffect(recent) {
+        visible = false
+        delay(40)
+        visible = true
+    }
+
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn(animationSpec = tween(180)) +
+            slideInVertically(animationSpec = tween(260), initialOffsetY = { it / 8 })
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         recent.forEach { atividade ->
             RecentActivityCard(
                 atividade = atividade,
                 desafio = atividade.desafioId?.let { desafios[it] },
                 groupNames = activityGroupNamesByActivityId[atividade.id].orEmpty(),
                 acceptedMentions = acceptedMentionsByActivityId[atividade.id].orEmpty(),
-                onClick = { navController.navigate("activity_detail/${atividade.id}") }
+                onClick = { navController.navigate("activity_detail/${atividade.id}") },
+                onChallengeClick = {
+                    atividade.desafioId?.let { challengeId ->
+                        navController.navigate("challenge/$challengeId")
+                    }
+                }
             )
+        }
         }
     }
 }
@@ -412,15 +465,18 @@ fun RecentActivityCard(
     desafio: Desafio? = null,
     groupNames: List<String> = emptyList(),
     acceptedMentions: List<Profile> = emptyList(),
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onChallengeClick: () -> Unit = {}
 ) {
     ZenithTheme {
+        val surfaceShape = RoundedCornerShape(size = 5.dp)
+
         Column(
             modifier = Modifier
                 .padding(start = 32.dp, top = 10.dp, end = 32.dp)
                 .fillMaxWidth()
-                .background(color = Color(0xFFF5F5F5), shape = RoundedCornerShape(size = 5.dp))
-                .border(width = 1.dp, color = Color(0xFFE0E0E0), shape = RoundedCornerShape(size = 5.dp))
+                .background(color = Color(0xFFF5F5F5), shape = surfaceShape)
+                .border(width = 1.dp, color = Color(0xFFE0E0E0), shape = surfaceShape)
                 .clickable { onClick() }
                 .padding(start = 12.dp, top = 10.dp, end = 12.dp, bottom = 10.dp)
         ) {
@@ -434,23 +490,25 @@ fun RecentActivityCard(
                 ) {
                     Text(
                         text = tempoRelativo(atividade.realizadaEm),
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.W500,
-                        color = Color(0xFF000000),
+                        style = MaterialTheme.typography.bodyMedium.copy(fontFamily = Inter),
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color(0xFF2A2A2A),
                         fontStyle = FontStyle.Italic
                     )
                     Spacer(modifier = Modifier.height(14.dp))
                     Text(
                         text = activityType(atividade),
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.W600,
-                        color = Color(0xFF238D25)
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            fontFamily = Inter,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF238D25)
+                        )
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     groupNames.takeIf { it.isNotEmpty() }?.let { groups ->
                         Text(
                             text = groups.joinToString(prefix = "Grupo: "),
-                            style = MaterialTheme.typography.labelSmall,
+                            style = MaterialTheme.typography.labelSmall.copy(fontFamily = Inter),
                             color = Color(0xFF6F6C6C)
                         )
                         Spacer(modifier = Modifier.height(2.dp))
@@ -458,38 +516,40 @@ fun RecentActivityCard(
                     acceptedMentions.takeIf { it.isNotEmpty() }?.let { mentions ->
                         Text(
                             text = mentionLabel(mentions),
-                            style = MaterialTheme.typography.labelSmall,
+                            style = MaterialTheme.typography.labelSmall.copy(fontFamily = Inter),
                             color = Color(0xFF6F6C6C)
                         )
                     }
                     Spacer(modifier = Modifier.height(10.dp))
                     Text(
                         text = atividade.titulo ?: "Atividade registrada:",
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = FontWeight.W600,
-                        color = Color(0xFF000000)
+                        style = MaterialTheme.typography.bodyLarge.copy(fontFamily = Inter),
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF111111)
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = formattedActivityValue(atividade),
                         style = MaterialTheme.typography.displayMedium.copy(
+                            fontFamily = Inter,
                             fontSize = 27.sp,
                             fontStyle = FontStyle.Italic,
-                            fontWeight = FontWeight.W700,
+                            fontWeight = FontWeight.W800,
                         ),
                         color = Color(0xFF1B820E)
                     )
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        text = "Duracao: ${formattedDuration(atividade.duracaoMin)}",
-                        style = MaterialTheme.typography.labelSmall,
+                        text = "Duração: ${formattedDuration(atividade.duracaoMin)}",
+                        style = MaterialTheme.typography.labelSmall.copy(fontFamily = Inter),
                         fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
                         color = Color(0xFF6F6C6C)
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "Nota do usuario: ${atividade.nota?.let { "$it/10" } ?: "-"}",
-                        style = MaterialTheme.typography.labelSmall,
+                        text = "Nota do usuário: ${atividade.nota?.let { "$it/10" } ?: "-"}",
+                        style = MaterialTheme.typography.labelSmall.copy(fontFamily = Inter),
                         fontSize = 12.sp,
                         color = Color(0xFF6F6C6C)
                     )
@@ -498,28 +558,35 @@ fun RecentActivityCard(
                     Spacer(modifier = Modifier.width(10.dp))
                     Column(
                         modifier = Modifier.width(92.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
+                        horizontalAlignment = Alignment.End
                     ) {
-                        ActivityStatusBadge(verificada = atividade.verificada)
+                        ActivityStatusBadge(
+                            verificada = atividade.verificada,
+                            modifier = Modifier.padding(end = 8.dp)
+                        )
                         RouteSparkline(rota = atividade.rota)
                     }
                 }
             }
-            ChallengeActivitySummary(desafio = desafio, atividade = atividade)
+            ChallengeActivitySummary(desafio = desafio, atividade = atividade, onClick = onChallengeClick)
         }
     }
 }
 
 @Composable
-private fun ActivityStatusBadge(verificada: Boolean) {
+private fun ActivityStatusBadge(
+    verificada: Boolean,
+    modifier: Modifier = Modifier
+) {
     if (!verificada) return
 
     Box(
-        modifier = Modifier
+        modifier = modifier
             .padding(1.dp)
             .width(24.dp)
             .height(16.dp)
-            .background(color = Color(0x5CC9C9C9), shape = RoundedCornerShape(size = 25.dp))
+            .background(color = Color(0x5CC9C9C9), shape = RoundedCornerShape(size = 25.dp)),
+        contentAlignment = Alignment.TopEnd
     ) {
         Icon(
             painter = painterResource(
@@ -528,48 +595,62 @@ private fun ActivityStatusBadge(verificada: Boolean) {
             contentDescription = "Status da Atividade",
             tint = Color.Unspecified,
             modifier = Modifier
-                .padding(start = 3.dp, top = 3.dp, bottom = 3.dp)
+                .padding(top = 3.dp, end = 3.dp, bottom = 3.dp)
                 .size(18.dp)
         )
     }
 }
 
 @Composable
-fun ChallengeActivitySummary(desafio: Desafio?, atividade: Atividade) {
+fun ChallengeActivitySummary(
+    desafio: Desafio?,
+    atividade: Atividade,
+    onClick: () -> Unit = {}
+) {
     if (atividade.desafioId.isNullOrBlank()) return
 
     Spacer(modifier = Modifier.height(10.dp))
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Color(0xFFEAF3DE), RoundedCornerShape(5.dp))
-            .border(1.dp, Color(0x33238D25), RoundedCornerShape(5.dp))
+            .clip(RoundedCornerShape(5.dp))
+            .background(Color(0xFFF1F7EC), RoundedCornerShape(5.dp))
+            .border(1.dp, Color(0x26238D25), RoundedCornerShape(5.dp))
+            .clickable { onClick() }
             .padding(horizontal = 10.dp, vertical = 8.dp)
     ) {
         Text(
-            text = desafio?.titulo?.takeIf { it.isNotBlank() } ?: "Desafio vinculado",
+            text = "Desafio vinculado",
             style = MaterialTheme.typography.labelMedium,
             fontWeight = FontWeight.W700,
             color = Color(0xFF238D25)
         )
         Text(
-            text = desafio?.let { "${challengeModeLabel(it)} - conta para o ranking" }
-                ?: "Conta para o ranking do desafio",
-            style = MaterialTheme.typography.labelSmall,
+            text = desafio?.titulo?.takeIf { it.isNotBlank() } ?: "Abrir desafio",
+            style = MaterialTheme.typography.labelSmall.copy(fontFamily = Inter),
+            fontWeight = FontWeight.W800,
             fontSize = 12.sp,
-            color = Color(0xFF4F664F)
+            color = Color(0xFF1F3E22)
         )
-        val status = when {
-            atividade.gpsQualidade == "ruim" -> "GPS ruim"
-            atividade.verificada -> "Atividade verificada"
-            else -> "Registro manual"
+        desafio?.let {
+            Text(
+                text = challengeContributionLabel(it, atividade),
+                style = MaterialTheme.typography.labelSmall.copy(fontFamily = Inter),
+                fontWeight = FontWeight.W800,
+                fontSize = 12.sp,
+                color = Color(0xFF238D25)
+            )
         }
-        Text(
-            text = status,
-            style = MaterialTheme.typography.labelSmall,
-            fontSize = 12.sp,
-            color = Color(0xFF6F6C6C)
-        )
+    }
+}
+
+private fun challengeContributionLabel(challenge: Desafio, atividade: Atividade): String {
+    return when (challenge.rankingTipo) {
+        "tempo_total" -> "+${UnitFormatters.minutes(atividade.duracaoMin)}"
+        "distancia_total", "maior_distancia", "menor_tempo", "menor_pace" ->
+            "+${UnitFormatters.kilometersWithSpace(atividade.valor)}"
+        else -> atividade.passos?.let { "+${UnitFormatters.steps(it)} passos" }
+            ?: "+${UnitFormatters.compactNumber(atividade.valor)} ${challenge.unidade.lowercase(Locale.ROOT)}"
     }
 }
 
@@ -590,7 +671,7 @@ private fun RouteSparkline(rota: String?) {
     val points = remember(rota) { parseRouteSparklinePoints(rota) }
     if (points.size < 2) return
 
-    Spacer(modifier = Modifier.height(14.dp))
+    Spacer(modifier = Modifier.height(34.dp))
     Canvas(
         modifier = Modifier
             .width(90.dp)
@@ -665,11 +746,12 @@ fun Title(titulo: Titulo?, onClick: () -> Unit = {}) {
 }
 
 @Composable
-fun Streak(streak: Int) {
+fun Streak(streak: Int, onClick: (() -> Unit)? = null) {
     Row(
         modifier = Modifier
             .padding(start = 32.dp, end = 32.dp)
             .fillMaxWidth()
+            .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier)
             .background(color = Color(0x29D2D4D2), shape = RoundedCornerShape(size = 12.dp))
             .padding(start = 14.dp, top = 14.dp, end = 14.dp, bottom = 14.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
