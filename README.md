@@ -1,41 +1,43 @@
-# Zenith
+# Zenith - Supere seus limites
 
-Aplicativo Android em Kotlin/Jetpack Compose para atividades, perfil social, desafios e integração com Supabase.
+**Rede social de bem-estar desenvolvida como projeto acadêmico de Análise e Desenvolvimento de Sistemas (ADS).**
+<br> O Zenith foi desenvolvido com o objetivo de reunir acompanhamento de atividades físicas, metas pessoais e recursos sociais em uma única aplicação.
 
-## Estrutura
+## Funcionalidades
 
-- `app/src/main/java/br/com/zenith/data`: cliente Supabase, modelos e lógica de dados.
-- `app/src/main/java/br/com/zenith/service`: serviços Android, como rastreamento de atividade.
-- `app/src/main/java/br/com/zenith/ui`: telas, componentes Compose, animações e tema.
-- `app/src/main/java/br/com/zenith/viewmodels`: estado e regras de cada fluxo.
-- `app/src/main/res`: imagens, fontes, drawables e strings.
-- `supabase/migrations`: baseline SQL do schema usado pelas features atuais.
+* Registro e acompanhamento de atividades físicas.
+* Metas pessoais e acompanhamento de progresso.
+* Perfil de usuário e estatísticas.
+* Comparação de atividades com amigos.
+* Desafios, conquistas e gamificação.
+* Feed para compartilhamento de atividades e conquistas.
 
-## Configuração local
+## Tecnologias
 
-1. Crie `local.properties` com `MAPS_API_KEY=...`.
-2. Revise `app/src/main/assets/properties.env` com `SUPABASE_URL` e `ANON_KEY`.
-3. Abra o projeto no Android Studio ou use Gradle pelo terminal.
+* **Android:** Kotlin, Jetpack Compose e Material 3.
+* **Backend:** Supabase.
+* **Integrações:** Google Maps, Health Connect
+* **Interface web:** React, TypeScript e Vite.
 
-## Comandos úteis
+## Demonstração
 
-```bash
-./gradlew :app:compileDebugKotlin
-./gradlew build
-./gradlew test
-./gradlew installDebug
-```
+As imagens abaixo apresentam algumas das interfaces e funcionalidades desenvolvidas para o projeto.
 
-## Convenções
+<img width="800" height="560" alt="Frame 1" src="https://github.com/user-attachments/assets/a10f4b0d-a731-4329-858d-f97de7499eea" />
+<img width="800" height="560" alt="Frame 2" src="https://github.com/user-attachments/assets/5d6f966e-28f2-4a2a-819d-0f1402e80688" />
+<img width="800" height="560" alt="Frame 3" src="https://github.com/user-attachments/assets/2929e47f-8cbc-434c-9822-515460ca020c" />
+<img width="800" height="560" alt="Frame 4" src="https://github.com/user-attachments/assets/a1119535-d388-4b01-86e5-4d1d8b2592d3" />
+<img width="800" height="560" alt="Frame 5" src="https://github.com/user-attachments/assets/f46dc6b7-8268-4dba-aeb1-d16ab8f0882b" />
+<img width="800" height="560" alt="Frame 6" src="https://github.com/user-attachments/assets/b3feb7c2-3aa3-4e69-835e-6192602730f0" />
 
-- Use Kotlin com indentação de 4 espaços.
-- Composables usam `PascalCase` e terminam com `Screen`, `Components` ou nome descritivo.
-- ViewModels terminam com `ViewModel`.
-- Modelos ficam em `data/models` e representam tabelas/respostas do Supabase.
-- Evite comentários óbvios, logs de debug permanentes e abstrações sem uso claro.
+## Status do projeto
 
-## Migrations
+**Descontinuado.** O desenvolvimento foi encerrado e o repositório é mantido como registro do projeto acadêmico e das soluções implementadas durante seu desenvolvimento.
 
-O projeto usa uma baseline única: `20260608000000_baseline_challenge_features.sql`.
+### Agradecimentos
 
-Para produção, nao apague migrations já aplicadas sem alinhar o histórico remoto. Se o banco já recebeu as migrations antigas, marque a baseline como aplicada apenas depois de validar o schema atual em staging.
+Aos membros do grupo, Jônatas que auxiliou na modelagem de dados, Angelo que auxiliou na construção da identidade visual, Nyls que auxiliou na documentação.
+
+---
+
+Projeto acadêmico desenvolvido em equipe como parte do curso de Análise e Desenvolvimento de Sistemas.
